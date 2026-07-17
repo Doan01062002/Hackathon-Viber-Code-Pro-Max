@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { SectionCard } from "@/features/rail-ui/components/Primitives";
 import { apiClient } from "@/lib/api/client";
 import { alerts as mockAlerts } from "@/features/rail-ui/mockData";
@@ -27,6 +28,7 @@ function severityClass(value: string) {
 }
 
 export function AlertsScreen() {
+  const router = useRouter();
   const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
   const [filterType, setFilterType] = useState<"all" | "bottleneck" | "empty">("all");
   const [loading, setLoading] = useState(true);
@@ -121,7 +123,24 @@ export function AlertsScreen() {
                 <strong>{item.title}</strong>
                 <p>{item.detail}</p>
               </div>
-              <button className="btn btn-ghost" type="button" onClick={() => window.alert(`Chi tiết cảnh báo: ${item.title}`)}>
+              <button 
+                className="btn btn-ghost" 
+                type="button" 
+                onClick={() => {
+                  const routeMatch = item.title.match(/(?:Chặng|Đoạn)\s+([A-Z0-9]+)\s*→\s*([A-Z0-9]+)/i);
+                  const seatMatch = item.title.match(/\(([^)]+)\)/);
+                  
+                  const origin = routeMatch ? routeMatch[1].trim() : "HAN";
+                  const destination = routeMatch ? routeMatch[2].trim() : "DAN";
+                  
+                  let seatType = "giuong_nam_k6";
+                  if (seatMatch && seatMatch[1].includes("Ngồi mềm")) {
+                    seatType = "ngoi_mem";
+                  }
+                  
+                  router.push(`/quote?origin=${origin}&destination=${destination}&seatType=${seatType}&date=2024-01-01`);
+                }}
+              >
                 Xem chi tiết
               </button>
             </article>
