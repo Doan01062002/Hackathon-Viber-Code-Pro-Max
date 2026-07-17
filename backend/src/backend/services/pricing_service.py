@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.views.pricing_view import PricingQuoteResponse, PricingExplanation
 
 class PricingService:
-    def create_pricing_quote(self, od_product_id: int, db: Session) -> PricingQuoteResponse:
+    def create_pricing_quote(self, od_product_id: int, db: Session, run_version: Optional[str] = None) -> PricingQuoteResponse:
         # 1. Lấy thông tin cơ bản của sản phẩm OD
         product_row = db.execute(
             text("SELECT base_price, seat_type, trip_id FROM od_products WHERE id = :od_product_id"),
@@ -103,10 +103,10 @@ class PricingService:
         insert_query = text("""
             INSERT INTO price_quotes (
                 od_product_id, policy_id, opportunity_cost, proposed_price, final_price, 
-                decision, explanation, expires_at
+                decision, explanation, expires_at, run_version
             ) VALUES (
                 :od_product_id, :policy_id, :opportunity_cost, :proposed_price, :final_price,
-                'accepted', :explanation, CURRENT_TIMESTAMP + INTERVAL '15 minutes'
+                'accepted', :explanation, CURRENT_TIMESTAMP + INTERVAL '15 minutes', :run_version
             ) RETURNING id, expires_at
         """)
 
@@ -116,7 +116,8 @@ class PricingService:
             "opportunity_cost": opportunity_cost,
             "proposed_price": proposed_price,
             "final_price": final_price,
-            "explanation": json.dumps(explanation_data)
+            "explanation": json.dumps(explanation_data),
+            "run_version": run_version
         }).fetchone()
 
         quote_id, expires_at_val = insert_result
