@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MetricGrid, SectionCard } from "@/features/rail-ui/components/Primitives";
 import { buildCurveChart, useForecast } from "@/features/forecast";
 import { buildSegmentHeatmap, useSegmentsLoad } from "@/features/segments";
@@ -9,6 +10,8 @@ import {
   odMatrix,
   rightRailCards,
 } from "@/features/rail-ui/mockData";
+import { seatApi } from "@/features/rail-ui/api/seatApi";
+import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
 
 const DEFAULT_TRIP_ID = 1;
 
@@ -57,8 +60,24 @@ function buildMockPolyline(values: number[], max: number) {
 }
 
 export function DashboardScreen() {
+  const router = useRouter();
   const forecast = useForecast(DEFAULT_TRIP_ID);
   const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
+  const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(gapSuggestions);
+
+  useEffect(() => {
+    async function loadGaps() {
+      try {
+        const data = await seatApi.getGapSuggestions(DEFAULT_TRIP_ID);
+        if (data && data.length > 0) {
+          setSuggestions(data);
+        }
+      } catch (err) {
+        console.warn("Không tải được gợi ý khoảng trống, dùng mock:", err);
+      }
+    }
+    loadGaps();
+  }, []);
 
   const legs = useMemo(() => segments.data?.legs ?? [], [segments.data?.legs]);
   const heatmap = useMemo(
@@ -490,8 +509,8 @@ export function DashboardScreen() {
           subtitle="Các hành động có thể triển khai ngay để tận dụng tồn kho đang bị bỏ phí."
         >
           <div className="action-list">
-            {gapSuggestions.map((item) => (
-              <article className="action-item" key={item.route}>
+            {suggestions.map((item) => (
+              <article className="action-item" key={`${item.route}-${item.seatType}`}>
                 <div>
                   <strong>{item.route}</strong>
                   <p>{item.reason}</p>
@@ -501,7 +520,15 @@ export function DashboardScreen() {
                   <span>{item.benefit}</span>
                   <span className={`priority-text ${severityClass(item.priority)}`}>{item.priority}</span>
                 </div>
-                <button className="btn btn-ghost" type="button">
+                <button 
+                  className="btn btn-ghost" 
+                  type="button"
+                  onClick={() => {
+                    const match = item.reason.match(/toa\s+([A-Za-z0-9]+)/i);
+                    const coachNo = match ? match[1].trim() : "01";
+                    router.push(`/train-layout?coach=${coachNo}`);
+                  }}
+                >
                   Xem chi tiết
                 </button>
               </article>

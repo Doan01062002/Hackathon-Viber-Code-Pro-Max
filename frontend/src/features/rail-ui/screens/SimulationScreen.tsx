@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import { SectionCard } from "@/features/rail-ui/components/Primitives";
 import { apiClient } from "@/lib/api/client";
 import { scenarioChart as mockChart, simulationSummary as mockSummary, simulationTable as mockTable } from "@/features/rail-ui/mockData";
+import { policyApi } from "@/features/policy/api/policyApi";
+import type { PolicyDto } from "@/features/policy/api/policyApi";
+import { optimizeApi } from "@/features/optimize/api/optimizeApi";
+import type { OptimizeVersionDto } from "@/features/optimize/api/optimizeApi";
 
 interface SimulationCompareData {
   trip_id: number;
@@ -19,6 +23,92 @@ export function SimulationScreen() {
   const [simData, setSimData] = useState<SimulationCompareData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // States cho quản lý Policy Limits
+  const [showPolicyPanel, setShowPolicyPanel] = useState(false);
+  const [policies, setPolicies] = useState<PolicyDto[]>([]);
+  const [fetchingPolicies, setFetchingPolicies] = useState(false);
+  const [selectedPolicy, setSelectedPolicy] = useState<PolicyDto | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    name: string;
+    min_price: number;
+    max_price: number;
+    max_step_change: number;
+    status: string;
+  } | null>(null);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [policyMessage, setPolicyMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // States cho quản lý Rollback
+  const [showRollbackPanel, setShowRollbackPanel] = useState(false);
+  const [versions, setVersions] = useState<OptimizeVersionDto[]>([]);
+  const [fetchingVersions, setFetchingVersions] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+  const [rollbackMessage, setRollbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  async function loadPolicies() {
+    try {
+      setFetchingPolicies(true);
+      const data = await policyApi.getPolicies();
+      setPolicies(data);
+    } catch (err) {
+      console.error("Lỗi tải chính sách:", err);
+    } finally {
+      setFetchingPolicies(false);
+    }
+  }
+
+  useEffect(() => {
+    if (showPolicyPanel) {
+      loadPolicies();
+    }
+  }, [showPolicyPanel]);
+
+  async function loadVersions() {
+    try {
+      setFetchingVersions(true);
+      const data = await optimizeApi.getVersions(1);
+      setVersions(data);
+    } catch (err) {
+      console.error("Lỗi tải lịch sử phiên bản:", err);
+    } finally {
+      setFetchingVersions(false);
+    }
+  }
+
+  useEffect(() => {
+    if (showRollbackPanel) {
+      loadVersions();
+    }
+  }, [showRollbackPanel]);
+
+  async function handleRollback(version: string) {
+    try {
+      setRollingBack(true);
+      setRollbackMessage(null);
+      await optimizeApi.rollbackVersion(1, version);
+      setRollbackMessage({ text: `Đã khôi phục thành công về phiên bản ${version}!`, type: "success" });
+      loadVersions();
+      runSimulation();
+    } catch (err: any) {
+      setRollbackMessage({
+        text: err instanceof Error ? err.message : "Khôi phục phiên bản thất bại.",
+        type: "error"
+      });
+    } finally {
+      setRollingBack(false);
+    }
+  }
+
+  const formatDateTime = (isoString: string | null) => {
+    if (!isoString) return "N/A";
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleString("vi-VN");
+    } catch {
+      return isoString;
+    }
+  };
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
@@ -202,11 +292,339 @@ export function SimulationScreen() {
           <button className="btn btn-ghost" type="button">
             Ghi đè thủ công
           </button>
-          <button className="btn btn-ghost" type="button">
-            Cập nhật giới hạn chính sách
+          <button 
+            className="btn btn-ghost" 
+            type="button" 
+            onClick={() => {
+              setShowPolicyPanel((val) => !val);
+              setShowRollbackPanel(false);
+            }}
+          >
+            {showPolicyPanel ? "Ẩn giới hạn chính sách" : "Cập nhật giới hạn chính sách"}
+          </button>
+          <button 
+            className="btn btn-ghost" 
+            type="button" 
+            onClick={() => {
+              setShowRollbackPanel((val) => !val);
+              setShowPolicyPanel(false);
+            }}
+          >
+            {showRollbackPanel ? "Ẩn lịch sử phiên bản" : "Khôi phục phiên bản"}
           </button>
         </div>
       </SectionCard>
+
+      {showPolicyPanel && (
+        <SectionCard
+          title="Quản lý giới hạn chính sách (Policy Limits)"
+          subtitle="Điều chỉnh giá trần, giá sàn và biên độ thay đổi tối đa của từng phân khúc sản phẩm."
+          actions={
+            <button className="btn btn-ghost" type="button" onClick={() => setShowPolicyPanel(false)}>
+              Đóng panel
+            </button>
+          }
+        >
+          {policyMessage && (
+            <div 
+              style={{
+                backgroundColor: policyMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
+                borderLeft: `4px solid ${policyMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
+                padding: "12px 16px",
+                borderRadius: "8px",
+                color: policyMessage.type === "success" ? "var(--success)" : "var(--danger)",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px"
+              }}
+            >
+              {policyMessage.type === "success" ? "✅" : "⚠️"} {policyMessage.text}
+            </div>
+          )}
+
+          {fetchingPolicies ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải dữ liệu chính sách...</p>
+          ) : (
+            <div className="table-wrap" style={{ marginBottom: "24px" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Tên chính sách</th>
+                    <th>Giá sàn (Min)</th>
+                    <th>Giá trần (Max)</th>
+                    <th>Δ Max Step</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {policies.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.id}</td>
+                      <td><strong>{p.name}</strong></td>
+                      <td>{formatVND(p.min_price)}</td>
+                      <td>{formatVND(p.max_price)}</td>
+                      <td>{formatVND(p.max_step_change)}</td>
+                      <td>
+                        <span 
+                          style={{ 
+                            display: "inline-block", 
+                            padding: "4px 10px", 
+                            borderRadius: "6px", 
+                            backgroundColor: p.status === "active" ? "rgba(60, 154, 117, 0.12)" : p.status === "draft" ? "rgba(200, 132, 48, 0.12)" : "rgba(142, 144, 165, 0.12)", 
+                            color: p.status === "active" ? "var(--success)" : p.status === "draft" ? "var(--warning)" : "var(--muted)", 
+                            fontSize: "12px",
+                            fontWeight: 600
+                          }}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          onClick={() => {
+                            setSelectedPolicy(p);
+                            setEditFormData({
+                              name: p.name,
+                              min_price: p.min_price,
+                              max_price: p.max_price,
+                              max_step_change: p.max_step_change,
+                              status: p.status,
+                            });
+                            setPolicyMessage(null);
+                          }}
+                        >
+                          Sửa
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {policies.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
+                        Không tìm thấy chính sách nào trong cơ sở dữ liệu.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {editFormData && selectedPolicy && (
+            <div 
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                padding: "24px",
+                backgroundColor: "var(--surface-soft)",
+                marginTop: "20px"
+              }}
+            >
+              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "16px", color: "var(--text)" }}>
+                Cập nhật chính sách: {selectedPolicy.name} (ID: {selectedPolicy.id})
+              </h3>
+              <div 
+                className="form-grid" 
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: "16px",
+                  marginBottom: "20px"
+                }}
+              >
+                <label className="field">
+                  <span>Tên chính sách</span>
+                  <input
+                    className="input"
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  <span>Giá tối thiểu (Sàn)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    value={editFormData.min_price}
+                    onChange={(e) => setEditFormData({ ...editFormData, min_price: parseFloat(e.target.value) || 0 })}
+                  />
+                </label>
+                <label className="field">
+                  <span>Giá tối đa (Trần)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    value={editFormData.max_price}
+                    onChange={(e) => setEditFormData({ ...editFormData, max_price: parseFloat(e.target.value) || 0 })}
+                  />
+                </label>
+                <label className="field">
+                  <span>Biến động bước tối đa</span>
+                  <input
+                    className="input"
+                    type="number"
+                    value={editFormData.max_step_change}
+                    onChange={(e) => setEditFormData({ ...editFormData, max_step_change: parseFloat(e.target.value) || 0 })}
+                  />
+                </label>
+                <label className="field">
+                  <span>Trạng thái</span>
+                  <select
+                    className="input"
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                  >
+                    <option value="draft">draft</option>
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="action-row">
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={savingPolicy}
+                  onClick={async () => {
+                    if (!editFormData.name || !editFormData.name.trim()) {
+                      setPolicyMessage({ text: "Tên chính sách không được để trống.", type: "error" });
+                      return;
+                    }
+                    if (editFormData.min_price > editFormData.max_price) {
+                      setPolicyMessage({ text: "Giá sàn (min_price) không được lớn hơn giá trần (max_price).", type: "error" });
+                      return;
+                    }
+                    try {
+                      setSavingPolicy(true);
+                      await policyApi.updatePolicy(selectedPolicy.id, editFormData);
+                      setPolicyMessage({ text: "Cập nhật giới hạn chính sách thành công!", type: "success" });
+                      setSelectedPolicy(null);
+                      setEditFormData(null);
+                      loadPolicies();
+                    } catch (err: any) {
+                      setPolicyMessage({
+                        text: err instanceof Error ? err.message : "Cập nhật thất bại.",
+                        type: "error",
+                      });
+                    } finally {
+                      setSavingPolicy(false);
+                    }
+                  }}
+                >
+                  {savingPolicy ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => {
+                    setSelectedPolicy(null);
+                    setEditFormData(null);
+                    setPolicyMessage(null);
+                  }}
+                >
+                  Hủy bỏ
+                </button>
+              </div>
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {showRollbackPanel && (
+        <SectionCard
+          title="Lịch sử tối ưu hóa & Khôi phục phiên bản (Rollback)"
+          subtitle="Danh sách các phiên bản giải tối ưu hóa trước đây của chuyến tàu. Cho phép khôi phục lại cấu hình giá cơ hội và hạn ngạch ghế."
+          actions={
+            <button className="btn btn-ghost" type="button" onClick={() => setShowRollbackPanel(false)}>
+              Đóng panel
+            </button>
+          }
+        >
+          {rollbackMessage && (
+            <div 
+              style={{
+                backgroundColor: rollbackMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
+                borderLeft: `4px solid ${rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
+                padding: "12px 16px",
+                borderRadius: "8px",
+                color: rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px"
+              }}
+            >
+              {rollbackMessage.type === "success" ? "✅" : "⚠️"} {rollbackMessage.text}
+            </div>
+          )}
+
+          {fetchingVersions ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải lịch sử phiên bản...</p>
+          ) : (
+            <div className="table-wrap" style={{ marginBottom: "24px" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Phiên Bản</th>
+                    <th>Thời Điểm Tính Toán</th>
+                    <th>Trạng Thái</th>
+                    <th>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.map((v) => (
+                    <tr key={v.run_version}>
+                      <td><strong>{v.run_version}</strong></td>
+                      <td>{formatDateTime(v.calculated_at)}</td>
+                      <td>
+                        <span 
+                          style={{ 
+                            display: "inline-block", 
+                            padding: "4px 10px", 
+                            borderRadius: "6px", 
+                            backgroundColor: v.is_active ? "rgba(60, 154, 117, 0.12)" : "rgba(142, 144, 165, 0.12)", 
+                            color: v.is_active ? "var(--success)" : "var(--muted)", 
+                            fontSize: "12px",
+                            fontWeight: 600
+                          }}
+                        >
+                          {v.is_active ? "Đang áp dụng" : "Không hoạt động"}
+                        </span>
+                      </td>
+                      <td>
+                        {v.is_active ? (
+                          <span style={{ color: "var(--muted)", fontSize: "14px" }}>Hiện tại</span>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            style={{ minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
+                            type="button"
+                            disabled={rollingBack}
+                            onClick={() => handleRollback(v.run_version)}
+                          >
+                            {rollingBack ? "Đang khôi phục..." : "Khôi phục"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {versions.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
+                        Không tìm thấy lịch sử phiên bản nào cho chuyến tàu này.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionCard>
+      )}
     </div>
   );
 }

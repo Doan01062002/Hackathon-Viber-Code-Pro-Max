@@ -267,7 +267,7 @@ class PricingService:
                 WHERE t.service_date = :service_date
                   AND odp.seat_type = :seat_type
                   AND odp.is_active = TRUE
-                  AND (:trip_id IS NULL OR t.id = :trip_id)
+                  AND (CAST(:trip_id AS INTEGER) IS NULL OR t.id = :trip_id)
                   AND (LOWER(origin.code) = LOWER(:origin) OR LOWER(origin.name) = LOWER(:origin))
                   AND (
                       LOWER(destination.code) = LOWER(:destination)
