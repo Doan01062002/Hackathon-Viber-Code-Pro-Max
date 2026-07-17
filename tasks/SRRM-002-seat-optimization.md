@@ -1,7 +1,7 @@
 # Task — SRRM-002: Xây dựng Bộ tối ưu DLP & Gán ghế vật lý
 
 ## 1. Mục tiêu
-Phát triển lõi tối ưu hóa phân bổ chỗ ngồi sử dụng Quy hoạch tuyến tính tất định (DLP) nhằm tối đa hóa doanh thu toàn chuyến. Đồng thời xây dựng thuật toán gán số ghế vật lý giảm phân mảnh tồn kho chặng nhỏ và hỗ trợ ghép các đoạn trống.
+Phát triển lõi tối ưu hóa phân bổ chỗ ngồi sử dụng Quy hoạch tuyến tính tất định (DLP) dựa trên cơ sở dữ liệu PostgreSQL. Đồng thời xây dựng thuật toán gán số ghế vật lý giảm phân mảnh tồn kho và ghi nhận các phương án ghép khoảng trống ghế.
 
 ---
 
@@ -12,27 +12,34 @@ Phát triển lõi tối ưu hóa phân bổ chỗ ngồi sử dụng Quy hoạc
 * **Mô hình toán:**
   * *Hàm mục tiêu:* $\max \sum_{j} f_j \cdot x_j$ (với $f_j$ là giá vé luồng $j$, $x_j$ là biến số lượng vé bán).
   * *Ràng buộc sức chứa chặng:* $\sum_{j} a_{\ell j} \cdot x_j \le c_\ell \quad \forall \ell$
-  * *Ràng buộc nhu cầu:* $0 \le x_j \le \hat{D}_j$ (với $\hat{D}_j$ là nhu cầu dự báo từ Task SRRM-001).
-* **Xuất Bid Price:** Sau khi bộ giải (HiGHS hoặc GLOP qua OR-Tools) giải xong bài toán tuyến tính, ta lấy giá trị đối ngẫu (dual variables) tương ứng với các ràng buộc sức chứa chặng. Giá trị này chính là **Bid Price ($\pi_\ell$)** của chặng $\ell$.
+    * Sức chứa chặng $c_\ell$ được lấy từ bảng `segment_capacities.capacity`.
+    * Ma trận hệ số chặng-OD $a_{\ell j}$ được đọc trực tiếp từ bảng liên kết `od_product_segments`.
+  * *Ràng buộc nhu cầu:* $0 \le x_j \le \hat{D}_j$ (với $\hat{D}_j$ là nhu cầu dự báo từ bảng `demand_forecasts.demand_point`).
+* **Xuất Bid Price & Quotas:**
+  * Giá trị đối ngẫu thu được từ các ràng buộc sức chứa là **Bid Price ($\pi_\ell$)** của chặng $\ell$.
+  * Số lượng vé tối ưu $x_j$ chính là hạn ngạch chỗ (**Quota**) của sản phẩm OD $j$.
+* **Lưu kết quả (Transaction Swap):**
+  * Ghi kết quả mới vào `bid_prices` và `quotas` kèm theo mã phiên `run_version` với `is_active = FALSE`.
+  * Mở một transaction, cập nhật toàn bộ các bản ghi của phiên cũ thành `is_active = FALSE`, cập nhật phiên mới thành `is_active = TRUE` (được bảo vệ bởi partial unique index `ux_bid_prices_active` và `ux_quotas_active`), sau đó commit.
 
-### 2.2. Thuật toán Gán ghế Vật lý (Interval Partitioning)
-* **Vấn đề:** Khi hành khách đặt vé chặng ngắn, hệ thống phải chỉ định một số ghế vật lý cụ thể (ví dụ: Toa 2 Ghế 15) sao cho không chồng chéo hành trình với khách khác trên cùng ghế đó, đồng thời không chiếm chỗ của khách đi chặng dài tương lai.
-* **Thuật toán:**
-  * Sắp xếp các yêu cầu đặt vé theo thứ tự ga đi tăng dần.
-  * Với mỗi yêu cầu, duyệt tìm ghế vật lý đầu tiên đang trống trên toàn bộ các chặng thuộc hành trình của yêu cầu đó (Best-Fit hoặc First-Fit trên khoảng ga).
-  * Nếu không tìm thấy ghế trống liền mạch, hệ thống sẽ đề xuất đổi ghế giữa chặng (nếu được cấu hình cho phép) hoặc từ chối đặt vé nếu vượt quá sức chứa chặng của DLP.
+### 2.2. Thuật toán Gán ghế Vật lý & Ghép chặng trống
+* **Gán ghế vật lý:** Khi khách mua vé thành công, chạy thuật toán gán ghế thực tế tại bảng `seats` để liên kết `bookings.seat_id`, đảm bảo không chồng lấn chặng (`od_product_segments`) với các khách hàng khác trên cùng ghế đó.
+* **Ghép chặng trống (Gap Combinations):**
+  * Chạy tiến trình quét tìm các khoảng trống ghế vật lý của từng ghế trong chuyến tàu.
+  * Nếu phát hiện ghế có khoảng trống giữa hai ga (không chồng lấn với booking nào khác), ghi gợi ý bán vé chặng ngắn bù vào bảng `gap_combinations` kèm `suggested_od_product_id` để tối ưu hóa việc lấp đầy.
 
 ---
 
 ## 3. Các thành phần mã nguồn liên quan
-* `ai/src/ai/nodes/optimization.py` [NEW]: Node chạy tối ưu hóa trong LangGraph.
-* `ai/src/ai/tools/dlp_solver.py` [NEW]: Thư viện gọi OR-Tools giải DLP và xuất bid price.
-* `ai/src/ai/tools/seat_allocator.py` [NEW]: Cài đặt thuật toán gán ghế vật lý (Interval Partitioning).
-* `ai/tests/test_optimization.py` [NEW]: Test độ chính xác của bộ giải DLP và bộ gán ghế.
+* `ai/src/ai/nodes/optimization.py` [MODIFY]: Node tối ưu trong LangGraph.
+* `ai/src/ai/tools/dlp_solver.py` [MODIFY]: Thư viện gọi OR-Tools giải DLP và xuất bid price.
+* `backend/src/backend/services/optimize_service.py` [NEW]: Lớp service điều phối transaction lưu trữ kết quả và swap trạng thái `is_active`.
+* `ai/tests/test_optimization.py` [MODIFY]: Test bộ giải DLP và bộ gán ghế.
 
 ---
 
 ## 4. Tiêu chí Chấp nhận (Acceptance Criteria)
-* **AC1:** Bộ giải DLP tính toán ra kết quả phân bổ hạn ngạch tối ưu và xuất ra danh sách Bid Price tương ứng cho mỗi chặng.
-* **AC2:** Thuật toán gán ghế vật lý hoạt động chính xác $100\%$ không xảy ra chồng lấn ghế (cùng một ghế vật lý bị gán cho 2 hành khách đi chung một chặng).
-* **AC3:** Thời gian chạy toàn bộ luồng DLP và gán ghế cho 1 đoàn tàu 10 toa (khoảng 600 ghế) không vượt quá 1 giây trên môi trường kiểm thử.
+* **AC1:** Bộ giải DLP tính toán chính xác và xuất ra danh sách Bid Price cùng Quotas.
+* **AC2:** Quy trình swap phiên hoạt động `is_active = TRUE` trong transaction chạy an toàn, rollback toàn bộ nếu có bất kỳ lỗi ghi DB nào xảy ra.
+* **AC3:** Thuật toán gán ghế vật lý hoạt động chính xác $100\%$ không xảy ra chồng lấn ghế vật lý trên các chặng giao nhau.
+* **AC4:** Các cơ hội lấp chỗ trống được quét đầy đủ và lưu chính xác vào bảng `gap_combinations`.

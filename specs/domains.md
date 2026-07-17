@@ -1,77 +1,77 @@
 # Specs — Phân tích Miền Nghiệp vụ (Domains)
 
-Hệ thống **Smart Rail Revenue Management (SRRM)** được chia thành 4 miền nghiệp vụ chính. Tài liệu này đặc tả thuật ngữ, thực thể dữ liệu và mô hình thuật toán tương ứng cho từng miền.
+Hệ thống **Smart Rail Revenue Management (SRRM)** được xây dựng xung quanh thiết kế cơ sở dữ liệu PostgreSQL gồm 21 bảng. Tài liệu này đặc tả chi tiết thuật ngữ nghiệp vụ và cách ánh xạ sang mô hình dữ liệu thực tế.
 
 ---
 
-## 1. Các Thực thể & Thuật ngữ Chung
+## 1. Mô hình hóa Chặng và Luồng đi lại (Topology & OD Matrix)
 
-* **Ga (Station):** Các điểm dừng đỗ của tàu dọc hành trình. Ký hiệu danh sách ga là $S_1, S_2, ..., S_N$.
-* **Chặng (Leg - $\ell$):** Đoạn đường nối giữa hai ga dừng liên tiếp của tàu. Một hành trình tàu có $N$ ga sẽ có $N-1$ chặng.
-* **Luồng OD (Origin - Destination):** Cặp ga đi ($O$) và ga đến ($D$) cụ thể của hành khách. Một luồng OD $j$ sẽ đi qua một tập hợp các chặng liên tiếp.
-* **Ma trận Chặng-OD ($a_{\ell j}$):** Nhận giá trị $1$ nếu luồng OD $j$ đi qua chặng $\ell$, ngược lại nhận giá trị $0$.
-* **Bid Price ($\pi_\ell$):** Chi phí cơ hội của một chỗ ngồi trên chặng $\ell$. Nó thể hiện doanh thu kỳ vọng lớn nhất bị mất đi nếu ta bán một chỗ trên chặng $\ell$ cho một yêu cầu vé chặng ngắn giá rẻ khác. Đây là mắt xích liên kết giữa miền Tối ưu hóa chỗ ngồi và miền Định giá động.
+* **Ga (Station):** Lưu tại bảng `stations` (mã ga duy nhất `code`, thứ tự hiển thị `display_order`).
+* **Chuyến tàu theo ngày (Trip):** Lưu tại bảng `trips` (mã tàu `train_id`, ngày chạy `service_date`).
+* **Chặng liên tiếp (Segment - $\ell$):** Lưu tại bảng `segments`. Một hành trình tàu được chia thành các chặng nhỏ nối giữa hai ga dừng liên tiếp (được đánh số thứ tự `sequence_no` tăng dần).
+* **Sản phẩm chặng đi–đến (Origin-Destination Product - $j$):** Lưu tại bảng `od_products`. Định nghĩa các cặp ga lên/xuống, loại chỗ (`seat_type`) và hạng giá (`fare_class`).
+* **Ma trận Chặng-OD ($a_{\ell j}$):** Được materialize (lưu trữ vật lý) tại bảng nối nhiều-nhiều `od_product_segments`. Nếu sản phẩm OD $j$ đi qua chặng $\ell$, một bản ghi tương ứng sẽ được lưu tại đây. Giúp tính toán chi phí cơ hội nhanh chóng mà không cần suy luận lại lộ trình trên mỗi request.
 
 ---
 
 ## 2. Miền 1: Dự báo & Phân tích Nhu cầu (Forecasting & Analytics)
 
-Nhiệm vụ của miền này là ước lượng nhu cầu đi lại tiềm năng của hành khách cho từng luồng OD theo thời gian thực.
+Nhiệm vụ của miền này là ước lượng nhu cầu đặt vé tiềm năng từ phía hành khách.
 
-### Mô hình hóa và thuật toán:
-* **Giải kiểm duyệt nhu cầu (Unconstraining):** 
-  * *Vấn đề:* Dữ liệu bán vé lịch sử chỉ ghi lại số vé **đã bán**, không ghi lại nhu cầu thực tế nếu vé đã bị bán hết sớm hoặc bị chặn bán do chính sách hạn ngạch.
-  * *Thuật toán:* Áp dụng thuật toán **Expectation-Maximization (EM)** hoặc **Double Exponential** để khôi phục phân phối nhu cầu thực tế (latent demand).
-* **Mô hình Dự báo Điểm & Khoảng (Forecasting Model):**
-  * *Phương pháp:* Sử dụng mô hình **Gradient Boosting (LightGBM/XGBoost)** hồi quy Poisson (vì dữ liệu mua vé là dữ liệu đếm) hoặc Negative Binomial để xuất ra phân phối nhu cầu tiềm năng cùng khoảng tin cậy.
-* **Đường cong đặt vé (Booking Curve / Pickup):**
-  * Ước lượng tiến độ đặt vé tích lũy theo số ngày đặt trước (lead time) nhằm dự báo lượng cầu cuối cùng (final demand).
+```
+[search_logs] + [bookings] (Lịch sử) ──> [EM Algorithm] ──> [LightGBM] ──> [demand_forecasts]
+```
+
+### Mô hình hóa và bảng liên quan:
+* **Giải kiểm duyệt nhu cầu (Unconstraining):** Sử dụng thuật toán **Expectation-Maximization (EM)**. Nhu cầu thực tế được khôi phục bằng cách kết hợp số vé bán thành công (`bookings`) và số lượt tìm kiếm thất bại do hết chỗ (`search_logs` với `result = 'sold_out'`).
+* **Đặc trưng lịch:** Bảng `calendar_features` cung cấp thông tin theo ngày (`service_date`): lễ tết (`is_holiday`, `is_tet`), mùa vụ (`season`), thời tiết (`weather`), sự kiện (`local_event`) để làm đặc trưng cho mô hình.
+* **Đầu ra dự báo:** Lưu tại bảng `demand_forecasts`. Dự báo được tính theo phiên (`forecast_at`) và số ngày đặt trước (`lead_days`), chứa cả dự báo điểm (`demand_point`) và các phân vị phân phối (`demand_p10`, `demand_p50`, `demand_p90`).
 
 ---
 
 ## 3. Miền 2: Tối ưu Phân bổ Chỗ ngồi (Inventory Optimization)
 
-Miền này giải bài toán phân phối chỗ ngồi hữu hạn của tàu cho các luồng OD khác nhau nhằm tối đa hóa tổng doanh thu toàn chuyến.
+Nhiệm vụ của miền này là kiểm soát số lượng ghế khả dụng để tối đa hóa doanh thu chặng dài và hạn chế ghế trống cục bộ chặng ngắn.
 
-### Mô hình hóa và thuật toán:
-* **Quy hoạch Tuyến tính Tất định (Deterministic Linear Program - DLP):**
-  * *Hàm mục tiêu:* Tối đa hóa tổng doanh thu mong đợi từ tất cả các luồng OD:
-    $$\max \sum_{j} f_j \cdot x_j$$
-    Trong đó $f_j$ là giá vé của luồng OD $j$, và $x_j$ là số lượng vé đề xuất bán cho luồng $j$.
-  * *Ràng buộc:* Sức chứa của từng chặng $\ell$ không được vượt quá giới hạn $c_\ell$:
-    $$\sum_{j} a_{\ell j} \cdot x_j \le c_\ell \quad \forall \ell$$
-  * *Xuất Bid Price:* Giá trị đối ngẫu (dual values) thu được từ các ràng buộc sức chứa chính là **Bid Price ($\pi_\ell$)** của chặng $\ell$.
-* **Ghép đoạn trống (Gap Combining) & Tách đoạn (Segmenting):**
-  * Phát hiện và ghép các đoạn trống xen kẽ của cùng một ghế vật lý để tạo thành một hành trình dài hơn có giá trị cao.
-* **Gán ghế vật lý giảm phân mảnh (Physical Seat Assignment):**
-  * Sử dụng thuật toán **Interval Partitioning** (Greedy hoặc tối ưu hóa CP-SAT) sắp xếp các booking không chồng lấn lên cùng một ghế vật lý thực tế, giảm thiểu tối đa số lượng ghế bị phân mảnh.
+```
+[segment_capacities] 
+[segment_inventory]   ──> [DLP Optimizer (OR-Tools)] ──> [bid_prices] + [quotas] (run_version)
+[demand_forecasts]
+```
+
+### Mô hình hóa và bảng liên quan:
+* **Quy hoạch Tuyến tính DLP:** Tối đa hóa doanh thu dựa trên sức chứa của `segment_capacities` và nhu cầu từ `demand_forecasts`.
+* **Quản lý Phiên bản (Snapshot Management):** 
+  * Kết quả tối ưu được ghi vào `bid_prices` (chi phí cơ hội của chặng $\pi_\ell$) và `quotas` (hạn ngạch chỗ được phân bổ cho luồng OD) kèm theo mã phiên tính toán `run_version`.
+  * Tránh xung đột ghi dở dang bằng cách lưu phiên mới với `is_active = FALSE`, sau đó thực hiện hoán đổi nguyên tử (`is_active = TRUE`) trong một transaction.
+* **Gán ghế vật lý & Tránh phân mảnh:**
+  * Khách đặt vé được gán ghế thực tế tại bảng `seats`.
+  * Bộ quét chạy batch phát hiện các chặng trống liền kề của cùng một ghế để tạo gợi ý bán vé bù tại bảng `gap_combinations`, giúp tối ưu hóa hệ số lấp đầy.
 
 ---
 
 ## 4. Miền 3: Định giá Động (Dynamic Pricing)
 
-Dựa trên chi phí cơ hội thực tế thu được từ miền tối ưu, miền định giá thực hiện điều chỉnh mức giá vé phù hợp với quan hệ cung cầu tại thời điểm bán.
+Tính toán mức giá bán vé tối ưu cho từng yêu cầu tìm kiếm, bảo đảm các điều kiện trần/sàn pháp lý.
 
-### Mô hình hóa và thuật toán:
-* **Tính toán giá trị cơ sở (Opportunity Cost):**
-  * Giá vốn cơ hội $c_j$ của luồng OD $j$ bằng tổng Bid Price của toàn bộ các chặng mà luồng này đi qua:
-    $$c_j = \sum_{\ell} a_{\ell j} \cdot \pi_\ell$$
-* **Công thức Markup tối ưu:**
-  * *Với cầu co giãn hằng số $\epsilon$ ($\epsilon > 1$):* Áp dụng Markup Nhân:
-    $$p_j^* = \frac{\epsilon}{\epsilon - 1} \cdot c_j$$
-  * *Với cầu dạng mũ $\lambda(p) = \lambda_0 e^{-\alpha p}$:* Áp dụng Markup Cộng:
-    $$p_j^* = c_j + \frac{1}{\alpha}$$
-* **Ràng buộc kiểm soát (Ceiling & Floor Pricing):**
-  * Áp cứng khoảng giá quy định: $p_{\min} \le p_j^* \le p_{\max}$.
-  * Giới hạn bước nhảy biến động giá giữa hai lần cập nhật liên tiếp không vượt quá $\Delta_{\max}$ để bảo vệ trải nghiệm của hành khách.
+```
+[bid_prices] (active) ──> Tính Opportunity Cost ──> Markup tối ưu ──> [price_policies] (Guard) ──> [price_quotes]
+```
+
+### Mô hình hóa và bảng liên quan:
+* **Chi phí cơ hội (Opportunity Cost - $c_j$):** Được tính bằng cách sum các `bid_price` hiện hành (`is_active = TRUE`) của các chặng cấu thành nên lộ trình OD:
+  $$c_j = \sum_{\ell \in \text{od\_product\_segments}} \pi_\ell$$
+* **Policy Guard (Bộ lọc chính sách):** Tra cứu từ bảng `price_policies` để đảm bảo giá vé nằm trong khung `min_price` và `max_price`, đồng thời bước tăng giá so với lịch sử không vượt quá `max_step_change`.
+* **Nhật ký báo giá:** Mỗi lượt báo giá được ghi nhận tại bảng `price_quotes` (lưu proposed price, final price, decision và JSON giải trình `explanation`). Khi khách hàng thanh toán mua vé, booking tại `bookings` sẽ liên kết trực tiếp với báo giá này để chốt giá vé không đổi.
 
 ---
 
-## 5. Miền 4: Mô phỏng & Phê duyệt (Simulation & Auditing)
+## 5. Miền 4: Mô phỏng, Phê duyệt & Kiểm toán (Simulation & Auditing)
 
-Cung cấp khả năng vận hành thử nghiệm trước khi áp dụng thực tế và ghi nhật ký kiểm toán.
+Phục vụ việc chạy thử nghiệm, shadow mode và lưu vết hoạt động can thiệp thủ công.
 
-### Phương pháp vận hành:
-* **Phase 1: Backtesting (Kiểm thử lịch sử):** Mô phỏng lại chính sách AI trên tập dữ liệu lịch sử để so sánh trực quan các chỉ số doanh thu và hệ số sử dụng ghế với thực tế đã bán.
-* **Phase 2: Shadow Mode (Chạy song song):** Nhận luồng yêu cầu vé thực tế từ hệ thống bán vé hiện tại, đưa ra khuyến nghị hạn ngạch và giá vé trên dashboard quản trị để kiểm tra độ ổn định và chính xác mà không tác động tới hệ thống thật.
-* **Phê duyệt thủ công (Manual Override):** Cho phép Revenue Manager điều chỉnh tăng/giảm hạn ngạch hoặc ép một mức giá cụ thể khi có biến động bất thường ngoài phạm vi học của mô hình AI.
+### Mô hình hóa và bảng liên quan:
+* **Shadow Mode:** Hệ thống lấy luồng tìm kiếm thực tế lưu vào `search_logs`, gọi AI tính toán giá vé tối ưu, sau đó lưu báo giá vào `price_quotes` với trạng thái `decision = 'accepted'` hoặc `'blocked'` để Revenue Manager kiểm tra độ ổn định mà không làm thay đổi giá bán thật.
+* **Kiểm toán (Auditing):** 
+  * Toàn bộ thao tác điều chỉnh hạn ngạch thủ công, thay đổi cấu hình toa tàu, hoặc thay đổi chính sách giá trần/sàn của `price_policies` phải được ghi nhận tại bảng `audit_logs`.
+  * Lưu trữ dữ liệu dạng JSONB (`before_data`, `after_data`) để dễ dàng so sánh cấu hình trước và sau khi thay đổi.

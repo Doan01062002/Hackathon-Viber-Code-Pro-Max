@@ -1,71 +1,76 @@
 # Planning — Danh mục Yêu cầu Phát triển (Product Backlog)
 
-Tài liệu này quản lý toàn bộ các hạng mục công việc cần thực hiện để hoàn thiện giải pháp **SRRM**. Các công việc được phân vào 4 Epic lớn tương ứng với 3 Khối logic và phần Nền tảng/Giao diện.
+Tài liệu này quản lý toàn bộ backlog phát triển của dự án **SRRM**, được cập nhật để bổ sung các tác vụ liên quan đến hạ tầng cơ sở dữ liệu PostgreSQL và quản lý giao dịch.
+
+---
+
+## EPIC 0 — Hạ tầng Cơ sở Dữ liệu & Giao dịch (Database)
+
+* **SRRM-D1: Cấu hình PostgreSQL Schema & Triggers**
+  * *Mô tả:* Khởi tạo 21 bảng trong PostgreSQL theo thiết kế [`schema.sql`](file:///c:/Users/vando/OneDrive/Desktop/Hackathon-Viber-Code-Pro-Max/schema.sql). Cấu hình 5 index tường minh và 7 trigger tự động cập nhật trường `updated_at`.
+  * *Độ ưu tiên:* Cao nhất (Blocker cho toàn bộ dự án)
+* **SRRM-D2: Thiết lập Repository Layer & Row-Level Locking**
+  * *Mô tả:* Lập trình SQLAlchemy Repository. Viết logic khóa dòng tồn kho (`SELECT FOR UPDATE` trên bảng `segment_inventory`) theo thứ tự ID tăng dần khi khách đặt vé. Viết worker giải phóng các booking held đã hết hạn (`expires_at`).
+  * *Độ ưu tiên:* Cao nhất
 
 ---
 
 ## EPIC 1 — Khối Dự báo & Phân tích Nhu cầu (Forecasting)
 
-* **SRRM-F1: Thu thập và Tiền xử lý Dữ liệu Lịch sử**
-  * *Mô tả:* Xây dựng pipeline xử lý dữ liệu vé bán, lịch trình tàu, và cơ cấu sơ đồ ghế.
-  * *Độ ưu tiên:* Cao (Blocker cho các task sau)
-* **SRRM-F2: Giải thuật Khôi phục Nhu cầu (Unconstraining - EM Algorithm)**
-  * *Mô tả:* Lập trình thuật toán EM để ước lượng nhu cầu tiềm năng thực tế từ dữ liệu vé bị cắt khi hết chỗ.
+* **SRRM-F1: Pipeline Tiền xử lý dữ liệu từ Database**
+  * *Mô tả:* Đọc dữ liệu lịch sử đặt vé (`bookings`), nhật ký tìm kiếm (`search_logs`), và đặc trưng lịch (`calendar_features`) từ PostgreSQL.
+  * *Độ ưu tiên:* Cao
+* **SRRM-F2: Giải thuật Khôi phục Nhu cầu EM (Expectation-Maximization)**
+  * *Mô tả:* Lập trình thuật toán khôi phục nhu cầu thực tế bằng cách unconstrain số vé bán với số lượt tìm kiếm thất bại (`result = 'sold_out'`).
   * *Độ ưu tiên:* Cao
 * **SRRM-F3: Mô hình Dự báo Nhu cầu OD (LightGBM Regression)**
-  * *Mô tả:* Huấn luyện mô hình dự báo điểm và khoảng nhu cầu cho từng cặp ga đi/đến theo ngày và loại chỗ.
+  * *Mô tả:* Huấn luyện mô hình dự báo và ghi kết quả dự báo điểm/phân vị vào bảng `demand_forecasts`.
   * *Độ ưu tiên:* Cao
-* **SRRM-F4: Phân tích và Trực quan hóa Tải chặng**
-  * *Mô tả:* Xây dựng logic phân tích tải chặng dọc tuyến đường và API xuất dữ liệu Heatmap.
+* **SRRM-F4: Phân tích Tải chặng & Heatmap API**
+  * *Mô tả:* Xây dựng API tổng hợp tải chặng từ việc join `segments` và `segment_inventory` để trả về dữ liệu vẽ Heatmap.
   * *Độ ưu tiên:* Trung bình
 
 ---
 
 ## EPIC 2 — Khối Tối ưu Phân bổ Chỗ (Inventory Optimization)
 
-* **SRRM-O1: Xây dựng Lõi tối ưu Tuyến tính DLP (Deterministic Linear Program)**
-  * *Mô tả:* Sử dụng Google OR-Tools thiết lập mô hình quy hoạch tuyến tính phân bổ quota chỗ và xuất Bid Price đối ngẫu cho từng chặng.
+* **SRRM-O1: Xây dựng Lõi tối ưu Tuyến tính DLP (OR-Tools)**
+  * *Mô tả:* Giải bài toán quy hoạch tuyến tính tối đa hóa doanh thu từ ma trận `od_product_segments` và `segment_capacities`.
   * *Độ ưu tiên:* Cao
-* **SRRM-O2: Thuật toán Gán ghế Vật lý (Interval Partitioning)**
-  * *Mô tả:* Thiết lập thuật toán greedy/tối ưu xếp chồng booking không giao nhau để giảm phân mảnh ghế vật lý.
+* **SRRM-O2: Hoán đổi Phiên bản Tối ưu nguyên tử (Atomic Swap)**
+  * *Mô tả:* Viết logic transaction ghi kết quả bid price đối ngẫu vào `bid_prices` và quotas vào `quotas` dưới dạng `run_version` mới, sau đó swap cờ `is_active = TRUE` một cách nguyên tử.
   * *Độ ưu tiên:* Cao
-* **SRRM-O3: Ghép chặng trống (Gap Combining)**
-  * *Mô tả:* Phát hiện các chặng trống liền kề của cùng một ghế vật lý và xuất phương án ghép vé chặng ngắn.
+* **SRRM-O3: Thuật toán Gán ghế Vật lý (Interval Partitioning)**
+  * *Mô tả:* Sắp xếp và gán mã ghế vật lý `seat_id` vào `bookings` khi giao dịch được xác nhận.
+  * *Độ ưu tiên:* Cao
+* **SRRM-O4: Phát hiện Khoảng trống Ghế (Gap Combinations Cache)**
+  * *Mô tả:* Quét tìm các khoảng trống ghế vật lý dọc chặng và ghi gợi ý bán vé chặng ngắn bù vào bảng `gap_combinations` phục vụ tra cứu nhanh khi hết chỗ.
   * *Độ ưu tiên:* Trung bình
-* **SRRM-O4: Cơ chế Giải phóng & Tái phân bổ Quota cận ngày**
-  * *Mô tả:* Tự động nhả hạn ngạch chặng dài chưa bán được để chuyển sang chặng ngắn khi cận giờ tàu chạy.
-  * *Độ ưu tiên:* Thấp
 
 ---
 
 ## EPIC 3 — Khối Định giá Động (Dynamic Pricing)
 
-* **SRRM-P1: Công thức tính Giá động dựa trên Bid Price**
-  * *Mô tả:* Cài đặt thuật toán tính toán giá vé tối ưu bằng cách cộng/nhân hệ số markup trên tổng bid price các chặng đi qua.
+* **SRRM-P1: Công thức tính Giá động từ Bid Price**
+  * *Mô tả:* Tính toán chi phí cơ hội của lộ trình bằng cách sum các `bid_price` hoạt động của các chặng cấu thành. Áp dụng hệ số markup.
   * *Độ ưu tiên:* Cao
-* **SRRM-P2: Áp đặt Ràng buộc Trần/Sàn & Biến động tối đa ($\Delta_{\max}$)**
-  * *Mô tả:* Lớp lọc bảo vệ ép giá vé nằm trong khung quy định và hạn chế tăng/giảm sốc giữa các lần cập nhật.
+* **SRRM-P2: Áp đặt Policy Guard**
+  * *Mô tả:* Đọc chính sách từ `price_policies` và ép giá đề xuất nằm trong khoảng trần/sàn và giới hạn bước nhảy giá. Ghi nhật ký vào `price_quotes`.
   * *Độ ưu tiên:* Cao
-* **SRRM-P3: Cơ chế Giải thích Đề xuất Giá (Explainable Pricing)**
-  * *Mô tả:* Sinh chuỗi diễn giải lý do tăng/giảm giá vé dựa trên mức độ khan hiếm chặng cho Revenue Manager.
+* **SRRM-P3: Cơ chế Giải thích Đề xuất Giá**
+  * *Mô tả:* Sinh JSON giải trình lý do tính giá lưu vào trường `price_quotes.explanation`.
   * *Độ ưu tiên:* Trung bình
-* **SRRM-P4: Điều tiết Cầu chéo giữa các Tàu**
-  * *Mô tả:* Gợi ý giảm giá giờ thấp điểm hoặc tăng giá giờ cao điểm của các tàu chạy gần khung giờ để cân bằng tải.
-  * *Độ ưu tiên:* Thấp
 
 ---
 
 ## EPIC 4 — Tích hợp & Giao diện (Platform & UI)
 
-* **SRRM-I1: Xây dựng Dashboard Quản trị Doanh thu (Next.js)**
-  * *Mô tả:* Thiết kế giao diện theo dõi heatmap tải chặng, ma trận nhu cầu OD và biểu đồ đặt vé.
+* **SRRM-I1: Dashboard Quản trị Doanh thu**
+  * *Mô tả:* UI hiển thị Heatmap tải chặng, ma trận nhu cầu và các cơ hội lấp khoảng trống từ `gap_combinations`.
   * *Độ ưu tiên:* Cao
-* **SRRM-I2: Giao diện Mô phỏng Chính sách (Simulation & Backtest UI)**
-  * *Mô tả:* Màn hình cho phép điều chỉnh tham số tối ưu, chạy mô phỏng trên dữ liệu lịch sử và xuất biểu đồ so sánh doanh thu.
+* **SRRM-I2: Workspace Mô phỏng & So sánh chính sách**
+  * *Mô tả:* Giao diện so sánh doanh thu chính sách giá mới cấu hình tại `price_policies` so với doanh thu lịch sử đã lưu tại `bookings`.
   * *Độ ưu tiên:* Cao
-* **SRRM-I3: API Gateway & Định tuyến LangGraph Agent**
-  * *Mô tả:* Phát triển các REST API trên FastAPI và cấu hình LangGraph agent để tiếp nhận yêu cầu tự nhiên từ chatbot.
-  * *Độ ưu tiên:* Cao
-* **SRRM-I4: Ghi log Kiểm toán & Phân quyền RBAC**
-  * *Mô tả:* Lưu vết hoạt động điều chỉnh của Revenue Manager và bảo mật phân quyền truy cập.
+* **SRRM-I3: Nhật ký Kiểm toán (Audit Logs)**
+  * *Mô tả:* Lưu vết toàn bộ hoạt động điều chỉnh của Revenue Manager vào bảng `audit_logs` để bảo đảm tính an toàn vận hành.
   * *Độ ưu tiên:* Trung bình

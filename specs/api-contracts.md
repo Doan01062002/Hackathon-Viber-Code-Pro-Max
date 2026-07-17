@@ -1,12 +1,12 @@
 # Specs — Thiết kế Hợp đồng API & Giao diện Module (API Contracts)
 
-Hệ thống **SRRM** được phát triển theo cấu trúc Monorepo phân ranh giới rõ ràng. Dưới đây là đặc tả các giao thức truyền thông và API giữa các thành phần.
+Hệ thống **SRRM** thực hiện giao tiếp giữa Frontend, Backend và AI thông qua các interface được chuẩn hóa theo kiểu dữ liệu của cơ sở dữ liệu PostgreSQL.
 
 ---
 
 ## 1. Giao diện Python nội bộ (Backend Service $\leftrightarrow$ AI Module)
 
-AI module (`ai/`) không chạy giao thức mạng (HTTP) mà được Backend (`backend/`) import trực tiếp như một thư viện Python trong cùng process. Giao diện công khai duy nhất nằm ở `ai/src/ai/__init__.py`.
+Lớp `ai/` được import và chạy trong cùng tiến trình của `backend/`. 
 
 ### Hàm Interface chính:
 ```python
@@ -17,14 +17,14 @@ def run_agent(query: str, session_id: str = None) -> AgentResult:
     """
 ```
 
-### Kiểu dữ liệu đầu ra:
+### Kiểu dữ liệu đầu ra `AgentResult`:
 ```python
 @dataclass
 class AgentResult:
     status: str          # "success" | "error"
     response: str        # Câu trả lời dạng văn bản (Markdown) cho người dùng
-    action_type: str     # Loại hành động: "forecast_query" | "optimize_trigger" | "pricing_adjust" | "chat"
-    data: dict           # Dữ liệu trả về có cấu trúc (ví dụ: danh sách hạn ngạch, bid prices)
+    action_type: str     # "forecast_query" | "optimize_trigger" | "pricing_adjust" | "chat"
+    data: dict           # Dữ liệu trả về (cấu trúc khớp với snapshot DB)
     error_message: str = None
 ```
 
@@ -32,14 +32,14 @@ class AgentResult:
 
 ## 2. API REST (Frontend $\leftrightarrow$ Backend)
 
-Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL `/api/v1` và được Frontend gọi duy nhất thông qua `frontend/src/lib/api/`.
+Các REST API được cung cấp tại base URL `/api/v1`. Kiểu dữ liệu số học phản ánh đúng thiết kế trong `schema.sql` (sử dụng kiểu float/decimal cho giá trị tiền và khoảng cách).
 
 ### 2.1. API Chat chính (Tương tác Trợ lý AI)
 * **Endpoint:** `POST /api/v1/chat`
 * **Request Body:**
   ```json
   {
-    "message": "Hiển thị heatmap tải chặng của tàu SE1 ngày 20/07/2026",
+    "message": "Hiển thị heatmap tải chặng của chuyến tàu ID 1 ngày 20/07/2026",
     "session_id": "session-123456"
   }
   ```
@@ -48,15 +48,20 @@ Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL
   {
     "message_id": "msg-789",
     "role": "assistant",
-    "content": "Đây là heatmap tải chặng của tàu SE1 ngày 20/07/2026...",
+    "content": "Đây là heatmap tải chặng của chuyến tàu...",
     "action_type": "forecast_query",
     "payload": {
-      "train_id": "SE1",
-      "departure_date": "2026-07-20",
+      "trip_id": 1,
       "legs": [
-        {"leg_id": "HN-Vinh", "occupancy": 0.85, "status": "warning"},
-        {"leg_id": "Vinh-Hue", "occupancy": 0.40, "status": "normal"},
-        {"leg_id": "Hue-DN", "occupancy": 0.95, "status": "critical"}
+        {
+          "segment_id": 101,
+          "sequence_no": 1,
+          "origin_station_id": 1,
+          "destination_station_id": 2,
+          "capacity": 120,
+          "remaining": 15,
+          "bid_price": 150000.00
+        }
       ]
     }
   }
@@ -67,37 +72,22 @@ Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL
 ### 2.2. API Biểu đồ nhiệt tải chặng (Legs Heatmap)
 * **Endpoint:** `GET /api/v1/analytics/legs-heatmap`
 * **Query Parameters:**
-  * `train_id` (string, required): Mã đoàn tàu (ví dụ: `SE1`).
-  * `departure_date` (string, required): Ngày chạy tàu (`YYYY-MM-DD`).
+  * `trip_id` (integer, required): ID của chuyến tàu (tham chiếu `trips.id`).
 * **Response Body (Success 200):**
   ```json
   {
-    "train_id": "SE1",
-    "departure_date": "2026-07-20",
+    "trip_id": 1,
     "legs": [
       {
-        "sequence": 1,
-        "origin": "HN",
-        "destination": "Vinh",
+        "segment_id": 101,
+        "sequence_no": 1,
+        "origin_station_code": "HN",
+        "destination_station_code": "Vinh",
         "capacity": 120,
-        "sold": 102,
-        "allocated_quota": {
-          "long_haul": 80,
-          "short_haul": 40
-        },
-        "bid_price": 150000.0
-      },
-      {
-        "sequence": 2,
-        "origin": "Vinh",
-        "destination": "Hue",
-        "capacity": 120,
-        "sold": 48,
-        "allocated_quota": {
-          "long_haul": 80,
-          "short_haul": 40
-        },
-        "bid_price": 50000.0
+        "remaining": 98,
+        "seat_type": "soft_seat",
+        "bid_price": 50000.00,
+        "is_bottleneck": false
       }
     ]
   }
@@ -108,24 +98,23 @@ Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL
 ### 2.3. API Đề xuất giá vé động (Pricing Quote)
 * **Endpoint:** `GET /api/v1/pricing/quote`
 * **Query Parameters:**
-  * `origin` (string): Ga đi.
-  * `destination` (string): Ga đến.
-  * `departure_date` (string): Ngày đi.
-  * `seat_type` (string): Loại ghế.
+  * `od_product_id` (integer, required): ID của sản phẩm OD (tham chiếu `od_products.id`).
 * **Response Body (Success 200):**
   ```json
   {
-    "origin": "HN",
-    "destination": "Hue",
-    "base_price": 450000.0,
-    "proposed_price": 520000.0,
-    "fare_class": "STANDARD",
-    "calculation_details": {
-      "sum_bid_prices": 370000.0,
-      "markup_factor": 1.4,
-      "applied_constraints": ["CEILING_LIMIT_ENFORCED"]
+    "quote_id": 2048,
+    "od_product_id": 15,
+    "policy_id": 3,
+    "opportunity_cost": 350000.00,
+    "proposed_price": 420000.00,
+    "final_price": 420000.00,
+    "decision": "accepted",
+    "explanation": {
+      "base_opportunity_cost": 350000.00,
+      "markup_factor": 1.2,
+      "triggered_policies": ["STANDARD_MARKUP"]
     },
-    "explanation": "Giá vé tăng 15% do chặng Huế-Đà Nẵng đang cháy vé (Bid Price chặng cao)."
+    "expires_at": "2026-07-17T19:00:00Z"
   }
   ```
 
@@ -136,18 +125,18 @@ Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL
 * **Request Body:**
   ```json
   {
-    "train_id": "SE1",
-    "departure_date": "2026-07-20"
+    "trip_id": 1
   }
   ```
 * **Response Body (Success 200):**
   ```json
   {
     "status": "success",
-    "resolved_at": "2026-07-17T18:25:00Z",
-    "objective_value": 158000000.0,
-    "total_tickets_allocated": 284,
-    "message": "Đã tối ưu hóa phân bổ chỗ và cập nhật danh sách Bid Price thành công."
+    "resolved_at": "2026-07-17T18:48:00Z",
+    "run_version": "ver-20260717-1848",
+    "quotas_updated_count": 10,
+    "bid_prices_updated_count": 5,
+    "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công."
   }
   ```
 
@@ -156,25 +145,17 @@ Tất cả các API HTTP được Backend (`backend/`) cung cấp tại base URL
 ### 2.5. API So sánh chính sách mô phỏng (Policy Comparison)
 * **Endpoint:** `GET /api/v1/simulation/compare`
 * **Query Parameters:**
-  * `train_id` (string): Mã tàu.
-  * `start_date` (string): Ngày bắt đầu.
-  * `end_date` (string): Ngày kết thúc.
+  * `trip_id` (integer, required): ID của chuyến tàu.
+  * `policy_id` (integer, optional): ID chính sách giá để so sánh.
 * **Response Body (Success 200):**
   ```json
   {
-    "summary": {
-      "revenue_lift_pct": 5.4,
-      "passenger_km_lift_pct": 3.8,
-      "empty_seats_reduction_pct": 22.1
-    },
-    "daily_data": [
-      {
-        "date": "2026-07-10",
-        "historical_revenue": 120000000.0,
-        "simulated_ai_revenue": 126480000.0,
-        "historical_occupancy": 0.78,
-        "simulated_ai_occupancy": 0.81
-      }
-    ]
+    "trip_id": 1,
+    "historical_revenue": 158000000.00,
+    "simulated_revenue": 169860000.00,
+    "revenue_lift_pct": 7.5,
+    "historical_passenger_km": 12500.00,
+    "simulated_passenger_km": 13100.00,
+    "passenger_km_lift_pct": 4.8
   }
   ```

@@ -16,16 +16,18 @@ DEST="$REPO_ROOT/docs/ai-log/sessions"
 PROJECT_SLUG="$(printf '%s' "$REPO_ROOT" | sed 's#/#-#g')"
 SRC_DIR="$HOME/.claude/projects/$PROJECT_SLUG"
 
-# Không có thư mục phiên là chuyện bình thường: đồng đội có thể dùng Codex,
-# Cursor, hay công cụ khác. Báo ra stderr rồi thoát êm — script này chạy trong
-# hook Stop, không được làm ồn hay chặn lượt trả lời của ai.
+# Chạy xuất phiên Gemini Antigravity
+echo "⏳ Đang quét xuất phiên Gemini Antigravity..." >&2
+if command -v python3 &>/dev/null; then
+    python3 "$REPO_ROOT/scripts/export_gemini_log.py" || true
+elif command -v python &>/dev/null; then
+    python "$REPO_ROOT/scripts/export_gemini_log.py" || true
+fi
+
+# Không có thư mục phiên Claude là bình thường: kiểm tra và báo nhẹ
 if [ ! -d "$SRC_DIR" ]; then
-    {
-        echo "ℹ️  Không tìm thấy phiên Claude Code cho repo này: $SRC_DIR"
-        echo "   Dùng công cụ AI khác? Xuất log thủ công và bỏ vào docs/ai-log/sessions/,"
-        echo "   rồi khai báo trong docs/ai-log/tools-used.md"
-    } >&2
-    exit 1
+    echo "ℹ️  Không tìm thấy phiên Claude Code cho repo này: $SRC_DIR" >&2
+    exit 0
 fi
 
 shopt -s nullglob

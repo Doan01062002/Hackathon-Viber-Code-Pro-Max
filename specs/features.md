@@ -1,64 +1,64 @@
 # Specs — Danh sách Tính năng & Yêu cầu Chức năng (Features)
 
-Tài liệu này liệt kê chi tiết các tính năng của hệ thống **Smart Rail Revenue Management (SRRM)** được phân nhóm theo 3 khối lõi và các chức năng nền tảng dùng chung của MVP.
+Tài liệu này đặc tả chi tiết danh mục tính năng của hệ thống **SRRM**, được cập nhật để chỉ rõ cơ chế tương tác với cơ sở dữ liệu PostgreSQL.
 
 ---
 
-## 1. KHỐI 1 — Dự báo & Phân tích Nhu cầu (Forecasting & Analytics)
+## 1. KHỐI 1 — Dự báo & Phân tích Nhu cầu (Forecasting)
 
-Khối này cung cấp các phân tích dữ liệu lịch sử và đưa ra dự báo nhu cầu đi lại tiềm năng để làm đầu vào cho bài toán tối ưu phân bổ chỗ.
+Phân hệ dự báo sử dụng dữ liệu lịch sử để dự kiến lượng cầu đi lại tiềm năng.
 
-| Mã Tính năng | Tên Yêu cầu | Mô tả Chi tiết & Tiêu chí Chấp nhận |
+| Mã | Tên Yêu cầu | Tương tác Cơ sở Dữ liệu & Tiêu chí Nghiệm thu |
 |---|---|---|
-| **FR1.1** | Dự báo nhu cầu OD | Ước lượng nhu cầu đi lại cho từng cặp `(ga đi, ga đến, ngày đi, mã tàu, loại chỗ, số ngày đặt trước)`. Trả về cả trị dự báo điểm và khoảng tin cậy. |
-| **FR1.2** | Đặc trưng dự báo | Tích hợp các đặc trưng: ngày trong tuần/tháng, mùa vụ, ngày lễ/Tết, chiều đi–về, thời tiết, sự kiện địa phương, thông tin giá hiện tại và giá đối thủ. |
-| **FR1.3** | Giải kiểm duyệt nhu cầu | Áp dụng thuật toán EM để khôi phục nhu cầu tiềm năng thực tế từ các chuyến tàu đã hết vé sớm trong lịch sử. |
-| **FR1.4** | Đường cong đặt vé | Mô hình hóa tiến độ mua vé tích lũy theo thời gian đặt trước để cập nhật dự báo nhu cầu cuối cùng liên tục. |
-| **FR1.5** | Cập nhật dự báo động | Tính toán lại dự báo nhu cầu khi có lô dữ liệu bán vé mới cập nhật trong thời gian cho phép. |
-| **FR1.6** | Phân tích tải chặng | Tính toán sức chứa, số ghế đã bán/giữ/còn trống, tỷ lệ lấp lầy và doanh thu dự kiến cho từng chặng nhỏ liên tiếp dọc hành trình tàu. |
-| **FR1.7** | Heatmap tải chặng | Trực quan hóa tải chặng dạng biểu đồ nhiệt theo thời gian, giúp Revenue Manager nhận diện ngay các chặng quá tải hoặc trống nhiều trong 1 thao tác. |
+| **FR1.1** | Dự báo nhu cầu OD | Đọc dữ liệu lịch sử từ `bookings` và ghi nhận kết quả dự báo điểm/phân vị vào bảng `demand_forecasts` (`demand_point`, `demand_p10`, `demand_p50`, `demand_p90`). |
+| **FR1.2** | Đặc trưng dự báo | Kết hợp thông tin từ bảng danh mục `stations`, `trains` và bảng đặc trưng lịch `calendar_features` (lễ, tết, thời tiết, sự kiện) làm đầu vào huấn luyện. |
+| **FR1.3** | Giải kiểm duyệt nhu cầu | Sử dụng dữ liệu tìm kiếm từ `search_logs` với các bản ghi có trạng thái `result = 'sold_out'` hoặc `'no_result'` làm đầu vào cho thuật toán EM để khôi phục nhu cầu ẩn. |
+| **FR1.4** | Đường cong đặt vé | Tính toán lượng vé đặt tích lũy theo thời gian đặt trước dựa trên trường `booked_at` của bảng `bookings`. |
+| **FR1.5** | Cập nhật dự báo động | Tự động chạy lại quy trình dự báo theo lô (batch job) khi có thêm bản ghi mới trong `bookings` và `search_logs`. |
+| **FR1.6** | Phân tích tải chặng | Truy vấn và tổng hợp chênh lệch giữa sức chứa gốc (`segment_capacities.capacity`) và tồn kho thực tế (`segment_inventory.remaining`) để tính toán lượng ghế đang sử dụng. |
+| **FR1.7** | Trực quan heatmap tải | Sử dụng dữ liệu chặng liên tiếp từ `segments` và tồn kho thực tế từ `segment_inventory` để vẽ biểu đồ lưới màu sắc theo thời gian. |
 
 ---
 
 ## 2. KHỐI 2 — Tối ưu hóa phân bổ chỗ (Inventory Optimization)
 
-Khối này chịu trách nhiệm phân chia ghế hợp lý giữa các chặng ngắn và chặng dài để tối đa hóa doanh thu tổng chuyến.
+Phân hệ tối ưu thực hiện bài toán DLP để phân bổ hạn ngạch bán vé hợp lý.
 
-| Mã Tính năng | Tên Yêu cầu | Mô tả Chi tiết & Tiêu chí Chấp nhận |
+| Mã | Tên Yêu cầu | Tương tác Cơ sở Dữ liệu & Tiêu chí Nghiệm thu |
 |---|---|---|
-| **FR2.1** | Xác định hạn ngạch chỗ | Tính toán hạn ngạch vé (quota) bán cho khách toàn tuyến, chặng dài, chặng vừa, chặng ngắn và chỗ giữ cho các ga trung gian. |
-| **FR2.2** | Kiểm soát bằng Bid Price | Ra quyết định chấp nhận/từ chối yêu cầu mua vé dựa trên quy tắc: Giá vé đề xuất phải lớn hơn hoặc bằng tổng Bid Price các chặng mà hành trình đi qua: $f_j \ge \sum_{\ell} a_{\ell j} \cdot \pi_\ell$. |
-| **FR2.3** | Cập nhật Bid Price động | Tính toán lại Bid Price và hạn ngạch tức thời khi có biến động đặt vé, hủy vé hoặc thay đổi sơ đồ đoàn tàu. |
-| **FR2.4** | Đề xuất tách đoạn | Tự động đề xuất thời điểm nhả chỗ giữ chặng dài để chuyển sang bán chặng ngắn hoặc ngược lại theo tiến độ bán thực tế. |
-| **FR2.5** | Ghép đoạn trống | Tự động tìm kiếm các đoạn trống xen kẽ của cùng một ghế vật lý và đề xuất tạo thành các vé chặng ngắn liên kết nhằm tận dụng tối đa ghế. |
-| **FR2.6** | Gán ghế giảm phân mảnh | Sử dụng thuật toán Interval Partitioning gán ghế vật lý sao cho lượng ghế dùng không vượt tải chồng lấn cực đại và giảm thiểu số ghế trống bị chia cắt. |
-| **FR2.7** | Gợi ý ghép đổi chỗ | (Tính năng cơ bản) Đề xuất phương án đổi chỗ dọc đường cho khách khi chặng dài hết ghế liền, nhưng ghép được từ 2 chặng ngắn trống ghế khác nhau của cùng 1 chuyến tàu. |
-| **FR2.8** | Tái phân bổ tồn kho | Giải phóng hạn ngạch chặng dài chưa bán được cận ngày đi để mở bán chặng ngắn đang có nhu cầu cao. |
+| **FR2.1** | Xác định hạn ngạch chỗ | Ghi đề xuất hạn ngạch vào bảng `quotas` dưới dạng `run_version` mới với cờ `is_active = FALSE`. |
+| **FR2.2** | Kiểm soát bằng Bid Price | Khi có yêu cầu vé, Backend kiểm tra `bid_prices` hoạt động (`is_active = TRUE`) của toàn bộ các chặng đi qua (`od_product_segments`) để so sánh tổng chi phí cơ hội với giá vé. |
+| **FR2.3** | Cập nhật Bid Price động | Khi chạy lại tối ưu hóa, thực hiện swap trạng thái nguyên tử: chuyển các bản ghi `bid_prices` và `quotas` của `run_version` cũ sang `is_active = FALSE` và set `is_active = TRUE` cho `run_version` mới trong 1 transaction. |
+| **FR2.4** | Đề xuất tách đoạn | Đề xuất nhả/giữ chỗ được cập nhật qua việc thay đổi giá trị trong `quotas` hiện hành. |
+| **FR2.5** | Ghép đoạn trống | Chạy thuật toán phát hiện khoảng trống vật lý trên ghế và ghi các phương án vé khuyến khích có thể bán bù vào bảng `gap_combinations`. |
+| **FR2.6** | Gán ghế vật lý | Khi xác nhận đặt vé, gán khóa ngoại `seat_id` (trỏ đến bảng `seats`) vào bản ghi của khách trong bảng `bookings`, đảm bảo trạng thái ghế là `available`. |
+| **FR2.7** | Gợi ý ghép đổi chỗ | Đọc sơ đồ chỗ trống chặng ngắn từ `segment_inventory` kết hợp với `seats` để gợi ý chuyển ghế dọc đường. |
+| **FR2.8** | Trừ tồn kho & Giữ chỗ | **Quy trình Core Transaction:** Khi khách yêu cầu giữ chỗ (`status = 'held'`), Backend khóa dòng (`SELECT FOR UPDATE`) trên bảng `segment_inventory` của các chặng liên quan theo thứ tự ID tăng dần (tránh deadlock). Thực hiện trừ tồn kho nguyên tử (`remaining = remaining - 1`) và thêm bản ghi vào `bookings`. Hủy hold sau TTL (`expires_at`) sẽ cộng trả lại tồn kho. |
 
 ---
 
 ## 3. KHỐI 3 — Định giá động (Dynamic Pricing)
 
-Khối này tính toán mức giá bán tối ưu theo chặng và thời điểm mở bán trong khung trần/sàn được phê duyệt.
+Tính toán mức giá bán tối ưu dựa trên chi phí cơ hội và độ co giãn nhu cầu.
 
-| Mã Tính năng | Tên Yêu cầu | Mô tả Chi tiết & Tiêu chí Chấp nhận |
+| Mã | Tên Yêu cầu | Tương tác Cơ sở Dữ liệu & Tiêu chí Nghiệm thu |
 |---|---|---|
-| **FR3.1** | Đề xuất giá theo Bid Price | Giá vé đề xuất được tính toán dưới dạng markup trên chi phí cơ hội: $p_j^* = \text{Markup}(c_j)$. Luồng đi qua chặng khan hiếm sẽ tự động có giá cao hơn. |
-| **FR3.2** | Các yếu tố định giá | Tích hợp các yếu tố: tải chặng, số ngày tới ngày đi, tốc độ bán vé thực tế, loại chỗ, tính chất ngày cuối tuần/lễ tết. |
-| **FR3.3** | Phân hạng sản phẩm giá | Hỗ trợ cấu hình các hạng vé: Tiết kiệm (mua sớm, không hoàn hủy), Tiêu chuẩn, Linh hoạt, Phút chót, Nhóm/khứ hồi. |
-| **FR3.4** | Định giá theo tải chặng | Hành trình đi qua các chặng "nút cổ chai" gần đầy sẽ tăng giá (trong biên độ trần); hành trình qua các chặng trống được áp dụng giá khuyến mãi chéo. |
-| **FR3.5** | Điều tiết cầu liên tàu | Đề xuất điều chỉnh giá để chuyển dịch cầu từ các tàu quá tải sang các tàu thấp điểm chạy gần khung giờ. |
-| **FR3.6** | Ràng buộc trần/sàn cứng | Ép cứng giới hạn giá tối đa/tối thiểu ($p_{\min} \le p \le p_{\max}$), giới hạn bước nhảy giá liên tiếp không vượt $\Delta_{\max}$, không định giá dựa trên thông tin cá nhân. |
-| **FR3.7** | Giải thích đề xuất giá | Cung cấp phân tích diễn giải lý do đưa ra mức giá cụ thể (ví dụ: do chặng A-B bị quá tải làm bid price tăng $X\%$). |
+| **FR3.1** | Đề xuất giá theo Bid Price | Tổng hợp chi phí cơ hội từ tổng các `bid_price` hiện hành của các chặng mà sản phẩm đi qua để làm cơ sở định giá. |
+| **FR3.2** | Yếu tố định giá | Sử dụng thêm dữ liệu cự ly `distance_km` từ `od_products` và đặc trưng lịch từ `calendar_features`. |
+| **FR3.3** | Phân hạng sản phẩm giá | Ánh xạ và cấu hình các hạng vé tương ứng với trường `fare_class` (FK trỏ tới `fare_classes.code`). |
+| **FR3.4** | Giá phản ánh khan hiếm | Tự động tăng giá vé của luồng OD nếu một trong các chặng đi qua có `bid_prices.bid_price` tăng cao. |
+| **FR3.5** | Điều tiết cầu liên tàu | Đề xuất điều chỉnh giá vé chéo giữa các chuyến tàu chạy cùng ngày (`trips`) để cân bằng tải. |
+| **FR3.6** | Price Safeguards | Tra cứu chính sách từ `price_policies` để ép cứng trần/sàn (`min_price`, `max_price`, `max_step_change`). Ghi kết quả tính toán cuối cùng vào `price_quotes.final_price`. |
+| **FR3.7** | Giải thích đề xuất giá | Ghi cấu trúc giải thích chi tiết dưới dạng JSON vào cột `price_quotes.explanation` để kết xuất trực quan trên UI. |
 
 ---
 
 ## 4. CHỨC NĂNG NỀN TẢNG (Cross-cutting)
 
-| Mã Tính năng | Tên Yêu cầu | Mô tả Chi tiết & Tiêu chí Chấp nhận |
+| Mã | Tên Yêu cầu | Tương tác Cơ sở Dữ liệu & Tiêu chí Nghiệm thu |
 |---|---|---|
-| **FR4.1** | Dashboard Phân tích | Màn hình hiển thị Heatmap chặng, biểu đồ tốc độ bán (booking curve) thực tế so với dự báo, danh sách đoạn trống ghép được. |
-| **FR4.2** | Mô phỏng & So sánh | Giao diện chạy thử nghiệm chính sách giá/hạn ngạch mới và so sánh kết quả doanh thu dự kiến với kết quả bán thực tế trong lịch sử. |
-| **FR4.3** | Cảnh báo tự động | Phát ra cảnh báo (qua màn hình/email/slack) khi phát hiện chặng sắp cháy vé sớm hoặc chặng có nguy cơ trống ghế cao cận ngày chạy. |
-| **FR4.4** | Nhật ký kiểm toán | Ghi nhận chi tiết lịch sử thay đổi hạn ngạch, thay đổi giá, người thực hiện và lý do thay đổi để phục vụ kiểm toán hệ thống. |
-| **FR4.5** | Vòng lặp phản hồi khép kín | Thiết lập luồng dữ liệu tự động phản hồi: dữ liệu vé bán thực tế cập nhật lại mô hình dự báo nhu cầu $\rightarrow$ chạy lại tối ưu DLP $\rightarrow$ cập nhật lại bid price và bảng giá động. |
+| **FR4.1** | Dashboard Phân tích | Kết xuất giao diện từ việc join các bảng `trips`, `segments`, `segment_inventory`, `gap_combinations` và `search_logs`. |
+| **FR4.2** | Mô phỏng chính sách | Cho phép Revenue Manager điều chỉnh các hệ số trong `price_policies`, chạy giả lập và so sánh sự thay đổi doanh thu dự kiến của `price_quotes` so với doanh thu thực tế ghi nhận tại `bookings`. |
+| **FR4.3** | Cảnh báo tự động | Phát cảnh báo khi tồn kho `segment_inventory.remaining` tiệm cận mức 0 trước ngày đi quá nhanh. |
+| **FR4.4** | Nhật ký kiểm toán | Mọi hoạt động can thiệp ghi đè của con người đều được lưu trữ đầy đủ tại `audit_logs` (ghi actor, action, trước/sau dạng JSON). |
+| **FR4.5** | Vòng lặp phản hồi | Thiết lập chu kỳ tự động cập nhật: Dữ liệu mua bán mới (`bookings`) $\rightarrow$ Cập nhật dự báo (`demand_forecasts`) $\rightarrow$ Giải tối ưu DLP (`bid_prices` & `quotas`) $\rightarrow$ Cập nhật báo giá (`price_quotes`). |
