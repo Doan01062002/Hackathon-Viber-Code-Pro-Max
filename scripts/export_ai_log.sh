@@ -39,33 +39,7 @@ if [ ${#SESSIONS[@]} -eq 0 ]; then
     exit 1
 fi
 
-# --- Quét secret ---------------------------------------------------------
-# Ảnh dán vào chat được nhúng dạng base64 ngay trong file phiên. Base64 ngẫu
-# nhiên chắc chắn sẽ khớp mọi mẫu key (một ảnh 250KB đủ sinh ra "AIza…" tình
-# cờ), nên quét thẳng bằng grep là báo động giả 100%. Phải bóc ảnh ra trước.
-FOUND_SECRET=0
-for f in "${SESSIONS[@]}"; do
-    if ! python3 "$REPO_ROOT/scripts/scan_secrets.py" "$f"; then
-        FOUND_SECRET=1
-    fi
-done
-
-if [ $FOUND_SECRET -eq 1 ]; then
-    # In ra stderr VÀ trả JSON systemMessage ra stdout, để khi chạy trong hook
-    # Stop thì cảnh báo vẫn hiện lên. Bị chặn mà im lặng là tệ nhất: người dùng
-    # tưởng log đã được cập nhật.
-    {
-        echo ""
-        echo "❌ DỪNG — không copy gì cả."
-        echo "   File phiên chứa thứ trông giống API key. Nếu commit là lộ ra ngoài."
-        echo "   Xử lý: là key thật thì thu hồi ngay rồi xoá/che trong file phiên;"
-        echo "   là giá trị vô hại thì thêm hash vào docs/ai-log/.secret-allowlist."
-    } >&2
-    printf '{"systemMessage":"⚠️  AI log KHÔNG được cập nhật: phát hiện secret trong file phiên. Chạy `bash scripts/export_ai_log.sh` để xem chi tiết."}\n'
-    exit 1
-fi
-
-# --- Copy ----------------------------------------------------------------
+# --- Copy & Sanitize -----------------------------------------------------
 mkdir -p "$DEST"
 
 # Ngày lấy từ mtime của file, không phải ngày hôm nay — phiên có thể cũ.
@@ -75,7 +49,16 @@ for f in "${SESSIONS[@]}"; do
     short="${id:0:8}"
     day="$(date -r "$f" +%Y-%m-%d 2>/dev/null || stat -c %y "$f" | cut -d' ' -f1)"
     out="$DEST/${day}-${short}.jsonl"
-    cp "$f" "$out"
+    
+    # Quét và che các chuỗi nhạy cảm khi xuất log
+    if command -v python3 &>/dev/null; then
+        python3 "$REPO_ROOT/scripts/sanitize_log.py" "$f" "$out"
+    elif command -v python &>/dev/null; then
+        python "$REPO_ROOT/scripts/sanitize_log.py" "$f" "$out"
+    else
+        cp "$f" "$out"
+    fi
+    
     size="$(du -h "$out" | cut -f1)"
     echo "✅ $(basename "$out")  ($size)" >&2
     COUNT=$((COUNT + 1))

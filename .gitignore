@@ -22,9 +22,19 @@ env/
 .idea/
 # Quyền Claude Code riêng của từng máy — không chia sẻ
 .claude/settings.local.json
+service_account.json
+scratch/
+.codex/
 *.swp
 *.swo
 *~
+
+# Local personal files
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.bak
+~$*
 
 # OS
 .DS_Store
@@ -32,17 +42,26 @@ Thumbs.db
 
 # Data (never commit large data)
 data/
+eval/
 *.db
 *.sqlite3
+Task_Board_Duong_sat_MVP.xlsx
 
 # Logs
 logs/
 *.log
+artifacts/ai-logs/
+docs/task-board-csv/
+docs/ai-log/sessions/
 
 # AI log nộp BTC — phải được commit, không dính rule logs/ *.log ở trên.
 # Xuất bằng: bash scripts/export_ai_log.sh
 !docs/ai-log/
-!docs/ai-log/**
+!docs/ai-log/README.md
+!docs/ai-log/tools-used.md
+!docs/ai-log/screenshots/
+!docs/ai-log/screenshots/**
+!docs/ai-log/.secret-allowlist
 
 # Test coverage
 htmlcov/
