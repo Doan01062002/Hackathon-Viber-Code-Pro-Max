@@ -255,23 +255,23 @@ export function SimulationScreen() {
         >
           {policyMessage && (
             <div 
-              className={`banner ${policyMessage.type === "success" ? "banner-success" : "banner-warning"}`} 
               style={{
-                backgroundColor: policyMessage.type === "success" ? "#143a24" : "#3a2a18",
-                borderLeft: `4px solid ${policyMessage.type === "success" ? "#10b981" : "#d97706"}`,
-                padding: "12px",
-                borderRadius: "6px",
-                color: policyMessage.type === "success" ? "#10b981" : "#f59e0b",
+                backgroundColor: policyMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
+                borderLeft: `4px solid ${policyMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
+                padding: "12px 16px",
+                borderRadius: "8px",
+                color: policyMessage.type === "success" ? "var(--success)" : "var(--danger)",
                 fontSize: "14px",
+                fontWeight: 500,
                 marginBottom: "16px"
               }}
             >
-              {policyMessage.text}
+              {policyMessage.type === "success" ? "✅" : "⚠️"} {policyMessage.text}
             </div>
           )}
 
           {fetchingPolicies ? (
-            <p style={{ color: "#888", textAlign: "center", padding: "20px" }}>Đang tải dữ liệu chính sách...</p>
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải dữ liệu chính sách...</p>
           ) : (
             <div className="table-wrap" style={{ marginBottom: "24px" }}>
               <table className="data-table">
@@ -295,7 +295,17 @@ export function SimulationScreen() {
                       <td>{formatVND(p.max_price)}</td>
                       <td>{formatVND(p.max_step_change)}</td>
                       <td>
-                        <span className={`badge badge-${p.status === "active" ? "success" : "neutral"}`} style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", backgroundColor: p.status === "active" ? "#143a24" : "#333", color: p.status === "active" ? "#10b981" : "#aaa", fontSize: "11px" }}>
+                        <span 
+                          style={{ 
+                            display: "inline-block", 
+                            padding: "4px 10px", 
+                            borderRadius: "6px", 
+                            backgroundColor: p.status === "active" ? "rgba(60, 154, 117, 0.12)" : p.status === "draft" ? "rgba(200, 132, 48, 0.12)" : "rgba(142, 144, 165, 0.12)", 
+                            color: p.status === "active" ? "var(--success)" : p.status === "draft" ? "var(--warning)" : "var(--muted)", 
+                            fontSize: "12px",
+                            fontWeight: 600
+                          }}
+                        >
                           {p.status}
                         </span>
                       </td>
@@ -322,7 +332,7 @@ export function SimulationScreen() {
                   ))}
                   {policies.length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: "center", color: "#888" }}>
+                      <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
                         Không tìm thấy chính sách nào trong cơ sở dữ liệu.
                       </td>
                     </tr>
@@ -335,13 +345,14 @@ export function SimulationScreen() {
           {editFormData && selectedPolicy && (
             <div 
               style={{
-                border: "1px solid #333",
-                borderRadius: "8px",
-                padding: "20px",
-                backgroundColor: "#111"
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                padding: "24px",
+                backgroundColor: "var(--surface-soft)",
+                marginTop: "20px"
               }}
             >
-              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "16px", color: "var(--text)" }}>
                 Cập nhật chính sách: {selectedPolicy.name} (ID: {selectedPolicy.id})
               </h3>
               <div 
@@ -394,7 +405,6 @@ export function SimulationScreen() {
                     className="input"
                     value={editFormData.status}
                     onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
-                    style={{ backgroundColor: "#222", color: "#fff" }}
                   >
                     <option value="draft">draft</option>
                     <option value="active">active</option>
