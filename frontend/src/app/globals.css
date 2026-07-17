@@ -48,7 +48,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -128,6 +129,17 @@ input {
 .seat:focus-visible {
   outline: 2px solid rgba(115, 116, 199, 0.35);
   outline-offset: 2px;
+}
+
+.quote-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.quote-form-actions .error {
+  margin: 0;
 }
 
 .rail-shell {

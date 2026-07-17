@@ -56,9 +56,17 @@ class OptimizeResponse(BaseModel):
     n_od: int
 
 
+class SegmentPriceInput(BaseModel):
+    segment_id: int
+    bid_price: float
+
+
 class PriceRequest(BaseModel):
     od_id: int
     service_date: str
+    seat_type: str | None = None
+    base_price: float | None = None
+    segments: list[SegmentPriceInput] | None = None
     min_price: float | None = None
     max_price: float | None = None
 
@@ -69,6 +77,10 @@ class PriceExplanation(BaseModel):
     bottleneck_load_pct: float | None = None  # % sức chứa đã phân bổ tại chặng nút cổ chai
     elasticity: float
     base_price: float
+
+    def __getitem__(self, key: str):
+        """Giữ tương thích với code cũ truy cập explanation như một mapping."""
+        return getattr(self, key)
 
 
 class PriceResponse(BaseModel):

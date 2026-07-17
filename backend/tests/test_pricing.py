@@ -1,7 +1,54 @@
 import pytest
 from sqlalchemy import text
 
+from backend.controllers.pricing_controller import get_pricing_service
 from backend.database import get_session_factory
+from backend.views.pricing_view import PricingExplanation, PricingQuoteResponse
+
+
+class FakeODPricingService:
+    async def create_pricing_quote_from_od(self, request, db):
+        return PricingQuoteResponse(
+            quote_id=99,
+            od_product_id=7,
+            opportunity_cost=300_000,
+            proposed_price=450_000,
+            final_price=450_000,
+            decision="accepted",
+            explanation=PricingExplanation(
+                base_opportunity_cost=300_000,
+                markup_factor=1.5,
+                applied_policies=[],
+                bottleneck_segment_id=12,
+                bottleneck_segment="Hue -> Da Nang",
+                segment_bid_prices={"12": 300_000},
+            ),
+            expires_at="2026-07-18T12:15:00+00:00",
+            origin="Ha Noi",
+            destination="Da Nang",
+            service_date="2026-07-19",
+            seat_type=request.seat_type,
+            availability=18,
+        )
+
+
+@pytest.mark.asyncio
+async def test_quote_post_maps_frontend_contract(app, client):
+    app.dependency_overrides[get_pricing_service] = lambda: FakeODPricingService()
+
+    response = await client.post(
+        "/api/v1/quote",
+        json={
+            "origin": "HN",
+            "destination": "DAN",
+            "service_date": "2026-07-19",
+            "seat_type": "giuong_nam_k6",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["quote_id"] == 99
+    assert response.json()["availability"] == 18
 
 
 @pytest.mark.asyncio
