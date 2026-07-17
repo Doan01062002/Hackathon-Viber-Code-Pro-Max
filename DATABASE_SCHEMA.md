@@ -1,8 +1,8 @@
 # Database Schema — SRRM MVP
 
-Tài liệu này mô tả schema PostgreSQL trong [`schema.sql`](schema.sql) của hệ thống **Smart Rail Revenue Management (SRRM)**. Schema gồm **21 bảng** và **5 index tường minh**, phục vụ dữ liệu vận hành, tồn kho theo chặng, sản phẩm vé OD, giao dịch, dự báo nhu cầu, tối ưu doanh thu, định giá động và kiểm toán.
+Tài liệu này mô tả schema PostgreSQL trong [`schema.sql`](schema.sql) của hệ thống **Smart Rail Revenue Management (SRRM)**. Schema gồm **21 bảng**, **5 index tường minh**, **1 trigger function** và **7 trigger**, phục vụ dữ liệu vận hành, tồn kho theo chặng, sản phẩm vé OD, giao dịch, dự báo nhu cầu, tối ưu doanh thu, định giá động và kiểm toán.
 
-> Phạm vi hiện tại chỉ gồm bảng, ràng buộc và index; không có seed data, view, function hoặc trigger. Vì chưa có trigger, ứng dụng phải tự cập nhật các trường `updated_at`.
+> Phạm vi hiện tại gồm bảng, ràng buộc, index và trigger tự động cập nhật `updated_at`; không có seed data hoặc view.
 
 ## 1. Tổng quan quan hệ
 
@@ -384,7 +384,23 @@ Tổ hợp `(od_product_id, run_version)` là duy nhất. Partial unique index `
 
 Ngoài 5 index trên, PostgreSQL tự tạo index để thực thi các `PRIMARY KEY` và `UNIQUE` constraint. Schema không tự tạo index cho mọi khóa ngoại.
 
-## 9. Luồng dữ liệu chính
+## 9. Trigger tự động cập nhật `updated_at`
+
+Function `set_updated_at()` chạy trước mỗi lệnh `UPDATE`, gán `NEW.updated_at = CURRENT_TIMESTAMP` rồi trả về bản ghi mới. Bảy trigger mức dòng (`FOR EACH ROW`) dùng chung function này:
+
+| Trigger | Bảng | Thời điểm |
+|---|---|---|
+| `trg_calendar_features_updated_at` | `calendar_features` | `BEFORE UPDATE` |
+| `trg_trips_updated_at` | `trips` | `BEFORE UPDATE` |
+| `trg_segment_capacities_updated_at` | `segment_capacities` | `BEFORE UPDATE` |
+| `trg_segment_inventory_updated_at` | `segment_inventory` | `BEFORE UPDATE` |
+| `trg_od_products_updated_at` | `od_products` | `BEFORE UPDATE` |
+| `trg_bookings_updated_at` | `bookings` | `BEFORE UPDATE` |
+| `trg_price_policies_updated_at` | `price_policies` | `BEFORE UPDATE` |
+
+Mỗi lệnh UPDATE trên các bảng này sẽ làm mới `updated_at`, kể cả khi ứng dụng truyền một giá trị khác cho trường đó. Các bảng không có cột `updated_at` không được gắn trigger.
+
+## 10. Luồng dữ liệu chính
 
 1. `stations`, `trains`, `seat_types`, `fare_classes` và `calendar_features` cung cấp dữ liệu danh mục và đặc trưng lịch.
 2. `trips`, `segments` và `seats` mô tả chuyến cùng sơ đồ chỗ; `segment_capacities` và `segment_inventory` quản lý sức chứa theo từng chặng và loại chỗ.
@@ -393,10 +409,10 @@ Ngoài 5 index trên, PostgreSQL tự tạo index để thực thi các `PRIMARY
 5. Mô hình dự báo ghi kết quả vào `demand_forecasts`; bộ tối ưu tạo `bid_prices` và `quotas` từ nhu cầu và tồn kho.
 6. Bộ định giá tạo `price_quotes` trong giới hạn của `price_policies`; các thay đổi quan trọng được ghi vào `audit_logs`.
 
-## 10. Lưu ý toàn vẹn dữ liệu
+## 11. Lưu ý toàn vẹn dữ liệu
 
 - Schema chưa kiểm tra ga/chặng/sản phẩm OD có thực sự thuộc đúng cùng một chuyến và đúng thứ tự hành trình; tầng ứng dụng hoặc migration bổ sung phải bảo đảm điều này.
 - Schema chưa kiểm tra `bookings.seat_id` thuộc cùng chuyến với `od_product_id`.
 - Schema chưa tự đồng bộ `segment_inventory.remaining` khi booking thay đổi và chưa ép `remaining <= capacity`.
-- `updated_at` chỉ có giá trị mặc định lúc INSERT, không tự đổi lúc UPDATE vì schema không có trigger.
+- `updated_at` nhận `CURRENT_TIMESTAMP` lúc INSERT và được 7 trigger nói trên tự động làm mới lúc UPDATE.
 - Các FK không ghi `ON DELETE` dùng hành vi mặc định `NO ACTION`; chỉ các quan hệ được ghi rõ mới dùng `CASCADE` hoặc `SET NULL`.

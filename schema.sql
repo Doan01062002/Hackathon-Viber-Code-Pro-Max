@@ -1,6 +1,6 @@
 -- SRRM MVP database schema (PostgreSQL)
--- Scope: operational MVP tables, constraints, and indexes only.
--- No seed data, views, functions, or triggers.
+-- Scope: operational MVP tables, constraints, indexes, and updated_at triggers.
+-- No seed data or views.
 
 CREATE TABLE stations (
     id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -286,6 +286,49 @@ CREATE TABLE audit_logs (
     after_data      JSONB,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_calendar_features_updated_at
+    BEFORE UPDATE ON calendar_features
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_trips_updated_at
+    BEFORE UPDATE ON trips
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_segment_capacities_updated_at
+    BEFORE UPDATE ON segment_capacities
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_segment_inventory_updated_at
+    BEFORE UPDATE ON segment_inventory
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_od_products_updated_at
+    BEFORE UPDATE ON od_products
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_bookings_updated_at
+    BEFORE UPDATE ON bookings
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_price_policies_updated_at
+    BEFORE UPDATE ON price_policies
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
 
 CREATE UNIQUE INDEX ux_bid_prices_active
     ON bid_prices (segment_id, seat_type)
