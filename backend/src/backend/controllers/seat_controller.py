@@ -170,6 +170,7 @@ async def get_seat_layout(
         SeatLegendItem(tone="available", label="Còn trống"),
         SeatLegendItem(tone="selected", label="Đang chọn"),
         SeatLegendItem(tone="held", label="Đang giữ chỗ"),
+        SeatLegendItem(tone="confirmed", label="Đã bán"),
         SeatLegendItem(tone="blocked", label="Khóa vận hành"),
     ]
 

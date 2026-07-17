@@ -1166,23 +1166,33 @@ select {
 }
 
 .seat-available {
-  background: #eef2fb;
-  color: var(--primary);
+  background: #e6f7ed;
+  color: #15803d;
+  border-color: #bbf7d0;
 }
 
 .seat-selected {
   background: var(--primary);
   color: #fff;
+  border-color: var(--primary);
 }
 
 .seat-held {
-  background: #dee6fb;
-  color: #5362b1;
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.seat-confirmed {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
 }
 
 .seat-blocked {
-  background: #eef1f7;
-  color: var(--caption);
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
 }
 
 .legend-row {
