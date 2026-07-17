@@ -34,7 +34,10 @@ STATE: dict[str, object] = {}
 
 
 def _iso(value: str) -> date:
-    return date.fromisoformat(value)
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(422, "service_date phai dung dinh dang ISO YYYY-MM-DD") from exc
 
 
 def _feature_rows(ods, service_date: date) -> pd.DataFrame:
@@ -132,37 +135,61 @@ def forecast(req: ForecastRequest):
     )
 
 
-def _optimize(service_date: date):
+def _lambda_fingerprint(demand: dict[int, float]) -> str:
+    payload = "|".join(f"{od_id}:{value:.8f}" for od_id, value in sorted(demand.items()))
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _optimize(service_date: date, force_resolve: bool = False) -> tuple[dict, bool]:
     forecaster = _require_forecaster()
     key = service_date.isoformat()
-    cache = STATE["opt_cache"]
-    if key in cache:
-        return cache[key]
     meta = STATE["meta"]
     ods = meta["od_products"]
     prediction = forecaster.predict(_feature_rows(ods, service_date))
     demand = dict(zip(prediction["od_id"], prediction["lambda_hat"], strict=True))
+    fingerprint = _lambda_fingerprint(demand)
+
+    cached = STATE["opt_cache"].get(key)
+    if not force_resolve and cached is not None and cached["fingerprint"] == fingerprint:
+        return cached["solution"], True
+
     started_at = time.time()
     solution = opt.solve_bid_prices(ods, demand, len(meta["segments"]))
     solution["solve_ms"] = (time.time() - started_at) * 1000
-    cache[key] = solution
-    return solution
+    solution["run_version"] = f"{key}-{uuid.uuid4().hex[:12]}"
+    STATE["opt_cache"][key] = {"fingerprint": fingerprint, "solution": solution}
+    return solution, False
 
 
 @app.post("/internal/optimize", response_model=OptimizeResponse)
 def optimize(req: OptimizeRequest):
-    solution = _optimize(_iso(req.service_date))
+    solution, warm_started = _optimize(
+        _iso(req.service_date), force_resolve=req.force_resolve
+    )
     bid_prices = [
         BidPrice(segment_id=segment, seat_type=seat_type, bid_price=round(value, 0))
         for (segment, seat_type), value in solution["bid_prices"].items()
         if value > 0
     ]
+    quotas = [
+        Quota(
+            origin_idx=STATE["ods"][od_id]["origin_idx"],
+            dest_idx=STATE["ods"][od_id]["dest_idx"],
+            seat_type=STATE["ods"][od_id]["seat_type"],
+            quota=round(value, 3),
+        )
+        for od_id, value in solution["quotas"].items()
+        if value > 0
+    ]
     rejected_count = sum(1 for item in solution["accept"].values() if not item["accept"])
     return OptimizeResponse(
         service_date=req.service_date,
+        run_version=solution["run_version"],
+        warm_started=warm_started,
         solve_ms=round(solution["solve_ms"], 1),
         revenue_lp=round(solution["revenue_lp"], 0),
         bid_prices=bid_prices,
+        quotas=quotas,
         n_rejected=rejected_count,
         n_od=len(solution["accept"]),
     )
@@ -189,11 +216,23 @@ def price(req: PriceRequest):
     od_index = STATE.get("ods", {})
     if req.od_id not in od_index:
         raise HTTPException(404, "od_id khong ton tai")
-    solution = _optimize(_iso(req.service_date))
+    solution, _warm_started = _optimize(_iso(req.service_date))
     policy = None
     if req.min_price is not None and req.max_price is not None:
         policy = {"min_price": req.min_price, "max_price": req.max_price}
     result = pricing.price_od(
-        od_index[req.od_id], solution["bid_prices"], STATE["eps"], policy
+        od_index[req.od_id],
+        solution["bid_prices"],
+        STATE["eps"],
+        policy,
+        segment_load=solution.get("segment_load"),
     )
-    return PriceResponse(**result)
+    return PriceResponse(
+        od_id=result["od_id"],
+        seat_type=result["seat_type"],
+        opportunity_cost=result["opportunity_cost"],
+        proposed_price=result["proposed_price"],
+        final_price=result["final_price"],
+        decision=result["decision"],
+        explanation=PriceExplanation(**result["explanation"]),
+    )
