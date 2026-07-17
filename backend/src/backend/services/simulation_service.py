@@ -38,18 +38,48 @@ class SimulationService:
                 text("SELECT min_price, max_price FROM price_policies WHERE id = :policy_id"), {"policy_id": policy_id}
             ).fetchone()
 
-        quotes_res = db.execute(
+        # Lấy active version hiện tại của chuyến tàu từ quotas
+        active_ver_row = db.execute(
             text("""
-                SELECT
-                    q.proposed_price,
-                    q.final_price,
-                    p.distance_km
-                FROM price_quotes q
+                SELECT q.run_version FROM quotas q
                 JOIN od_products p ON q.od_product_id = p.id
-                WHERE p.trip_id = :trip_id AND q.decision = 'accepted'
+                WHERE p.trip_id = :trip_id AND q.is_active = TRUE
+                LIMIT 1
             """),
-            {"trip_id": trip_id},
-        ).fetchall()
+            {"trip_id": trip_id}
+        ).fetchone()
+        
+        active_version = active_ver_row[0] if active_ver_row else None
+
+        if active_version:
+            quotes_res = db.execute(
+                text("""
+                    SELECT
+                        q.proposed_price,
+                        q.final_price,
+                        p.distance_km
+                    FROM price_quotes q
+                    JOIN od_products p ON q.od_product_id = p.id
+                    WHERE p.trip_id = :trip_id 
+                      AND q.decision = 'accepted'
+                      AND q.run_version = :active_version
+                """),
+                {"trip_id": trip_id, "active_version": active_version},
+            ).fetchall()
+        else:
+            quotes_res = db.execute(
+                text("""
+                    SELECT
+                        q.proposed_price,
+                        q.final_price,
+                        p.distance_km
+                    FROM price_quotes q
+                    JOIN od_products p ON q.od_product_id = p.id
+                    WHERE p.trip_id = :trip_id 
+                      AND q.decision = 'accepted'
+                """),
+                {"trip_id": trip_id},
+            ).fetchall()
 
         sim_rev = 0.0
         sim_pkm = 0.0
