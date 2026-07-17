@@ -18,8 +18,9 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = {
+export type RequestOptions = {
   signal?: AbortSignal;
+  headers?: Record<string, string>;
 };
 
 async function request<TResponse>(
@@ -61,8 +62,8 @@ async function extractErrorMessage(res: Response): Promise<string> {
 
 export const apiClient = {
   get: <TResponse>(path: string, options?: RequestOptions) =>
-    request<TResponse>(path, { method: "GET" }, options),
+    request<TResponse>(path, { method: "GET", headers: options?.headers }, options),
 
   post: <TResponse>(path: string, body: unknown, options?: RequestOptions) =>
-    request<TResponse>(path, { method: "POST", body: JSON.stringify(body) }, options),
+    request<TResponse>(path, { method: "POST", body: JSON.stringify(body), headers: options?.headers }, options),
 };

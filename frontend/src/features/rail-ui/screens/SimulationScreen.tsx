@@ -1,58 +1,150 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { SectionCard } from "@/features/rail-ui/components/Primitives";
-import { scenarioChart, simulationSummary, simulationTable } from "@/features/rail-ui/mockData";
+import { apiClient } from "@/lib/api/client";
+import { scenarioChart as mockChart, simulationSummary as mockSummary, simulationTable as mockTable } from "@/features/rail-ui/mockData";
+
+interface SimulationCompareData {
+  trip_id: number;
+  historical_revenue: number;
+  simulated_revenue: number;
+  revenue_lift_pct: number;
+  historical_passenger_km: number;
+  simulated_passenger_km: number;
+  passenger_km_lift_pct: number;
+}
 
 export function SimulationScreen() {
+  const [simData, setSimData] = useState<SimulationCompareData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
+  async function runSimulation(policyId?: number) {
+    try {
+      setLoading(true);
+      setError(null);
+      const url = policyId 
+        ? `/api/v1/simulation/compare?trip_id=1&policy_id=${policyId}`
+        : "/api/v1/simulation/compare?trip_id=1";
+      const data = await apiClient.get<SimulationCompareData>(url);
+      setSimData(data);
+    } catch (err) {
+      console.warn("Không kết nối được API mô phỏng, dùng dữ liệu mô phỏng:", err);
+      setError("Không thể đồng bộ dữ liệu mô phỏng từ Backend server.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    runSimulation();
+  }, []);
+
+  const formatVND = (value: number) => {
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value);
+  };
+
+  const formatKM = (value: number) => {
+    return new Intl.NumberFormat("vi-VN").format(Math.round(value)) + " Khách-km";
+  };
+
+  // Cấu hình chiều cao biểu đồ so sánh dựa trên doanh thu
+  const getCompareChartData = () => {
+    if (!simData) return mockChart;
+    const maxRev = Math.max(simData.historical_revenue, simData.simulated_revenue);
+    const maxVol = Math.max(simData.historical_passenger_km, simData.simulated_passenger_km);
+    return [
+      {
+        name: "Lịch sử thực tế",
+        revenue: Math.round((simData.historical_revenue / maxRev) * 100),
+        volume: Math.round((simData.historical_passenger_km / maxVol) * 100),
+      },
+      {
+        name: "AI đề xuất tối ưu",
+        revenue: Math.round((simData.simulated_revenue / maxRev) * 100),
+        volume: Math.round((simData.simulated_passenger_km / maxVol) * 100),
+      }
+    ];
+  };
+
+  const chartData = getCompareChartData();
+
   return (
     <div className="page-stack">
+      {error && (
+        <div className="banner banner-warning" style={{ backgroundColor: "#3a2a18", borderLeft: "4px solid #d97706", padding: "12px", borderRadius: "6px", color: "#f59e0b", fontSize: "14px", marginBottom: "8px" }}>
+          ⚠️ <strong>Cảnh báo:</strong> {error} Hiển thị kịch bản Demo.
+        </div>
+      )}
+
       <SectionCard
-        title="Chọn kịch bản mô phỏng"
-        subtitle="Chạy thử chính sách trước khi phê duyệt để xem tác động lên doanh thu và lấp đầy."
-        actions={<button className="btn btn-primary">Chạy /v1/simulate</button>}
+        title="Chọn kịch bản mô phỏng chính sách"
+        subtitle="Chạy giả lập các mức trần/sàn trên dữ liệu hành trình lịch sử để nhìn rõ tác động doanh thu trước khi ban hành."
+        actions={
+          <button 
+            className="btn btn-primary" 
+            onClick={() => runSimulation()} 
+            disabled={loading}
+            style={{ opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? "Đang chạy mô phỏng..." : "Kích hoạt Mô Phỏng /v1/simulate"}
+          </button>
+        }
       >
         <div className="scenario-strip">
-          <button className="scenario-chip scenario-chip-active" type="button">
-            Cuối tuần tháng 7
+          <button className="scenario-chip scenario-chip-active" type="button" onClick={() => runSimulation()}>
+            Kịch bản mặc định (Trip #1)
           </button>
-          <button className="scenario-chip" type="button">
-            Khung giờ thấp điểm
+          <button className="scenario-chip" type="button" onClick={() => runSimulation(1)}>
+            Chính sách Huế - Đà Nẵng
           </button>
-          <button className="scenario-chip" type="button">
-            Cân bằng dịp Tết
+          <button className="scenario-chip" type="button" onClick={() => runSimulation()}>
+            Cân bằng mùa cao điểm
           </button>
         </div>
       </SectionCard>
 
-      <div className="two-up">
-        <SectionCard title="Tóm tắt kết quả" subtitle="Chỉ số chính cần nhìn trước khi bấm phê duyệt.">
+      <div className="two-up" style={{ opacity: loading ? 0.6 : 1, transition: "opacity 0.2s" }}>
+        <SectionCard title="Tóm tắt kết quả tăng trưởng" subtitle="Các chỉ số tăng trưởng then chốt do AI tính toán.">
           <div className="summary-grid">
             <article>
-              <span>Chính sách</span>
-              <strong>{simulationSummary.policy}</strong>
+              <span>Chính sách áp dụng</span>
+              <strong>{simData ? `Kịch bản Trip #${simData.trip_id}` : mockSummary.policy}</strong>
             </article>
             <article>
-              <span>Tăng doanh thu</span>
-              <strong>{simulationSummary.revenueLift}</strong>
+              <span>Tăng doanh thu (Revenue Lift)</span>
+              <strong style={{ color: "#10b981" }}>
+                {simData ? `+${simData.revenue_lift_pct.toFixed(2)}%` : mockSummary.revenueLift}
+              </strong>
             </article>
             <article>
-              <span>Tăng lấp đầy</span>
-              <strong>{simulationSummary.utilizationLift}</strong>
+              <span>Tăng sản lượng (Passenger-KM Lift)</span>
+              <strong style={{ color: "#10b981" }}>
+                {simData ? `+${simData.passenger_km_lift_pct.toFixed(2)}%` : mockSummary.utilizationLift}
+              </strong>
             </article>
             <article>
-              <span>Giảm từ chối chặng ngắn</span>
-              <strong>{simulationSummary.rejectedShortTrips}</strong>
+              <span>Trạng thái dự kiến</span>
+              <strong>Ổn định hệ số tải</strong>
             </article>
           </div>
-          <p className="section-note">{simulationSummary.note}</p>
+          <p className="section-note" style={{ marginTop: "16px", color: "#888" }}>
+            {simData 
+              ? `Hệ thống mô phỏng đã đối chiếu ${formatVND(simData.historical_revenue)} doanh thu thực tế lịch sử với doanh thu đề xuất từ các Price Quote có hiệu lực.` 
+              : mockSummary.note}
+          </p>
         </SectionCard>
 
-        <SectionCard title="Biểu đồ so sánh" subtitle="Doanh thu và sản lượng của từng kịch bản trên cùng thang nhìn.">
-          <div className="compare-chart">
-            {scenarioChart.map((item) => (
-              <div className="compare-col" key={item.name}>
-                <span>{item.name}</span>
-                <div className="compare-bars">
-                  <div className="compare-bar compare-revenue" style={{ height: `${item.revenue}%` }} />
-                  <div className="compare-bar compare-volume" style={{ height: `${item.volume}%` }} />
+        <SectionCard title="Biểu đồ so sánh kịch bản (ScenarioCompareChart)" subtitle="Cột xanh ngọc: Doanh thu | Cột xanh dương: Sản lượng Khách-km.">
+          <div className="compare-chart" style={{ display: "flex", gap: "24px", justifyContent: "space-around", alignItems: "flex-end", height: "180px", paddingTop: "20px" }}>
+            {chartData.map((item) => (
+              <div className="compare-col" key={item.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "11px", color: "#888" }}>{item.name}</span>
+                <div className="compare-bars" style={{ display: "flex", gap: "8px", height: "120px", alignItems: "flex-end" }}>
+                  <div className="compare-bar compare-revenue" style={{ height: `${item.revenue}%`, width: "20px", backgroundColor: "#10b981", borderRadius: "2px" }} title={`Doanh thu: ${item.revenue}%`} />
+                  <div className="compare-bar compare-volume" style={{ height: `${item.volume}%`, width: "20px", backgroundColor: "#3b82f6", borderRadius: "2px" }} title={`Khách-km: ${item.volume}%`} />
                 </div>
               </div>
             ))}
@@ -60,39 +152,58 @@ export function SimulationScreen() {
         </SectionCard>
       </div>
 
-      <SectionCard title="So sánh AI với hiện tại" subtitle="Bảng ra quyết định gọn, dễ đọc và đủ thuyết phục.">
-        <div className="table-wrap">
+      <SectionCard title="Bảng so sánh chi tiết chỉ số doanh thu & sản lượng" subtitle="Đối chiếu trực quan dữ liệu lịch sử trong cơ sở dữ liệu với giải thuật AI đề xuất.">
+        <div className="table-wrap" style={{ opacity: loading ? 0.6 : 1, transition: "opacity 0.2s" }}>
           <table className="data-table comparison-table">
             <thead>
               <tr>
-                <th>Chỉ số</th>
-                <th>Hiện tại</th>
-                <th>AI đề xuất</th>
+                <th>Chỉ số chặng tàu</th>
+                <th>Lịch sử thực tế</th>
+                <th>AI đề xuất tối ưu</th>
+                <th>Mức tăng trưởng</th>
               </tr>
             </thead>
             <tbody>
-              {simulationTable.map((item) => (
-                <tr key={item.metric}>
-                  <th scope="row">{item.metric}</th>
-                  <td>{item.current}</td>
-                  <td>{item.ai}</td>
-                </tr>
-              ))}
+              {simData ? (
+                <>
+                  <tr>
+                    <th scope="row">Tổng doanh thu chặng (VND)</th>
+                    <td>{formatVND(simData.historical_revenue)}</td>
+                    <td style={{ color: "#10b981", fontWeight: "bold" }}>{formatVND(simData.simulated_revenue)}</td>
+                    <td style={{ color: "#10b981", fontWeight: "bold" }}>+{simData.revenue_lift_pct.toFixed(2)}%</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Sản lượng luân chuyển (Khách-km)</th>
+                    <td>{formatKM(simData.historical_passenger_km)}</td>
+                    <td style={{ color: "#3b82f6", fontWeight: "bold" }}>{formatKM(simData.simulated_passenger_km)}</td>
+                    <td style={{ color: "#3b82f6", fontWeight: "bold" }}>+{simData.passenger_km_lift_pct.toFixed(2)}%</td>
+                  </tr>
+                </>
+              ) : (
+                mockTable.map((item) => (
+                  <tr key={item.metric}>
+                    <th scope="row">{item.metric}</th>
+                    <td>{item.current}</td>
+                    <td>{item.ai}</td>
+                    <td>N/A</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </SectionCard>
 
-      <SectionCard title="Hành động phê duyệt" subtitle="Giữ thao tác rõ ràng, an toàn và có chủ đích.">
+      <SectionCard title="Hành động phê duyệt chính sách" subtitle="Revenue Manager xem xét phê duyệt kịch bản để áp dụng trực tiếp lên hệ thống đặt vé.">
         <div className="action-row">
-          <button className="btn btn-primary" type="button">
-            Phê duyệt chính sách
+          <button className="btn btn-primary" type="button" onClick={() => alert("Đã gửi kịch bản tối ưu hóa lên hệ thống phê duyệt.")}>
+            Phê duyệt áp dụng AI
           </button>
           <button className="btn btn-ghost" type="button">
             Ghi đè thủ công
           </button>
           <button className="btn btn-ghost" type="button">
-            Cập nhật giới hạn
+            Cập nhật giới hạn chính sách
           </button>
         </div>
       </SectionCard>

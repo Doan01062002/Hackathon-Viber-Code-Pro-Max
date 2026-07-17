@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import pickle
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 
@@ -19,8 +21,10 @@ from .schemas import (
     ForecastResponse,
     OptimizeRequest,
     OptimizeResponse,
+    PriceExplanation,
     PriceRequest,
     PriceResponse,
+    Quota,
 )
 
 MODEL_PATH = os.path.join(

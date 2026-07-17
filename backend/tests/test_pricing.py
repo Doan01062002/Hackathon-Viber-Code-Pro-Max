@@ -206,3 +206,15 @@ async def test_policy_guard_max_step_change(client):
             db.execute(text("DELETE FROM price_policies WHERE id = :pid"), {"pid": policy_id})
         db.commit()
         db.close()
+
+
+@pytest.mark.asyncio
+async def test_get_all_products_success(client):
+    """Kiểm tra việc truy vấn toàn bộ sản phẩm OD thành công."""
+    response = await client.get("/api/v1/pricing/products")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "origin_station_code" in data[0]
+    assert "destination_station_code" in data[0]
