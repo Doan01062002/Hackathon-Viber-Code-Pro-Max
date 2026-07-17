@@ -69,20 +69,11 @@ def main():
         return 0
 
     dest_dir.mkdir(parents=True, exist_ok=True)
-    allowed = scan_secrets.load_allowlist()
-    found_secret = False
     copied_count = 0
 
+    import sanitize_log
+
     for conv_id, log_path in sessions:
-        # Chạy quét secret
-        findings = scan_secrets.scan(str(log_path))
-        blocking = [f for f in findings if scan_secrets.digest(f[2]) not in allowed]
-
-        if blocking:
-            scan_secrets.report_blocking(blocking, log_path.name, f" (trong phiên Gemini {conv_id[:8]})", str(log_path))
-            found_secret = True
-            continue
-
         # Lấy ngày sửa đổi cuối cùng của file log
         mtime = os.path.getmtime(log_path)
         day = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d")
@@ -91,16 +82,13 @@ def main():
         out_name = f"{day}-gemini-{short_id}.jsonl"
         out_path = dest_dir / out_name
 
-        shutil.copy2(log_path, out_path)
+        # Quét và che các chuỗi nhạy cảm khi xuất log
+        sanitize_log.sanitize(log_path, out_path)
         
         # Lấy dung lượng file
         size_kb = os.path.getsize(out_path) / 1024
         print(f"✅ {out_name}  ({size_kb:.1f} KB)", file=sys.stderr)
         copied_count += 1
-
-    if found_secret:
-        print("\n❌ DỪNG — Một số phiên Gemini chứa thông tin nhạy cảm và không được copy.", file=sys.stderr)
-        return 1
 
     if copied_count > 0:
         print(f"\nĐã xuất {copied_count} phiên Gemini → docs/ai-log/sessions/", file=sys.stderr)

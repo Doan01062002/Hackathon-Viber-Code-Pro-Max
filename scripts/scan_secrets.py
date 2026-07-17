@@ -30,7 +30,9 @@ PATTERNS = {
     "GitHub PAT": re.compile(r"\bgithub_pat_\w{60,}\b"),
     "AWS access key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "Google API key": re.compile(r"\bAIza[A-Za-z0-9_-]{35}\b"),
-    "Slack token": re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),
+    "Slack token": re.compile(r"\bxox[baprs.0-9a-zA-Z_-]{10,}"),
+    "Notion token": re.compile(r"\bntn_\w{30,}\b"),
+    "Vercel token": re.compile(r"\bvcp_\w{30,}\b"),
     "Private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
 }
 
