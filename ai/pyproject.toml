@@ -5,17 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai"
 version = "1.0.0"
-description = "LangGraph agent — thuần AI, không biết gì về HTTP"
+description = "SRRM ai-service — dependency manifest cho ai_service/ (forecasting/optimization/pricing)"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.10.0",
-    "pydantic-settings>=2.7.0",
-    "langchain>=0.3.0",
-    "langchain-openai>=0.3.0",
-    "langgraph>=0.2.0",
     # ai_service/ — Khối 1-2-3 (forecasting/optimization/pricing), phơi qua FastAPI /internal/*.
-    # Chưa phải package cài đặt riêng (nằm ngoài src/), nhưng cần các thư viện này để
-    # chạy và test được (xem ai/tests/conftest.py, scripts/train.py).
+    # Không phải package Python cài đặt được (không nằm dưới src/) — được import qua
+    # sys.path (xem ai/tests/conftest.py, scripts/train.py). File pyproject.toml này chỉ
+    # khai báo dependency + cấu hình pytest, không đóng gói module nào.
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
     "pandas>=2.2.0",
@@ -32,8 +29,8 @@ dev = [
     "ruff>=0.8.0",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+packages = []
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

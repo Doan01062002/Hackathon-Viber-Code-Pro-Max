@@ -1192,49 +1192,6 @@ input {
   color: var(--body);
 }
 
-.chat-window {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.message-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.message {
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.message-user {
-  border-left: 3px solid var(--primary);
-}
-
-.message-role {
-  font-size: 0.75rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.message-content {
-  margin: 0.25rem 0 0;
-  white-space: pre-wrap;
-}
-
-.message-input {
-  display: flex;
-  gap: 0.5rem;
-}
-
 .empty,
 .error {
   color: var(--muted);

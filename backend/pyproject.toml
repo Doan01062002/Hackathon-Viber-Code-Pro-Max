@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "backend"
 version = "1.0.0"
-description = "FastAPI backend theo bố cục MVC — import ai như một thư viện"
+description = "FastAPI backend theo bố cục MVC"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
@@ -17,8 +17,6 @@ dependencies = [
     "psycopg[binary]>=3.2.0,<4.0.0",
     "redis>=5.0.0",
     "httpx>=0.28.0",  # gọi ai-service qua HTTP (backend/services/ai_client.py)
-    # Module AI — cài bằng: pip install -e ./ai
-    "ai",
 ]
 
 [project.optional-dependencies]

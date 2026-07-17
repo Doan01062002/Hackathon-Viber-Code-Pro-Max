@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.app_name,
-        description="AI Agent built with LangGraph",
+        description="Smart Rail Revenue Management API",
         version="1.0.0",
         lifespan=lifespan,
     )
