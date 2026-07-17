@@ -13,13 +13,10 @@ dependencies = [
     "langchain>=0.3.0",
     "langchain-openai>=0.3.0",
     "langgraph>=0.2.0",
-    # ai_service/ — Khối 1-2-3 (forecasting/optimization/pricing), phơi qua FastAPI /internal/*.
-    # Chưa phải package cài đặt riêng (nằm ngoài src/), nhưng cần các thư viện này để
-    # chạy và test được (xem ai/tests/conftest.py, scripts/train.py).
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
-    "pandas>=2.2.0",
     "numpy>=1.26.0",
+    "pandas>=2.2.0",
     "scipy>=1.13.0",
     "scikit-learn>=1.5.0",
 ]
