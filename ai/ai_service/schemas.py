@@ -66,6 +66,7 @@ class PriceRequest(BaseModel):
 class PriceExplanation(BaseModel):
     bottleneck_segment: int | None
     segment_pi: dict[int, float]
+    bottleneck_load_pct: float | None = None  # % sức chứa đã phân bổ tại chặng nút cổ chai
     elasticity: float
     base_price: float
 
