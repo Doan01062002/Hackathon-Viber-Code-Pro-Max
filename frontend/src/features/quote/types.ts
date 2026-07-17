@@ -25,9 +25,9 @@ export type PricingQuoteResponse = {
   decision: "accepted" | "rejected" | "blocked";
   explanation: PricingExplanation;
   expires_at: string;
-  origin: string | null;
-  destination: string | null;
-  service_date: string | null;
-  seat_type: string | null;
-  availability: number | null;
+  origin: string;
+  destination: string;
+  service_date: string;
+  seat_type: string;
+  availability: number;
 };

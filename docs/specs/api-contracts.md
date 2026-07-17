@@ -180,3 +180,37 @@ Các REST API được cung cấp tại base URL `/api/v1`. Kiểu dữ liệu s
 * `origin` and `destination` accept either a station code or its exact name.
   `trip_id` is optional; when omitted, the earliest matching trip is selected.
 * The legacy `GET /api/v1/quote?od_product_id=...` contract remains available.
+
+### 3.1. Response Body (BE-07.4)
+
+```json
+{
+  "quote_id": 2048,
+  "od_product_id": 15,
+  "policy_id": 3,
+  "opportunity_cost": 350000.0,
+  "proposed_price": 420000.0,
+  "final_price": 420000.0,
+  "decision": "accepted",
+  "explanation": {
+    "base_opportunity_cost": 350000.0,
+    "markup_factor": 1.2,
+    "applied_policies": ["STANDARD_MARKUP"],
+    "bottleneck_segment_id": 101,
+    "bottleneck_segment": "Hue -> Da Nang",
+    "segment_bid_prices": {"100": 100000.0, "101": 250000.0}
+  },
+  "expires_at": "2026-07-18T12:15:00+00:00",
+  "origin": "Ha Noi",
+  "destination": "Da Nang",
+  "service_date": "2026-07-19",
+  "seat_type": "giuong_nam_k6",
+  "availability": 18
+}
+```
+
+Error responses use FastAPI's `detail` envelope:
+
+- `404`: OD cannot be mapped to an active product.
+- `422`: request body validation failed.
+- `502`: ai-service `/internal/price` is unavailable or returned an invalid payload.

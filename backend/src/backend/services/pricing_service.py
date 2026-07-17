@@ -5,7 +5,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.services.ai_pricing_client import AIPriceClient, SegmentBidPrice
-from backend.views.pricing_view import PricingExplanation, PricingQuoteRequest, PricingQuoteResponse
+from backend.views.pricing_view import (
+    PricingExplanation,
+    PricingQuoteODResponse,
+    PricingQuoteRequest,
+    PricingQuoteResponse,
+)
 
 
 def evaluate_bid_price(fare: float, opportunity_cost: float, availability: int) -> str:
@@ -161,7 +166,7 @@ class PricingService:
 
     async def create_pricing_quote_from_od(
         self, request: PricingQuoteRequest, db: Session
-    ) -> PricingQuoteResponse:
+    ) -> PricingQuoteODResponse:
         product = self._find_od_product(request, db)
         segments = self._load_segments(product["id"], product["seat_type"], db)
         if not segments:
@@ -234,7 +239,7 @@ class PricingService:
         ).fetchone()
         quote_id, expires_at = insert_result
 
-        return PricingQuoteResponse(
+        return PricingQuoteODResponse(
             quote_id=int(quote_id),
             od_product_id=int(product["id"]),
             policy_id=policy_id,

@@ -111,7 +111,7 @@ export function QuoteScreen() {
               <div className="quote-meta">
                 <article>
                   <span>Khả dụng</span>
-                  <strong>Còn {quote.availability ?? 0} chỗ</strong>
+                  <strong>Còn {quote.availability} chỗ</strong>
                 </article>
                 <article>
                   <span>Chi phí cơ hội</span>

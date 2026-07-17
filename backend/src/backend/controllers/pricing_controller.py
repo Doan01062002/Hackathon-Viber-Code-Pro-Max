@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.services.ai_pricing_client import AIServiceError
 from backend.services.pricing_service import PricingService
-from backend.views.pricing_view import PricingQuoteRequest, PricingQuoteResponse
+from backend.views.pricing_view import (
+    PricingQuoteODResponse,
+    PricingQuoteRequest,
+    PricingQuoteResponse,
+)
 
 router = APIRouter()
 
@@ -42,12 +46,12 @@ async def get_pricing_quote_alias(
     return _legacy_quote(od_product_id, service, db)
 
 
-@router.post("/quote", response_model=PricingQuoteResponse)
+@router.post("/quote", response_model=PricingQuoteODResponse)
 async def create_pricing_quote_from_od(
     request: PricingQuoteRequest,
     service: PricingService = Depends(get_pricing_service),
     db: Session = Depends(get_db),
-) -> PricingQuoteResponse:
+) -> PricingQuoteODResponse:
     """Map an OD request to segments and return an AI-generated price quote."""
     try:
         return await service.create_pricing_quote_from_od(request=request, db=db)

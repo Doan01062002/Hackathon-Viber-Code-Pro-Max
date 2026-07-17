@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -32,7 +33,7 @@ class PricingQuoteResponse(BaseModel):
     opportunity_cost: float
     proposed_price: float
     final_price: float
-    decision: str
+    decision: Literal["accepted", "rejected", "blocked"]
     explanation: PricingExplanation
     expires_at: str
     origin: str | None = None
@@ -40,3 +41,11 @@ class PricingQuoteResponse(BaseModel):
     service_date: date | None = None
     seat_type: str | None = None
     availability: int | None = Field(None, ge=0)
+
+
+class PricingQuoteODResponse(PricingQuoteResponse):
+    origin: str
+    destination: str
+    service_date: date
+    seat_type: str
+    availability: int = Field(..., ge=0)
