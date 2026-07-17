@@ -69,31 +69,18 @@ async def resolve_optimization_batch(
 ) -> OptimizeSubmitResponse:
     """Chạy quy trình dự báo -> tối ưu phân bổ -> định giá động bất đồng bộ dưới dạng background job."""
     # 1. Xác thực nhanh sự tồn tại của trip trước khi đẩy job chạy ngầm
-    trip_row = db.execute(
-        text("SELECT id FROM trips WHERE id = :trip_id"),
-        {"trip_id": request.trip_id}
-    ).fetchone()
+    trip_row = db.execute(text("SELECT id FROM trips WHERE id = :trip_id"), {"trip_id": request.trip_id}).fetchone()
     if not trip_row:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Không tìm thấy chuyến tàu với ID {request.trip_id}"
-        )
+        raise HTTPException(status_code=400, detail=f"Không tìm thấy chuyến tàu với ID {request.trip_id}")
 
     # 2. Tạo job chạy nền
     job_id = str(uuid.uuid4())
-    JOBS[job_id] = {
-        "job_id": job_id,
-        "status": "running",
-        "result": None,
-        "error": None
-    }
+    JOBS[job_id] = {"job_id": job_id, "status": "running", "result": None, "error": None}
 
     background_tasks.add_task(run_optimize_task, job_id, request.trip_id)
 
     return OptimizeSubmitResponse(
-        job_id=job_id,
-        status="running",
-        message="Yêu cầu chạy tối ưu hóa đã được đưa vào hàng đợi xử lý nền."
+        job_id=job_id, status="running", message="Yêu cầu chạy tối ưu hóa đã được đưa vào hàng đợi xử lý nền."
     )
 
 
@@ -108,9 +95,8 @@ async def get_optimize_job_status(job_id: str) -> OptimizeJobStatusResponse:
         job_id=job["job_id"],
         status=job["status"],
         result=OptimizeResponse(**job["result"]) if job["result"] else None,
-        error=job["error"]
+        error=job["error"],
     )
-
 
 
 from fastapi import Query
@@ -121,9 +107,11 @@ class OptimizeVersionResponse(BaseModel):
     calculated_at: str | None = Field(None, description="Thời điểm tạo phiên bản")
     is_active: bool = Field(..., description="Cờ trạng thái hoạt động")
 
+
 class OptimizeRollbackRequest(BaseModel):
     trip_id: int = Field(..., description="ID của chuyến tàu")
     target_version: str = Field(..., description="Phiên bản muốn khôi phục về")
+
 
 class OptimizeRollbackResponse(BaseModel):
     status: str = Field(..., description="Trạng thái (success/error)")
@@ -136,7 +124,7 @@ class OptimizeRollbackResponse(BaseModel):
 async def get_optimize_versions(
     trip_id: int = Query(..., description="ID của chuyến tàu"),
     service: OptimizeService = Depends(get_optimize_service),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> list[OptimizeVersionResponse]:
     """Lấy danh sách các phiên bản tối ưu đã chạy của chuyến tàu."""
     try:
@@ -152,7 +140,7 @@ async def get_optimize_versions(
 async def rollback_optimize_version(
     request: OptimizeRollbackRequest,
     service: OptimizeService = Depends(get_optimize_service),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> OptimizeRollbackResponse:
     """Khôi phục cấu hình tối ưu của chuyến tàu về phiên bản trước đó (Rollback)."""
     try:

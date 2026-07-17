@@ -386,6 +386,21 @@ input {
   align-items: center;
 }
 
+.curve-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.curve-state-error {
+  color: var(--danger);
+}
+
 .topbar-user-chip {
   min-height: 52px;
   padding: 4px 10px 4px 4px;

@@ -1,6 +1,8 @@
-import pytest
 import asyncio
+
+import pytest
 from sqlalchemy import text
+
 from backend.database import get_session_factory
 
 

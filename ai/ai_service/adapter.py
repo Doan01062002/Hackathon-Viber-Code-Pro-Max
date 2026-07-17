@@ -18,6 +18,7 @@ HUE_ID, DAN_ID = 9, 10  # id ga Huế / Đà Nẵng -> chặng nút cổ chai �
 def load_history(seeds_dir: str) -> pd.DataFrame:
     def p(f):
         return os.path.join(seeds_dir, f)
+
     od = pd.read_csv(p("od_products.csv"))
     trips = pd.read_csv(p("trips.csv"))[["id", "service_date"]].rename(columns={"id": "trip_id"})
     bk = pd.read_csv(p("bookings.csv"))

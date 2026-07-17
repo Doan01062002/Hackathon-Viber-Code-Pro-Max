@@ -2,7 +2,6 @@
 
 import pandas as pd
 import pytest
-
 from ai_service import config as C
 from ai_service import pricing
 
@@ -55,7 +54,9 @@ def test_zero_opportunity_cost_gives_zero_markup_price():
 def test_policy_guard_blocks_and_reports_min_price():
     od = _od(base_price=100_000)
     q = pricing.price_od(
-        od, {(0, "ngoi_mem"): 50_000}, {"ngoi_mem": 1.8},
+        od,
+        {(0, "ngoi_mem"): 50_000},
+        {"ngoi_mem": 1.8},
         policy={"min_price": 900_000, "max_price": 999_999},
     )
     assert q["decision"] == "blocked"
@@ -65,7 +66,9 @@ def test_policy_guard_blocks_and_reports_min_price():
 def test_policy_guard_within_range_stays_accepted():
     od = _od(base_price=100_000)
     q = pricing.price_od(
-        od, {(0, "ngoi_mem"): 10_000}, {"ngoi_mem": 1.8},
+        od,
+        {(0, "ngoi_mem"): 10_000},
+        {"ngoi_mem": 1.8},
         policy={"min_price": 1, "max_price": 999_999_999},
     )
     assert q["decision"] == "accepted"
@@ -94,8 +97,7 @@ def test_estimate_elasticity_is_clipped_to_floor_and_cap():
     rows = []
     for od_id in range(5):
         for i in range(150):
-            rows.append(dict(seat_type="ngoi_mem", od_id=od_id,
-                             shown_price=100_000 + i, willing=1))
+            rows.append(dict(seat_type="ngoi_mem", od_id=od_id, shown_price=100_000 + i, willing=1))
     hist = pd.DataFrame(rows)
     eps = pricing.estimate_elasticity(hist)
     assert C.ELASTICITY_FLOOR <= eps["ngoi_mem"] <= C.ELASTICITY_CAP

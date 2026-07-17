@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import text
+
 from backend.database import get_session_factory
 
 
@@ -58,7 +59,7 @@ async def test_rollback_success(client):
         db.execute(
             text("""
                 INSERT INTO bid_prices (segment_id, seat_type, bid_price, remaining_capacity, run_version, is_active, calculated_at)
-                VALUES 
+                VALUES
                     (:seg_id, :seat_type, 50000.00, 10, 'ver-rollback-prev', FALSE, NOW() - INTERVAL '1 hour'),
                     (:seg_id, :seat_type, 75000.00, 10, 'ver-rollback-curr', TRUE, NOW())
             """),
@@ -67,7 +68,7 @@ async def test_rollback_success(client):
         db.execute(
             text("""
                 INSERT INTO quotas (od_product_id, quota, run_version, is_active, calculated_at)
-                VALUES 
+                VALUES
                     (:od_id, 20, 'ver-rollback-prev', FALSE, NOW() - INTERVAL '1 hour'),
                     (:od_id, 15, 'ver-rollback-curr', TRUE, NOW())
             """),
