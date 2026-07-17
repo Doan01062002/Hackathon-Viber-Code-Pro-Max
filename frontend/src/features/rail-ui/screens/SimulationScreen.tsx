@@ -6,6 +6,8 @@ import { apiClient } from "@/lib/api/client";
 import { scenarioChart as mockChart, simulationSummary as mockSummary, simulationTable as mockTable } from "@/features/rail-ui/mockData";
 import { policyApi } from "@/features/policy/api/policyApi";
 import type { PolicyDto } from "@/features/policy/api/policyApi";
+import { optimizeApi } from "@/features/optimize/api/optimizeApi";
+import type { OptimizeVersionDto } from "@/features/optimize/api/optimizeApi";
 
 interface SimulationCompareData {
   trip_id: number;
@@ -37,6 +39,13 @@ export function SimulationScreen() {
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [policyMessage, setPolicyMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
+  // States cho quản lý Rollback
+  const [showRollbackPanel, setShowRollbackPanel] = useState(false);
+  const [versions, setVersions] = useState<OptimizeVersionDto[]>([]);
+  const [fetchingVersions, setFetchingVersions] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+  const [rollbackMessage, setRollbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
   async function loadPolicies() {
     try {
       setFetchingPolicies(true);
@@ -54,6 +63,52 @@ export function SimulationScreen() {
       loadPolicies();
     }
   }, [showPolicyPanel]);
+
+  async function loadVersions() {
+    try {
+      setFetchingVersions(true);
+      const data = await optimizeApi.getVersions(1);
+      setVersions(data);
+    } catch (err) {
+      console.error("Lỗi tải lịch sử phiên bản:", err);
+    } finally {
+      setFetchingVersions(false);
+    }
+  }
+
+  useEffect(() => {
+    if (showRollbackPanel) {
+      loadVersions();
+    }
+  }, [showRollbackPanel]);
+
+  async function handleRollback(version: string) {
+    try {
+      setRollingBack(true);
+      setRollbackMessage(null);
+      await optimizeApi.rollbackVersion(1, version);
+      setRollbackMessage({ text: `Đã khôi phục thành công về phiên bản ${version}!`, type: "success" });
+      loadVersions();
+      runSimulation();
+    } catch (err: any) {
+      setRollbackMessage({
+        text: err instanceof Error ? err.message : "Khôi phục phiên bản thất bại.",
+        type: "error"
+      });
+    } finally {
+      setRollingBack(false);
+    }
+  }
+
+  const formatDateTime = (isoString: string | null) => {
+    if (!isoString) return "N/A";
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleString("vi-VN");
+    } catch {
+      return isoString;
+    }
+  };
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
@@ -237,8 +292,25 @@ export function SimulationScreen() {
           <button className="btn btn-ghost" type="button">
             Ghi đè thủ công
           </button>
-          <button className="btn btn-ghost" type="button" onClick={() => setShowPolicyPanel((val) => !val)}>
+          <button 
+            className="btn btn-ghost" 
+            type="button" 
+            onClick={() => {
+              setShowPolicyPanel((val) => !val);
+              setShowRollbackPanel(false);
+            }}
+          >
             {showPolicyPanel ? "Ẩn giới hạn chính sách" : "Cập nhật giới hạn chính sách"}
+          </button>
+          <button 
+            className="btn btn-ghost" 
+            type="button" 
+            onClick={() => {
+              setShowRollbackPanel((val) => !val);
+              setShowPolicyPanel(false);
+            }}
+          >
+            {showRollbackPanel ? "Ẩn lịch sử phiên bản" : "Khôi phục phiên bản"}
           </button>
         </div>
       </SectionCard>
@@ -458,6 +530,97 @@ export function SimulationScreen() {
                   Hủy bỏ
                 </button>
               </div>
+            </div>
+          )}
+        </SectionCard>
+      )}
+
+      {showRollbackPanel && (
+        <SectionCard
+          title="Lịch sử tối ưu hóa & Khôi phục phiên bản (Rollback)"
+          subtitle="Danh sách các phiên bản giải tối ưu hóa trước đây của chuyến tàu. Cho phép khôi phục lại cấu hình giá cơ hội và hạn ngạch ghế."
+          actions={
+            <button className="btn btn-ghost" type="button" onClick={() => setShowRollbackPanel(false)}>
+              Đóng panel
+            </button>
+          }
+        >
+          {rollbackMessage && (
+            <div 
+              style={{
+                backgroundColor: rollbackMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
+                borderLeft: `4px solid ${rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
+                padding: "12px 16px",
+                borderRadius: "8px",
+                color: rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)",
+                fontSize: "14px",
+                fontWeight: 500,
+                marginBottom: "16px"
+              }}
+            >
+              {rollbackMessage.type === "success" ? "✅" : "⚠️"} {rollbackMessage.text}
+            </div>
+          )}
+
+          {fetchingVersions ? (
+            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải lịch sử phiên bản...</p>
+          ) : (
+            <div className="table-wrap" style={{ marginBottom: "24px" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Phiên Bản</th>
+                    <th>Thời Điểm Tính Toán</th>
+                    <th>Trạng Thái</th>
+                    <th>Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.map((v) => (
+                    <tr key={v.run_version}>
+                      <td><strong>{v.run_version}</strong></td>
+                      <td>{formatDateTime(v.calculated_at)}</td>
+                      <td>
+                        <span 
+                          style={{ 
+                            display: "inline-block", 
+                            padding: "4px 10px", 
+                            borderRadius: "6px", 
+                            backgroundColor: v.is_active ? "rgba(60, 154, 117, 0.12)" : "rgba(142, 144, 165, 0.12)", 
+                            color: v.is_active ? "var(--success)" : "var(--muted)", 
+                            fontSize: "12px",
+                            fontWeight: 600
+                          }}
+                        >
+                          {v.is_active ? "Đang áp dụng" : "Không hoạt động"}
+                        </span>
+                      </td>
+                      <td>
+                        {v.is_active ? (
+                          <span style={{ color: "var(--muted)", fontSize: "14px" }}>Hiện tại</span>
+                        ) : (
+                          <button
+                            className="btn btn-primary"
+                            style={{ minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
+                            type="button"
+                            disabled={rollingBack}
+                            onClick={() => handleRollback(v.run_version)}
+                          >
+                            {rollingBack ? "Đang khôi phục..." : "Khôi phục"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {versions.length === 0 && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
+                        Không tìm thấy lịch sử phiên bản nào cho chuyến tàu này.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </SectionCard>
