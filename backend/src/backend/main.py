@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
 from backend.controllers import api_router
 from backend.controllers.health_controller import router as health_router
+from backend.database import dispose_engine
 
 
 @asynccontextmanager
@@ -13,6 +14,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
     yield
+    dispose_engine()
     print("Shutting down...")
 
 

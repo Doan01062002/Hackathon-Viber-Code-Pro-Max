@@ -49,7 +49,7 @@ fi
 
 if [ "$failed" -ne 0 ]; then
   echo ""
-  echo "Ranh giới module bị vi phạm. Xem ARCHITECTURE.md."
+  echo "Ranh giới module bị vi phạm. Xem docs/ARCHITECTURE.md."
   exit 1
 fi
 

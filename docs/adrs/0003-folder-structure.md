@@ -17,20 +17,20 @@ Trong một dự án monorepo có sự tham gia sâu sắc của các AI Coding 
 Thống nhất cấu hình thư mục workspace theo mô hình **Context-Centric** (như mô tả trong hình vẽ hướng dẫn):
 
 ```
-├── /specs                  # Đặc tả sản phẩm & Nghiệp vụ (Single Source of Truth)
-├── /adrs                   # Tài liệu ghi nhận các Quyết định Kiến trúc (ADRs)
-├── /planning               # Kế hoạch phát triển, Product Backlog & Sprints
-│   └── /sprints            # Chi tiết từng Sprint
-├── /tasks                  # Các file đặc tả chi tiết từng tác vụ (User Stories)
+├── /docs                   # Toàn bộ tài liệu dự án
+│   ├── /specs              # Đặc tả sản phẩm & Nghiệp vụ (Single Source of Truth)
+│   ├── /adrs               # Tài liệu ghi nhận các Quyết định Kiến trúc (ADRs)
+│   ├── /planning           # Kế hoạch phát triển, Product Backlog & Sprints
+│   │   └── /sprints        # Chi tiết từng Sprint
+│   └── /tasks              # Các file đặc tả chi tiết từng tác vụ (User Stories)
 ├── /src                    # Mã nguồn chính (chia thành frontend/, backend/, ai/)
-├── /docs                   # Tài liệu bổ sung, sơ đồ kiến trúc vật lý, runbooks
 ├── AGENTS.md               # Quy tắc phối hợp giữa lập trình viên & AI
 ├── README.md               # Giới thiệu dự án và hướng dẫn chạy nhanh
 └── .gitignore              # Quy tắc loại trừ tệp tin của Git
 ```
 
 ### Nguyên tắc quản lý:
-1. **Liên kết vết (Traceability):** Mỗi file tác vụ trong `/tasks` phải trỏ ngược về một yêu cầu chức năng (FR) cụ thể trong `/specs/features.md`.
+1. **Liên kết vết (Traceability):** Mỗi file tác vụ trong `/docs/tasks` phải trỏ ngược về một yêu cầu chức năng (FR) cụ thể trong `/docs/specs/features.md`.
 2. **Quy tắc đặt tên:** 
   * Các file ADR đặt tên theo thứ tự tăng dần: `0001-...md`, `0002-...md`.
   * Các file Sprint đặt tên theo số hiệu: `sprint-01.md`, `sprint-02.md`.
