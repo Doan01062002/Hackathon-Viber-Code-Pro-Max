@@ -123,7 +123,32 @@ Script có thể chạy lại an toàn. Nếu chỉ có một phần schema tồ
 dừng với lỗi `Partial schema detected` thay vì tiếp tục tạo một database không
 nhất quán.
 
-### Bước 7: Chạy backend
+### Bước 7: Kiểm tra hoặc nạp mock data
+
+Kiểm tra định dạng file seed mà chưa kết nối database:
+
+```powershell
+python scripts/seed_db.py --validate-only
+```
+
+Nạp dữ liệu từ `seeds/` vào RDS:
+
+```powershell
+python scripts/seed_db.py
+```
+
+Loader COPY dữ liệu theo đúng thứ tự khóa ngoại, đồng bộ identity sequence và chỉ
+commit sau khi các kiểm tra quan hệ nghiệp vụ đạt. Có thể chạy lại an toàn; nếu
+dữ liệu đã đủ, kết quả là:
+
+```text
+Seed data already loaded with the expected row counts.
+```
+
+Không tự xóa hoặc nạp chồng khi loader báo `partially populated`; cần kiểm tra
+trạng thái database trước.
+
+### Bước 8: Chạy backend
 
 ```powershell
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
