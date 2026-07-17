@@ -28,7 +28,12 @@ export function TrainLayoutScreen() {
       setError(null);
       const data = await seatApi.getCoaches(1);
       setCoaches(data);
-      if (data.length > 0) {
+      
+      const params = new URLSearchParams(window.location.search);
+      const urlCoach = params.get("coach");
+      if (urlCoach && data.some(c => c.coach_no === urlCoach)) {
+        setSelectedCoachNo(urlCoach);
+      } else if (data.length > 0) {
         setSelectedCoachNo(data[0].coach_no);
       }
     } catch (err) {

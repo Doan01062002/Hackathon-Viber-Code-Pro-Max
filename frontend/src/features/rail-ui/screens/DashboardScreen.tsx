@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { MetricGrid, SectionCard } from "@/features/rail-ui/components/Primitives";
 import { buildCurveChart, useForecast } from "@/features/forecast";
 import { buildSegmentHeatmap, useSegmentsLoad } from "@/features/segments";
@@ -59,6 +60,7 @@ function buildMockPolyline(values: number[], max: number) {
 }
 
 export function DashboardScreen() {
+  const router = useRouter();
   const forecast = useForecast(DEFAULT_TRIP_ID);
   const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
   const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(gapSuggestions);
@@ -518,7 +520,15 @@ export function DashboardScreen() {
                   <span>{item.benefit}</span>
                   <span className={`priority-text ${severityClass(item.priority)}`}>{item.priority}</span>
                 </div>
-                <button className="btn btn-ghost" type="button">
+                <button 
+                  className="btn btn-ghost" 
+                  type="button"
+                  onClick={() => {
+                    const match = item.reason.match(/toa\s+([A-Za-z0-9]+)/i);
+                    const coachNo = match ? match[1].trim() : "01";
+                    router.push(`/train-layout?coach=${coachNo}`);
+                  }}
+                >
                   Xem chi tiết
                 </button>
               </article>
