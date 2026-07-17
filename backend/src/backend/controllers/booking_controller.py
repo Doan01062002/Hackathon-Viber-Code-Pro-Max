@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.services.booking_service import BookingService
-from backend.views.booking_view import BookingCreateRequest, BookingResponse, BookingConfirmResponse
+from backend.views.booking_view import BookingConfirmResponse, BookingCreateRequest, BookingResponse
 
 router = APIRouter()
 
+
 def get_booking_service() -> BookingService:
     return BookingService()
+
 
 @router.post("/booking", response_model=BookingResponse, status_code=201)
 async def create_booking_hold_standard(
@@ -24,6 +26,7 @@ async def create_booking_hold_standard(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
 
+
 @router.post("/booking/{booking_id}/confirm", response_model=BookingConfirmResponse)
 async def confirm_booking(
     booking_id: int,
@@ -37,6 +40,7 @@ async def confirm_booking(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
+
 
 @router.post("/booking/release-expired")
 async def release_expired_bookings(

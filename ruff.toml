@@ -3,7 +3,7 @@ line-length = 120
 
 [lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501"]
+ignore = ["E501", "E402", "N803", "N806", "N812"]
 
 [lint.isort]
 # Hai package local của repo — nếu không khai báo, ruff tưởng là thư viện ngoài

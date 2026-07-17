@@ -7,8 +7,10 @@ from backend.services.optimize_service import OptimizeService
 
 router = APIRouter()
 
+
 class OptimizeRequest(BaseModel):
     trip_id: int = Field(..., description="ID của chuyến tàu cần chạy tối ưu hóa")
+
 
 class OptimizeResponse(BaseModel):
     status: str = Field(..., description="Trạng thái xử lý (success / error)")
@@ -18,8 +20,10 @@ class OptimizeResponse(BaseModel):
     bid_prices_updated_count: int = Field(..., description="Số lượng bản ghi bid_prices đã được tạo mới")
     message: str = Field(..., description="Thông điệp kết quả")
 
+
 def get_optimize_service() -> OptimizeService:
     return OptimizeService()
+
 
 @router.post("/optimize/resolve", response_model=OptimizeResponse)
 async def resolve_optimization_batch(

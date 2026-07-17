@@ -1,8 +1,9 @@
-import sys
 import os
 import pickle
-from datetime import datetime, timezone, date
-from typing import Dict, Any
+import sys
+from datetime import UTC, date, datetime
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -12,21 +13,22 @@ ai_path = os.path.join(root_dir, "ai")
 if ai_path not in sys.path:
     sys.path.append(ai_path)
 
-from ai_service import datagen, forecasting, optimization as opt, pricing
+from ai_service import datagen
+from ai_service import optimization as opt
+
 
 class OptimizeService:
-    def run_optimization_batch(self, trip_id: int, db: Session) -> Dict[str, Any]:
+    def run_optimization_batch(self, trip_id: int, db: Session) -> dict[str, Any]:
         # 1. Job đọc dữ liệu đầu vào (BE-10.1)
         trip_row = db.execute(
-            text("SELECT id, service_date FROM trips WHERE id = :trip_id"),
-            {"trip_id": trip_id}
+            text("SELECT id, service_date FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}
         ).fetchone()
-        
+
         if not trip_row:
             raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
-            
+
         trip_id_db, service_date_val = trip_row
-        
+
         # Chuẩn hóa service_date
         if isinstance(service_date_val, str):
             service_date_str = service_date_val[:10]
@@ -40,7 +42,7 @@ class OptimizeService:
 
         # Đọc danh sách od_products của chuyến tàu từ database
         query_ods = text("""
-            SELECT 
+            SELECT
                 odp.id AS od_product_id,
                 st_orig.code AS origin_code,
                 st_dest.code AS dest_code,
@@ -55,7 +57,7 @@ class OptimizeService:
             WHERE odp.trip_id = :trip_id AND odp.is_active = TRUE
         """)
         od_rows = db.execute(query_ods, {"trip_id": trip_id}).mappings().all()
-        
+
         if not od_rows:
             raise ValueError(f"Không tìm thấy sản phẩm OD nào cho chuyến tàu {trip_id}")
 
@@ -67,44 +69,46 @@ class OptimizeService:
         # Lấy danh sách segments của chuyến tàu
         segments_rows = db.execute(
             text("SELECT id, sequence_no FROM segments WHERE trip_id = :trip_id ORDER BY sequence_no ASC"),
-            {"trip_id": trip_id}
+            {"trip_id": trip_id},
         ).fetchall()
         segment_map = {i: row[0] for i, row in enumerate(segments_rows)}
         nseg = len(segments_rows)
 
         # Chuẩn bị run_version duy nhất
-        run_version = "ver-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        solved_at = datetime.now(timezone.utc).isoformat()
+        run_version = "ver-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        solved_at = datetime.now(UTC).isoformat()
 
         # Tải Forecaster model
         model_path = os.path.join(ai_path, "models", "model.pkl")
         if not os.path.exists(model_path):
             raise RuntimeError(f"Không tìm thấy tệp model tại {model_path}. Hãy chạy train script trước.")
-            
+
         with open(model_path, "rb") as f:
             bundle = pickle.load(f)
         forecaster = bundle["forecaster"]
 
         # 2. Gọi forecast & lưu (BE-10.2)
         st, segs, ods, bn = datagen.build_network()
-        
+
         # Ánh xạ OD từ mạng lưới của AI với database
         valid_network_ods = []
         for od in ods:
             db_key = (od["origin"].upper(), od["dest"].upper(), od["seat_type"])
             if db_key in od_product_map:
                 valid_network_ods.append(od)
-                
+
         if not valid_network_ods:
             raise ValueError("Không tìm thấy sản phẩm OD khớp giữa cấu hình AI và database")
 
         # Dự báo nhu cầu GBDT
         from ai_service.app import _feature_rows
+
         feature_df = _feature_rows(valid_network_ods, service_date)
         pred_df = forecaster.predict(feature_df)
 
         # Phân phối point forecast qua 61 lead days (60 về 0)
         import numpy as np
+
         t = np.arange(60, -1, -1, dtype=float)
         w = np.exp(-t / 15.0)
         # Tet features check
@@ -116,13 +120,16 @@ class OptimizeService:
         weights = w.tolist()
 
         # Xóa các dự báo cũ của chuyến tàu này
-        db.execute(text("""
-            DELETE FROM demand_forecasts 
+        db.execute(
+            text("""
+            DELETE FROM demand_forecasts
             WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = :trip_id)
-        """), {"trip_id": trip_id})
+        """),
+            {"trip_id": trip_id},
+        )
 
         # Tạo thời điểm forecast duy nhất
-        forecast_at_dt = datetime.now(timezone.utc)
+        forecast_at_dt = datetime.now(UTC)
 
         # Chuẩn bị danh sách tham số để bulk insert forecast
         forecast_params = []
@@ -131,24 +138,26 @@ class OptimizeService:
             od_meta = next(x for x in valid_network_ods if x["od_id"] == od_id_val)
             db_key = (od_meta["origin"].upper(), od_meta["dest"].upper(), od_meta["seat_type"])
             db_od_id = od_product_map[db_key]
-            
+
             lambda_hat = float(r.lambda_hat)
             p10 = float(r.p10)
             p50 = float(r.p50)
             p90 = float(r.p90)
-            
+
             for lead in range(60, -1, -1):
                 wt = weights[60 - lead]
-                forecast_params.append({
-                    "od_product_id": db_od_id,
-                    "lead_days": lead,
-                    "demand_point": lambda_hat * wt,
-                    "demand_p10": p10 * wt,
-                    "demand_p50": p50 * wt,
-                    "demand_p90": p90 * wt,
-                    "model_version": forecaster.version,
-                    "forecast_at": forecast_at_dt
-                })
+                forecast_params.append(
+                    {
+                        "od_product_id": db_od_id,
+                        "lead_days": lead,
+                        "demand_point": lambda_hat * wt,
+                        "demand_p10": p10 * wt,
+                        "demand_p50": p50 * wt,
+                        "demand_p90": p90 * wt,
+                        "model_version": forecaster.version,
+                        "forecast_at": forecast_at_dt,
+                    }
+                )
 
         if forecast_params:
             insert_forecast_query = text("""
@@ -167,7 +176,7 @@ class OptimizeService:
         # Tra cứu tồn kho chặng hiện hành
         inventory_rows = db.execute(
             text("SELECT segment_id, seat_type, remaining FROM segment_inventory WHERE segment_id = ANY(:seg_ids)"),
-            {"seg_ids": list(segment_map.values())}
+            {"seg_ids": list(segment_map.values())},
         ).fetchall()
         inventory_map = {(row[0], row[1]): int(row[2]) for row in inventory_rows}
 
@@ -178,13 +187,15 @@ class OptimizeService:
             if seg_idx in segment_map:
                 seg_id = segment_map[seg_idx]
                 rem = inventory_map.get((seg_id, seat_type), 0)
-                bid_price_params.append({
-                    "segment_id": seg_id,
-                    "seat_type": seat_type,
-                    "bid_price": v,
-                    "remaining_capacity": rem,
-                    "run_version": run_version
-                })
+                bid_price_params.append(
+                    {
+                        "segment_id": seg_id,
+                        "seat_type": seat_type,
+                        "bid_price": v,
+                        "remaining_capacity": rem,
+                        "run_version": run_version,
+                    }
+                )
                 bid_prices_count += 1
 
         if bid_price_params:
@@ -204,11 +215,7 @@ class OptimizeService:
             od_meta = next(x for x in valid_network_ods if x["od_id"] == od_id_val)
             db_key = (od_meta["origin"].upper(), od_meta["dest"].upper(), od_meta["seat_type"])
             db_od_id = od_product_map[db_key]
-            quota_params.append({
-                "od_product_id": db_od_id,
-                "quota": int(round(q_val)),
-                "run_version": run_version
-            })
+            quota_params.append({"od_product_id": db_od_id, "quota": int(round(q_val)), "run_version": run_version})
             quotas_count += 1
 
         if quota_params:
@@ -225,33 +232,46 @@ class OptimizeService:
         # (demand_forecasts không cần update is_active do quản lý bằng cách delete-insert trực tiếp)
 
         # bid_prices swap
-        db.execute(text("""
-            UPDATE bid_prices 
-            SET is_active = FALSE 
+        db.execute(
+            text("""
+            UPDATE bid_prices
+            SET is_active = FALSE
             WHERE segment_id IN (SELECT id FROM segments WHERE trip_id = :trip_id)
-        """), {"trip_id": trip_id})
-        
-        db.execute(text("""
-            UPDATE bid_prices 
-            SET is_active = TRUE 
+        """),
+            {"trip_id": trip_id},
+        )
+
+        db.execute(
+            text("""
+            UPDATE bid_prices
+            SET is_active = TRUE
             WHERE run_version = :run_version
-        """), {"run_version": run_version})
+        """),
+            {"run_version": run_version},
+        )
 
         # quotas swap
-        db.execute(text("""
-            UPDATE quotas 
-            SET is_active = FALSE 
+        db.execute(
+            text("""
+            UPDATE quotas
+            SET is_active = FALSE
             WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = :trip_id)
-        """), {"trip_id": trip_id})
-        
-        db.execute(text("""
-            UPDATE quotas 
-            SET is_active = TRUE 
+        """),
+            {"trip_id": trip_id},
+        )
+
+        db.execute(
+            text("""
+            UPDATE quotas
+            SET is_active = TRUE
             WHERE run_version = :run_version
-        """), {"run_version": run_version})
+        """),
+            {"run_version": run_version},
+        )
 
         # 5. Gọi price & lưu price_quote cho tất cả OD (BE-10.4)
         from backend.services.pricing_service import PricingService
+
         pricing_service = PricingService()
         for db_id in od_product_map.values():
             pricing_service.create_pricing_quote(od_product_id=db_id, db=db, run_version=run_version)
@@ -265,5 +285,5 @@ class OptimizeService:
             "run_version": run_version,
             "quotas_updated_count": quotas_count,
             "bid_prices_updated_count": bid_prices_count,
-            "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công."
+            "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công.",
         }

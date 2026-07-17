@@ -7,8 +7,10 @@ from backend.views.pricing_view import PricingQuoteResponse
 
 router = APIRouter()
 
+
 def get_pricing_service() -> PricingService:
     return PricingService()
+
 
 @router.get("/pricing/quote", response_model=PricingQuoteResponse)
 async def get_pricing_quote_standard(
@@ -23,6 +25,7 @@ async def get_pricing_quote_standard(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
+
 
 @router.get("/quote", response_model=PricingQuoteResponse)
 async def get_pricing_quote_alias(

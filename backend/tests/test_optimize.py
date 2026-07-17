@@ -1,6 +1,8 @@
 import pytest
 from sqlalchemy import text
+
 from backend.database import get_session_factory
+
 
 @pytest.mark.asyncio
 async def test_optimize_resolve_success(client):
@@ -8,9 +10,7 @@ async def test_optimize_resolve_success(client):
     run_version = None
     try:
         # 1. Gọi API chạy tối ưu hóa cho trip 1
-        response = await client.post("/api/v1/optimize/resolve", json={
-            "trip_id": 1
-        })
+        response = await client.post("/api/v1/optimize/resolve", json={"trip_id": 1})
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"
@@ -21,11 +21,11 @@ async def test_optimize_resolve_success(client):
 
         # 2. Xác minh dữ liệu trong DB
         db.expire_all()
-        
+
         # Kiểm tra demand_forecasts
         fc_rows = db.execute(
             text("""
-                SELECT COUNT(*) FROM demand_forecasts 
+                SELECT COUNT(*) FROM demand_forecasts
                 WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = 1)
             """)
         ).fetchone()
@@ -33,22 +33,19 @@ async def test_optimize_resolve_success(client):
 
         # Kiểm tra bid_prices
         bp_rows = db.execute(
-            text("SELECT COUNT(*) FROM bid_prices WHERE run_version = :ver AND is_active = TRUE"),
-            {"ver": run_version}
+            text("SELECT COUNT(*) FROM bid_prices WHERE run_version = :ver AND is_active = TRUE"), {"ver": run_version}
         ).fetchone()
         assert bp_rows[0] > 0
 
         # Kiểm tra quotas
         quota_rows = db.execute(
-            text("SELECT COUNT(*) FROM quotas WHERE run_version = :ver AND is_active = TRUE"),
-            {"ver": run_version}
+            text("SELECT COUNT(*) FROM quotas WHERE run_version = :ver AND is_active = TRUE"), {"ver": run_version}
         ).fetchone()
         assert quota_rows[0] > 0
 
         # Kiểm tra price_quotes
         pq_rows = db.execute(
-            text("SELECT COUNT(*) FROM price_quotes WHERE run_version = :ver"),
-            {"ver": run_version}
+            text("SELECT COUNT(*) FROM price_quotes WHERE run_version = :ver"), {"ver": run_version}
         ).fetchone()
         assert pq_rows[0] > 0
 
@@ -56,7 +53,9 @@ async def test_optimize_resolve_success(client):
         # Dọn dẹp dữ liệu của run_version này để giữ database sạch
         if run_version:
             db.execute(
-                text("DELETE FROM demand_forecasts WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = 1)")
+                text(
+                    "DELETE FROM demand_forecasts WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = 1)"
+                )
             )
             db.execute(text("DELETE FROM bid_prices WHERE run_version = :ver"), {"ver": run_version})
             db.execute(text("DELETE FROM quotas WHERE run_version = :ver"), {"ver": run_version})
@@ -67,8 +66,6 @@ async def test_optimize_resolve_success(client):
 
 @pytest.mark.asyncio
 async def test_optimize_resolve_invalid_trip(client):
-    response = await client.post("/api/v1/optimize/resolve", json={
-        "trip_id": 999999
-    })
+    response = await client.post("/api/v1/optimize/resolve", json={"trip_id": 999999})
     assert response.status_code == 400
     assert "Không tìm thấy" in response.json()["detail"]
