@@ -7,9 +7,8 @@ trước nếu file chưa tồn tại — xem README/AGENTS.md).
 import os
 
 import pytest
-from fastapi.testclient import TestClient
-
 from ai_service.app import MODEL_PATH, app
+from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.skipif(
     not os.path.exists(MODEL_PATH),
@@ -64,9 +63,7 @@ def test_optimize_second_call_warm_starts_with_same_run_version(client):
 
 def test_optimize_force_resolve_bypasses_cache(client):
     first = client.post("/internal/optimize", json={"service_date": SERVICE_DATE}).json()
-    forced = client.post(
-        "/internal/optimize", json={"service_date": SERVICE_DATE, "force_resolve": True}
-    ).json()
+    forced = client.post("/internal/optimize", json={"service_date": SERVICE_DATE, "force_resolve": True}).json()
 
     assert forced["warm_started"] is False
     assert forced["run_version"] != first["run_version"]

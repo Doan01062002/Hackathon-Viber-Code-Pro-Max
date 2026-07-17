@@ -1,47 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { MetricGrid, SectionCard } from "@/features/rail-ui/components/Primitives";
-import { apiClient } from "@/lib/api/client";
+import { buildCurveChart, useForecast } from "@/features/forecast";
+import { buildSegmentHeatmap, useSegmentsLoad } from "@/features/segments";
 import {
-  bookingCurve as mockBookingCurve,
   gapSuggestions,
-  heatmapRows as mockHeatmapRows,
   odMatrix,
   rightRailCards,
 } from "@/features/rail-ui/mockData";
 
-// Giao diện dữ liệu Heatmap từ API
-interface LegHeatmapItem {
-  segment_id: number;
-  sequence_no: number;
-  origin_station_code: string;
-  destination_station_code: string;
-  capacity: number;
-  remaining: number;
-  seat_type: string;
-  bid_price: number;
-  is_bottleneck: boolean;
-}
-
-interface LegHeatmapResponse {
-  trip_id: number;
-  legs: LegHeatmapItem[];
-}
-
-// Giao diện dữ liệu Booking Curve từ API
-interface BookingCurvePoint {
-  lead_days: number;
-  cumulative_bookings: number;
-  forecast_demand_point: number;
-}
-
-interface ForecastResponse {
-  trip_id: number;
-  service_date: string;
-  forecasts: any[];
-  booking_curve: BookingCurvePoint[];
-}
+const DEFAULT_TRIP_ID = 1;
 
 function heatClass(value: number) {
   if (value >= 95) return "heat-critical";
@@ -56,40 +25,53 @@ function severityClass(value: string) {
   return "severity-thap";
 }
 
+// Fallback Mock Heatmap Rows (khi không có API)
+const mockHeatmapRows = [
+  { segment: "Hà Nội → Vinh", slots: [62, 68, 71, 76, 81, 79] },
+  { segment: "Vinh → Đồng Hới", slots: [58, 64, 66, 72, 75, 74] },
+  { segment: "Đồng Hới → Huế", slots: [73, 79, 82, 84, 88, 86] },
+  { segment: "Huế → Đà Nẵng", slots: [88, 92, 95, 97, 99, 96] },
+  { segment: "Đà Nẵng → Nha Trang", slots: [67, 71, 76, 79, 82, 80] },
+  { segment: "Nha Trang → Sài Gòn", slots: [59, 63, 68, 70, 74, 72] },
+];
+
+const defaultCurvePoints = [
+  { day: "D-30", actual: 14, forecast: 18 },
+  { day: "D-20", actual: 28, forecast: 31 },
+  { day: "D-10", actual: 48, forecast: 52 },
+  { day: "D-7", actual: 58, forecast: 61 },
+  { day: "D-3", actual: 74, forecast: 76 },
+  { day: "D-1", actual: 88, forecast: 91 },
+];
+
+function buildMockPolyline(values: number[], max: number) {
+  const width = 360;
+  const height = 180;
+  return values
+    .map((value, index) => {
+      const x = (index / (values.length - 1)) * width;
+      const y = height - (value / max) * 140 - 12;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
 export function DashboardScreen() {
-  const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
-  const [curve, setCurve] = useState<BookingCurvePoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const forecast = useForecast(DEFAULT_TRIP_ID);
+  const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setError(null);
-        // Lấy đồng thời heatmap chặng và booking curve dự báo
-        const [heatmapRes, forecastRes] = await Promise.all([
-          apiClient.get<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1"),
-          apiClient.get<ForecastResponse>("/api/v1/forecast?trip_id=1")
-        ]);
-        
-        setLegs(heatmapRes.legs);
-        setCurve(forecastRes.booking_curve);
-      } catch (err: any) {
-        console.warn("Lỗi khi kết nối API backend, fallback sang dữ liệu mô phỏng:", err);
-        setError("Không thể đồng bộ dữ liệu thời gian thực từ Backend server.");
-      } finally {
-        setLoading(false);
-      }
-    }
+  const legs = useMemo(() => segments.data?.legs ?? [], [segments.data?.legs]);
+  const heatmap = useMemo(
+    () => buildSegmentHeatmap(legs),
+    [legs],
+  );
 
-    fetchData();
-  }, []);
+  const curveChart = useMemo(
+    () => buildCurveChart(forecast.data?.booking_curve ?? []),
+    [forecast.data],
+  );
 
-  const legsToRender = legs.length > 0 ? legs : null;
-  const curveToRender = curve.length > 0 ? curve : mockBookingCurve;
-
-  // Tính toán Top Metrics động dựa trên dữ liệu DB thực tế
+  // Tính toán Top Metrics động dựa trên dữ liệu chặng thực tế từ backend (nếu có)
   let avgLoad = 78;
   let bottleneckCount = 1;
   if (legs.length > 0) {
@@ -100,44 +82,41 @@ export function DashboardScreen() {
   }
 
   const topMetrics = [
-    { label: legsToRender ? "Tải TB Thực tế" : "Tải trung bình", value: `${avgLoad}%`, detail: legsToRender ? "Tính trên tất cả chặng" : "Tăng 4 điểm so với hôm qua", tone: "good" },
+    {
+      label: legs.length > 0 ? "Tải TB Thực tế" : "Tải trung bình",
+      value: `${avgLoad}%`,
+      detail: legs.length > 0 ? "Tính trên tất cả chặng" : "Tăng 4 điểm so với hôm qua",
+      tone: "good",
+    },
     { label: "Doanh thu dự kiến", value: "2,84 tỷ", detail: "Đạt 103% kế hoạch ngày", tone: "neutral" },
-    { label: legsToRender ? "Chặng Bottleneck" : "Chặng rủi ro", value: bottleneckCount.toString().padStart(2, "0"), detail: legsToRender ? "Cần điều phối bid price" : "Huế → Đà Nẵng đang gần đầy", tone: bottleneckCount > 0 ? "danger" : "good" },
+    {
+      label: legs.length > 0 ? "Chặng Bottleneck" : "Chặng rủi ro",
+      value: bottleneckCount.toString().padStart(2, "0"),
+      detail: legs.length > 0 ? "Cần điều phối bid price" : "Huế → Đà Nẵng đang gần đầy",
+      tone: bottleneckCount > 0 ? "danger" : "good",
+    },
     { label: "Cảnh báo mở", value: "12", detail: "03 cảnh báo cần xử lý ngay", tone: "danger" },
   ];
 
-  // Tìm điểm cực đại để vẽ trục y biểu đồ tự động
-  const maxVal = Math.max(
-    ...curveToRender.map((point) => ("cumulative_bookings" in point ? (point as any).cumulative_bookings : (point as any).actual)),
-    ...curveToRender.map((point) => ("forecast_demand_point" in point ? (point as any).forecast_demand_point : (point as any).forecast)),
-    100
-  );
-
-  function buildPolyline(values: number[]) {
-    const width = 360;
-    const height = 180;
-    if (values.length === 0) return "";
-    return values
-      .map((value, index) => {
-        const x = (index / (values.length - 1)) * width;
-        const y = height - (value / maxVal) * 140 - 12;
-        return `${x},${y}`;
-      })
-      .join(" ");
-  }
-
-  const actualPoints = buildPolyline(
-    curveToRender.map((point) => ("cumulative_bookings" in point ? (point as any).cumulative_bookings : (point as any).actual))
-  );
-  const forecastPoints = buildPolyline(
-    curveToRender.map((point) => ("forecast_demand_point" in point ? (point as any).forecast_demand_point : (point as any).forecast))
-  );
+  // Gom lỗi (nếu có) hiển thị dưới dạng banner thông báo
+  const apiError = segments.error || forecast.error;
 
   return (
     <div className="page-stack">
-      {error && (
-        <div className="banner banner-warning" style={{ backgroundColor: "#3a2a18", borderLeft: "4px solid #d97706", padding: "12px", borderRadius: "6px", color: "#f59e0b", fontSize: "14px", marginBottom: "8px" }}>
-          ⚠️ <strong>Cảnh báo:</strong> {error} Hệ thống tự động chuyển sang chế độ mô phỏng dữ liệu Demo.
+      {apiError && (
+        <div
+          className="banner banner-warning"
+          style={{
+            backgroundColor: "#3a2a18",
+            borderLeft: "4px solid #d97706",
+            padding: "12px",
+            borderRadius: "6px",
+            color: "#f59e0b",
+            fontSize: "14px",
+            marginBottom: "8px",
+          }}
+        >
+          ⚠️ <strong>Cập nhật thất bại:</strong> Không kết nối được API backend. Hệ thống đang chuyển sang chế độ hiển thị dữ liệu mô phỏng Demo.
         </div>
       )}
 
@@ -182,7 +161,7 @@ export function DashboardScreen() {
             <div className="decision-stat-grid">
               <article className="decision-stat">
                 <span>Mức tải hiện tại</span>
-                <strong>{legsToRender ? `${avgLoad}%` : "97%"}</strong>
+                <strong>{legs.length > 0 ? `${avgLoad}%` : "97%"}</strong>
                 <small>Tăng 6% trong 2 giờ gần nhất</small>
               </article>
               <article className="decision-stat">
@@ -267,8 +246,16 @@ export function DashboardScreen() {
       <div className="dashboard-grid">
         <SectionCard
           title="Heatmap tải chặng"
-          subtitle="Nhìn nhanh chặng nào đang nóng lên theo từng khung giờ để quyết định mở hoặc giữ quota."
-          actions={<button className="btn btn-ghost">Bộ lọc tàu và ngày</button>}
+          subtitle="Tỉ lệ lấp đầy từng chặng theo loại chỗ; chặng nút cổ chai được đánh dấu để ưu tiên xử lý."
+          actions={
+            segments.status === "error" ? (
+              <button className="btn btn-ghost" type="button" onClick={segments.refetch}>
+                Thử lại
+              </button>
+            ) : (
+              <button className="btn btn-ghost">Bộ lọc tàu và ngày</button>
+            )
+          }
         >
           <div className="heatmap-legend">
             <span>
@@ -289,114 +276,186 @@ export function DashboardScreen() {
             </span>
           </div>
 
-          <div className="table-wrap">
-            <table className="data-table heatmap-table">
-              <thead>
-                {legsToRender ? (
-                  <tr>
-                    <th>Chặng hành trình</th>
-                    <th>Loại chỗ</th>
-                    <th>Tồn kho ghế</th>
-                    <th>Hệ số lấp đầy</th>
-                    <th>Giá cơ hội (Bid)</th>
-                    <th>Trạng thái</th>
-                  </tr>
-                ) : (
+          {segments.isLoading && <p className="curve-state">Đang tải dữ liệu tải chặng…</p>}
+
+          {heatmap ? (
+            <div className="table-wrap">
+              <table className="data-table heatmap-table">
+                <thead>
                   <tr>
                     <th>Chặng</th>
-                    <th>06h</th>
-                    <th>09h</th>
-                    <th>12h</th>
-                    <th>15h</th>
-                    <th>18h</th>
-                    <th>21h</th>
+                    {heatmap.columns.map((col) => (
+                      <th key={col.key}>{col.label}</th>
+                    ))}
+                    <th>Nút cổ chai</th>
                   </tr>
-                )}
-              </thead>
-              <tbody>
-                {legsToRender ? (
-                  legsToRender.map((leg) => {
-                    const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
-                    return (
-                      <tr key={leg.segment_id}>
-                        <th scope="row" style={{ color: "#fff" }}>
-                          {leg.origin_station_code} → {leg.destination_station_code}
-                        </th>
-                        <td>{leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"}</td>
-                        <td>{leg.remaining} / {leg.capacity}</td>
-                        <td className={heatClass(load)} style={{ fontWeight: "bold" }}>
-                          {load}%
-                        </td>
-                        <td style={{ color: "#10b981", fontWeight: "bold" }}>
-                          {leg.bid_price.toLocaleString()} VND
-                        </td>
-                        <td>
-                          {leg.is_bottleneck ? (
-                            <span className="priority-badge severity-cao">Nút cổ chai</span>
-                          ) : (
-                            <span className="priority-badge severity-thap">Thường</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  mockHeatmapRows.map((row) => (
-                    <tr key={row.segment}>
-                      <th scope="row">{row.segment}</th>
-                      {row.slots.map((slot, index) => (
-                        <td key={`${row.segment}-${index}`} className={heatClass(slot)}>
-                          {slot}%
-                        </td>
-                      ))}
+                </thead>
+                <tbody>
+                  {heatmap.rows.map((row) => (
+                    <tr key={row.seq}>
+                      <th scope="row">{row.label}</th>
+                      {heatmap.columns.map((col) => {
+                        const load = row.loads[col.key];
+                        return (
+                          <td
+                            key={`${row.seq}-${col.key}`}
+                            className={load === null ? undefined : heatClass(load)}
+                          >
+                            {load === null ? "—" : `${Math.round(load)}%`}
+                          </td>
+                        );
+                      })}
+                      <td>
+                        {row.isBottleneck ? (
+                          <span className="priority-badge severity-cao">Nút cổ chai</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            !segments.isLoading && (
+              <div className="table-wrap">
+                <table className="data-table heatmap-table">
+                  <thead>
+                    <tr>
+                      <th>Chặng</th>
+                      <th>06h</th>
+                      <th>09h</th>
+                      <th>12h</th>
+                      <th>15h</th>
+                      <th>18h</th>
+                      <th>21h</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mockHeatmapRows.map((row) => (
+                      <tr key={row.segment}>
+                        <th scope="row">{row.segment}</th>
+                        {row.slots.map((slot, index) => (
+                          <td key={`${row.segment}-${index}`} className={heatClass(slot)}>
+                            {slot}%
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
         </SectionCard>
 
         <SectionCard
           title="Đường cong đặt vé"
           subtitle="Theo dõi thực tế so với dự báo trên cùng một biểu đồ để nhìn ra điểm lệch sớm."
+          actions={
+            forecast.status === "error" ? (
+              <button className="btn btn-ghost" type="button" onClick={forecast.refetch}>
+                Thử lại
+              </button>
+            ) : undefined
+          }
         >
-          <div className="curve-chart">
-            <div className="curve-axis-labels">
-              <span>{Math.round(maxVal)}</span>
-              <span>{Math.round(maxVal / 2)}</span>
-              <span>0</span>
-            </div>
+          {forecast.isLoading && <p className="curve-state">Đang tải dữ liệu dự báo…</p>}
 
-            <div className="curve-svg-wrap">
-              <svg aria-hidden="true" className="curve-svg" viewBox="0 0 360 180">
-                <path className="curve-grid-line" d="M0 28 H360" />
-                <path className="curve-grid-line" d="M0 88 H360" />
-                <path className="curve-grid-line" d="M0 148 H360" />
-                <polyline className="curve-line curve-line-forecast" fill="none" points={forecastPoints} />
-                <polyline className="curve-line curve-line-actual" fill="none" points={actualPoints} />
-              </svg>
+          {curveChart ? (
+            <>
+              <div className="curve-chart">
+                <div className="curve-axis-labels">
+                  <span>100%</span>
+                  <span>50%</span>
+                  <span>0%</span>
+                </div>
 
-              <div className="curve-x-axis">
-                {curveToRender.map((point) => (
-                  <span key={"lead_days" in point ? (point as any).lead_days : (point as any).day}>
-                    {"lead_days" in point ? `D-${(point as any).lead_days}` : (point as any).day}
-                  </span>
-                ))}
+                <div className="curve-svg-wrap">
+                  <svg aria-hidden="true" className="curve-svg" viewBox="0 0 360 180">
+                    <path className="curve-grid-line" d="M0 28 H360" />
+                    <path className="curve-grid-line" d="M0 88 H360" />
+                    <path className="curve-grid-line" d="M0 148 H360" />
+                    <polyline
+                      className="curve-line curve-line-forecast"
+                      fill="none"
+                      points={curveChart.forecastPoints}
+                    />
+                    <polyline
+                      className="curve-line curve-line-actual"
+                      fill="none"
+                      points={curveChart.actualPoints}
+                    />
+                  </svg>
+
+                  <div className="curve-x-axis">
+                    {curveChart.labels.map((label) => (
+                      <span key={label}>{label}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="curve-summary">
-            <span>
-              <i className="curve-dot curve-dot-actual" />
-              Thực tế bán vé
-            </span>
-            <span>
-              <i className="curve-dot curve-dot-forecast" />
-              Dự báo nhu cầu
-            </span>
-          </div>
+              <div className="curve-summary">
+                <span>
+                  <i className="curve-dot curve-dot-actual" />
+                  Thực tế bán vé (Chuẩn hóa)
+                </span>
+                <span>
+                  <i className="curve-dot curve-dot-forecast" />
+                  Dự báo nhu cầu (Chuẩn hóa)
+                </span>
+              </div>
+            </>
+          ) : (
+            !forecast.isLoading && (
+              <>
+                <div className="curve-chart">
+                  <div className="curve-axis-labels">
+                    <span>100%</span>
+                    <span>50%</span>
+                    <span>0%</span>
+                  </div>
+
+                  <div className="curve-svg-wrap">
+                    <svg aria-hidden="true" className="curve-svg" viewBox="0 0 360 180">
+                      <path className="curve-grid-line" d="M0 28 H360" />
+                      <path className="curve-grid-line" d="M0 88 H360" />
+                      <path className="curve-grid-line" d="M0 148 H360" />
+                      <polyline
+                        className="curve-line curve-line-forecast"
+                        fill="none"
+                        points={buildMockPolyline(defaultCurvePoints.map(p => p.forecast), 100)}
+                      />
+                      <polyline
+                        className="curve-line curve-line-actual"
+                        fill="none"
+                        points={buildMockPolyline(defaultCurvePoints.map(p => p.actual), 100)}
+                      />
+                    </svg>
+
+                    <div className="curve-x-axis">
+                      {defaultCurvePoints.map((point) => (
+                        <span key={point.day}>{point.day}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="curve-summary">
+                  <span>
+                    <i className="curve-dot curve-dot-actual" />
+                    Thực tế bán vé
+                  </span>
+                  <span>
+                    <i className="curve-dot curve-dot-forecast" />
+                    Dự báo nhu cầu
+                  </span>
+                </div>
+              </>
+            )
+          )}
         </SectionCard>
 
         <SectionCard

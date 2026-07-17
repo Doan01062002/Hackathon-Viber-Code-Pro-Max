@@ -42,10 +42,7 @@ class AIPriceClient:
             "service_date": service_date.isoformat(),
             "seat_type": seat_type,
             "base_price": base_price,
-            "segments": [
-                {"segment_id": segment.segment_id, "bid_price": segment.bid_price}
-                for segment in segments
-            ],
+            "segments": [{"segment_id": segment.segment_id, "bid_price": segment.bid_price} for segment in segments],
         }
 
         try:

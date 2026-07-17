@@ -164,9 +164,7 @@ class PricingService:
             expires_at=expires_at_str,
         )
 
-    async def create_pricing_quote_from_od(
-        self, request: PricingQuoteRequest, db: Session
-    ) -> PricingQuoteODResponse:
+    async def create_pricing_quote_from_od(self, request: PricingQuoteRequest, db: Session) -> PricingQuoteODResponse:
         product = self._find_od_product(request, db)
         segments = self._load_segments(product["id"], product["seat_type"], db)
         if not segments:
@@ -198,10 +196,8 @@ class PricingService:
         decision = evaluate_bid_price(final_price, opportunity_cost, availability)
 
         bottleneck = max(segments, key=lambda segment: float(segment["bid_price"]))
-        bottleneck_name = f'{bottleneck["origin_name"]} -> {bottleneck["destination_name"]}'
-        segment_bid_prices = {
-            str(segment["segment_id"]): float(segment["bid_price"]) for segment in segments
-        }
+        bottleneck_name = f"{bottleneck['origin_name']} -> {bottleneck['destination_name']}"
+        segment_bid_prices = {str(segment["segment_id"]): float(segment["bid_price"]) for segment in segments}
         elasticity = float(ai_result.explanation.get("elasticity", 0.0) or 0.0)
         markup_factor = elasticity / (elasticity - 1) if elasticity > 1 else 1.0
         explanation = PricingExplanation(
@@ -258,8 +254,9 @@ class PricingService:
 
     @staticmethod
     def _find_od_product(request: PricingQuoteRequest, db: Session):
-        row = db.execute(
-            text("""
+        row = (
+            db.execute(
+                text("""
                 SELECT
                     odp.id, odp.base_price, odp.seat_type, t.service_date,
                     origin.name AS origin_name, destination.name AS destination_name
@@ -279,22 +276,26 @@ class PricingService:
                 ORDER BY t.departure_at ASC
                 LIMIT 1
             """),
-            {
-                "origin": request.origin,
-                "destination": request.destination,
-                "service_date": request.service_date,
-                "seat_type": request.seat_type,
-                "trip_id": request.trip_id,
-            },
-        ).mappings().first()
+                {
+                    "origin": request.origin,
+                    "destination": request.destination,
+                    "service_date": request.service_date,
+                    "seat_type": request.seat_type,
+                    "trip_id": request.trip_id,
+                },
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             raise ValueError("Khong tim thay san pham OD phu hop voi yeu cau")
         return row
 
     @staticmethod
     def _load_segments(od_product_id: int, seat_type: str, db: Session):
-        return db.execute(
-            text("""
+        return (
+            db.execute(
+                text("""
                 SELECT
                     segment.id AS segment_id,
                     origin.name AS origin_name,
@@ -315,13 +316,17 @@ class PricingService:
                 WHERE mapping.od_product_id = :od_product_id
                 ORDER BY segment.sequence_no ASC
             """),
-            {"od_product_id": od_product_id, "seat_type": seat_type},
-        ).mappings().all()
+                {"od_product_id": od_product_id, "seat_type": seat_type},
+            )
+            .mappings()
+            .all()
+        )
 
     @staticmethod
     def _load_policy(od_product_id: int, db: Session):
-        return db.execute(
-            text("""
+        return (
+            db.execute(
+                text("""
                 SELECT id, min_price, max_price, max_step_change
                 FROM price_policies
                 WHERE (od_product_id = :od_product_id OR od_product_id IS NULL)
@@ -331,8 +336,11 @@ class PricingService:
                 ORDER BY od_product_id DESC NULLS LAST
                 LIMIT 1
             """),
-            {"od_product_id": od_product_id},
-        ).mappings().first()
+                {"od_product_id": od_product_id},
+            )
+            .mappings()
+            .first()
+        )
 
     @staticmethod
     def _apply_policy(

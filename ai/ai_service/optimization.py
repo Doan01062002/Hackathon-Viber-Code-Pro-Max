@@ -151,9 +151,7 @@ def compute_segment_load(
         xj = float(x[j])
         for seg in od["segments"]:
             load[(seg, stype)] = load.get((seg, stype), 0.0) + xj
-    return {
-        key: (load[key] / cap if cap > 0 else 0.0) for key, cap in zip(constraint_keys, capacity, strict=True)
-    }
+    return {key: (load[key] / cap if cap > 0 else 0.0) for key, cap in zip(constraint_keys, capacity, strict=True)}
 
 
 def solve_bid_prices(

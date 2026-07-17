@@ -27,9 +27,7 @@ from .schemas import (
     Quota,
 )
 
-MODEL_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "model.pkl"
-)
+MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "model.pkl")
 STATE: dict[str, object] = {}
 
 
@@ -163,9 +161,7 @@ def _optimize(service_date: date, force_resolve: bool = False) -> tuple[dict, bo
 
 @app.post("/internal/optimize", response_model=OptimizeResponse)
 def optimize(req: OptimizeRequest):
-    solution, warm_started = _optimize(
-        _iso(req.service_date), force_resolve=req.force_resolve
-    )
+    solution, warm_started = _optimize(_iso(req.service_date), force_resolve=req.force_resolve)
     bid_prices = [
         BidPrice(segment_id=segment, seat_type=seat_type, bid_price=round(value, 0))
         for (segment, seat_type), value in solution["bid_prices"].items()
@@ -206,12 +202,8 @@ def price(req: PriceRequest):
             "base_price": req.base_price,
             "segments": [segment.segment_id for segment in req.segments],
         }
-        bid_prices = {
-            (segment.segment_id, req.seat_type): segment.bid_price for segment in req.segments
-        }
-        return PriceResponse(
-            **pricing.price_od(od, bid_prices, STATE.get("eps", C.ELASTICITY))
-        )
+        bid_prices = {(segment.segment_id, req.seat_type): segment.bid_price for segment in req.segments}
+        return PriceResponse(**pricing.price_od(od, bid_prices, STATE.get("eps", C.ELASTICITY)))
 
     od_index = STATE.get("ods", {})
     if req.od_id not in od_index:

@@ -4,12 +4,15 @@
 import numpy as np
 import pandas as pd
 import pytest
-
 from ai_service import config as C
 from ai_service import pricing
 
 REQUIRED_COLS = dict(
-    dow=0, month=1, is_holiday=0, is_tet=0, distance_km=100.0,
+    dow=0,
+    month=1,
+    is_holiday=0,
+    is_tet=0,
+    distance_km=100.0,
 )
 
 
@@ -43,8 +46,17 @@ def _endogenous_price_demand_panel(n_groups=40, days=150, true_eps=2.2, seed=123
             qty_mean = base_q * np.exp(shock) * (price / 100.0) ** (-true_eps)
             qty = rng.poisson(max(qty_mean, 0.1))
             rows.append(
-                dict(od_id=g, seat_type="ngoi_mem", shown_price=price, willing=int(qty),
-                     dow=t % 7, month=1, is_holiday=0, is_tet=0, distance_km=100.0)
+                dict(
+                    od_id=g,
+                    seat_type="ngoi_mem",
+                    shown_price=price,
+                    willing=int(qty),
+                    dow=t % 7,
+                    month=1,
+                    is_holiday=0,
+                    is_tet=0,
+                    distance_km=100.0,
+                )
             )
     df = pd.DataFrame(rows)
     return df[df["willing"] > 0].reset_index(drop=True)
@@ -71,11 +83,13 @@ def test_prepare_price_quantity_data_raises_on_missing_columns():
 
 
 def test_prepare_price_quantity_data_filters_invalid_rows():
-    df = pd.DataFrame([
-        _history_row(shown_price=100.0, willing=5),
-        _history_row(shown_price=0.0, willing=5),  # giá <=0 -> loại
-        _history_row(shown_price=100.0, willing=np.nan),  # thiếu lượng -> loại
-    ])
+    df = pd.DataFrame(
+        [
+            _history_row(shown_price=100.0, willing=5),
+            _history_row(shown_price=0.0, willing=5),  # giá <=0 -> loại
+            _history_row(shown_price=100.0, willing=np.nan),  # thiếu lượng -> loại
+        ]
+    )
     out = pricing.prepare_price_quantity_data(df)
     assert len(out) == 1
     assert set(pricing.PRICE_QTY_COLUMNS).issubset(out.columns)
@@ -132,7 +146,10 @@ def test_2sls_recovers_true_elasticity_close_than_naive_ols_under_endogeneity():
 
     est = pricing._estimate_2sls(
         df.assign(log_price=np.log(df["shown_price"])),
-        endogenous_col="log_price", fallback=1.5, min_obs=300, sign=-1.0,
+        endogenous_col="log_price",
+        fallback=1.5,
+        min_obs=300,
+        sign=-1.0,
     )
 
     assert not est.used_fallback
@@ -146,7 +163,10 @@ def test_2sls_falls_back_when_insufficient_data():
     df = pd.DataFrame([_history_row()])  # 1 dòng, quá ít
     est = pricing._estimate_2sls(
         df.assign(log_price=np.log(df["shown_price"])),
-        endogenous_col="log_price", fallback=1.7, min_obs=300, sign=-1.0,
+        endogenous_col="log_price",
+        fallback=1.7,
+        min_obs=300,
+        sign=-1.0,
     )
     assert est.used_fallback is True
     assert est.value == 1.7
@@ -196,7 +216,7 @@ def test_estimate_elasticity_iv_uses_only_matching_seat_type():
     assert est.value == pytest.approx(2.2, abs=0.2)
 
 
-def test_estimate_elasticity_iv_clips_to_config_bounds():
+def test_estimate_elasticity_iv_clips_to_bounds():
     # ε thật cực lớn (8.0) vượt ELASTICITY_CAP -> phải bị clip, không trả thẳng 8.0
     df = _endogenous_price_demand_panel(true_eps=8.0)
     df["seat_type"] = "ngoi_mem"
@@ -219,8 +239,9 @@ def test_estimate_exponential_alpha_iv_returns_positive_alpha_for_downward_slopi
 def test_estimate_elasticity_public_api_smoke_on_real_datagen():
     """Chạy trên dữ liệu mô phỏng thật của datagen.simulate() (như scripts/train.py) —
     đảm bảo toàn bộ pipeline AI-09 -> AI-15 không vỡ trên dữ liệu thực tế của hệ thống."""
-    from ai_service import datagen
     from datetime import date
+
+    from ai_service import datagen
 
     sim = datagen.simulate(start=date(2024, 1, 1), days=60)
     eps = pricing.estimate_elasticity(sim["history"])
@@ -342,7 +363,9 @@ def test_price_od_caps_at_max_surge():
 def test_price_od_policy_guard_blocks_and_reports_min_price():
     od = _od(base_price=100_000)
     q = pricing.price_od(
-        od, {(0, "ngoi_mem"): 50_000}, {"ngoi_mem": 1.8},
+        od,
+        {(0, "ngoi_mem"): 50_000},
+        {"ngoi_mem": 1.8},
         policy={"min_price": 900_000, "max_price": 999_999},
     )
     assert q["decision"] == "blocked"
@@ -352,8 +375,68 @@ def test_price_od_policy_guard_blocks_and_reports_min_price():
 def test_price_od_policy_guard_within_range_stays_accepted():
     od = _od(base_price=100_000)
     q = pricing.price_od(
-        od, {(0, "ngoi_mem"): 10_000}, {"ngoi_mem": 1.8},
+        od,
+        {(0, "ngoi_mem"): 10_000},
+        {"ngoi_mem": 1.8},
         policy={"min_price": 1, "max_price": 999_999_999},
     )
     assert q["decision"] == "accepted"
     assert q["final_price"] == q["proposed_price"]
+
+
+def test_explanation_shape():
+    od = _od(segments=(0,), base_price=100_000)
+    q = pricing.price_od(od, {(0, "ngoi_mem"): 50_000}, {"ngoi_mem": 1.8})
+    exp = q["explanation"]
+    assert set(exp.keys()) == {
+        "bottleneck_segment",
+        "segment_pi",
+        "elasticity",
+        "base_price",
+        "bottleneck_load_pct",
+    }
+    assert exp["elasticity"] == 1.8
+    assert exp["base_price"] == 100_000
+
+
+def test_estimate_elasticity_fallback_when_insufficient_data():
+    empty = pd.DataFrame(
+        columns=[
+            "seat_type",
+            "willing",
+            "shown_price",
+            "od_id",
+            "dow",
+            "month",
+            "is_holiday",
+            "is_tet",
+            "distance_km",
+        ]
+    )
+    eps = pricing.estimate_elasticity(empty)
+    for stype in C.SEAT_TYPES:
+        assert eps[stype] == C.ELASTICITY[stype]
+
+
+def test_estimate_elasticity_is_clipped_to_floor_and_cap():
+    # Dữ liệu tổng hợp: giá không đổi trong từng OD -> slope ~0 -> fallback về config,
+    # nhưng vẫn phải nằm trong [FLOOR, CAP] theo hợp đồng của hàm.
+    rows = []
+    for od_id in range(5):
+        for i in range(150):
+            rows.append(
+                dict(
+                    seat_type="ngoi_mem",
+                    od_id=od_id,
+                    shown_price=100_000 + i,
+                    willing=1,
+                    dow=0,
+                    month=1,
+                    is_holiday=0,
+                    is_tet=0,
+                    distance_km=100.0,
+                )
+            )
+    hist = pd.DataFrame(rows)
+    eps = pricing.estimate_elasticity(hist)
+    assert C.ELASTICITY_FLOOR <= eps["ngoi_mem"] <= C.ELASTICITY_CAP

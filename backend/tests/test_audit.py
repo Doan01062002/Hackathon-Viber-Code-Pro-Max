@@ -37,10 +37,7 @@ async def test_get_audit_logs_filtering(client):
 
         # 2. Gọi API lọc theo actor và action vừa tạo
         headers = {"x-user-role": "it_integrator"}
-        response = await client.get(
-            "/api/v1/audit/logs?actor=test_actor_xyz&action=TEST_ACTION_XYZ",
-            headers=headers
-        )
+        response = await client.get("/api/v1/audit/logs?actor=test_actor_xyz&action=TEST_ACTION_XYZ", headers=headers)
         assert response.status_code == 200
         logs = response.json()
         assert len(logs) > 0
