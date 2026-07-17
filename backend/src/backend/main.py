@@ -6,13 +6,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import get_settings
 from backend.controllers import api_router
 from backend.controllers.health_controller import router as health_router
+from backend.database import dispose_engine
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
     print(f"Starting {settings.app_name} in {settings.app_env} mode")
+
+    worker = None
+    try:
+        from backend.worker import EventWorker
+
+        worker = EventWorker(debounce_seconds=5.0)
+        worker.start()
+    except Exception as e:
+        print(f"Warning: Could not start EventWorker: {str(e)}")
+
     yield
+
+    if worker:
+        try:
+            worker.stop()
+        except Exception:
+            pass
+
+    dispose_engine()
     print("Shutting down...")
 
 
