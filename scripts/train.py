@@ -1,6 +1,7 @@
 import os
 import pickle
-from datetime import date
+import shutil
+from datetime import date, datetime
 import sys
 
 # Thêm thư mục ai vào sys.path để có thể import ai_service
@@ -17,7 +18,10 @@ def main():
     # 1. Tạo thư mục ai/models/ nếu chưa tồn tại
     models_dir = os.path.join(ai_path, "models")
     os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, "model.pkl")
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    versioned_model_path = os.path.join(models_dir, f"model_{timestamp}.pkl")
+    default_model_path = os.path.join(models_dir, "model.pkl")
     
     # 2. Sinh dữ liệu mô phỏng lịch sử (ví dụ: 100 ngày để chạy nhanh và hội tụ tốt)
     print("[TRAIN] Generating 100 days of simulation history...")
@@ -34,13 +38,16 @@ def main():
     eps = pricing.estimate_elasticity(hist)
     
     # 5. Lưu mô hình và tham số
-    print(f"[TRAIN] Saving model to {model_path}...")
+    print(f"[TRAIN] Saving model to {versioned_model_path}...")
     bundle = {
         "forecaster": fc,
         "eps": eps
     }
-    with open(model_path, "wb") as f:
+    with open(versioned_model_path, "wb") as f:
         pickle.dump(bundle, f)
+        
+    print(f"[TRAIN] Copying latest model to {default_model_path}...")
+    shutil.copy2(versioned_model_path, default_model_path)
         
     print("[TRAIN] Training completed successfully!")
 

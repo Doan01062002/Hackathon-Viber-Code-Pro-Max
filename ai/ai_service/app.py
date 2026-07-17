@@ -40,6 +40,8 @@ def _iso(value: str) -> date:
 
 def _feature_rows(ods, service_date: date) -> pd.DataFrame:
     _, is_holiday, is_tet = datagen.calendar_factor(service_date)
+    days_to_tet, is_pre_tet, is_post_tet, _ = datagen.tet_context(service_date)
+    is_rainy, promo = datagen.weather_promo(service_date)
     return pd.DataFrame(
         [
             {
@@ -50,6 +52,11 @@ def _feature_rows(ods, service_date: date) -> pd.DataFrame:
                 "is_holiday": int(is_holiday),
                 "is_tet": int(is_tet),
                 "is_summer": int(service_date.month in (6, 7, 8)),
+                "days_to_tet": days_to_tet,
+                "is_pre_tet": int(is_pre_tet),
+                "is_post_tet": int(is_post_tet),
+                "is_rainy": int(is_rainy),
+                "promo": int(promo),
                 "distance_km": od["distance_km"],
                 "base_price": od["base_price"],
                 "pop_o": od["pop_o"],

@@ -164,7 +164,9 @@ def test_evaluate_returns_expected_keys_and_valid_ranges():
 
     metrics = F.evaluate(fc, test)
 
-    assert set(metrics.keys()) == {"wape", "mae", "corr_lambda_true", "n"}
+    assert set(metrics.keys()) == {
+        "wape", "mae", "corr_lambda_true", "n", "pinball", "coverage_80", "backend"
+    }
     assert metrics["n"] == len(test)
     assert metrics["wape"] >= 0
     assert metrics["mae"] >= 0
