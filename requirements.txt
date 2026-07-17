@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 numpy>=1.24
 pandas>=2.0
 scipy>=1.11
@@ -7,3 +8,49 @@ shap>=0.44
 fastapi>=0.110
 uvicorn>=0.27
 pydantic>=2.5
+=======
+# -*- coding: utf-8 -*-
+# ============================================================
+# Cài toàn bộ dependency Python của dự án — chỉ cần 1 lệnh:
+#
+#     pip install -r requirements.txt
+#
+# Hai dòng `-e` ở cuối file không phải lối tắt suông: pip đọc
+# pyproject.toml của từng module và kéo về đầy đủ thư viện bên dưới.
+# ============================================================
+#
+# ── ai/  (ai/pyproject.toml) ────────────────────────────────
+#   langgraph            State graph cho agent
+#   langchain            Core abstractions
+#   langchain-openai     LLM client (ChatOpenAI)
+#   pydantic             Kiểu dữ liệu
+#   pydantic-settings    Đọc config từ .env
+#
+# ── backend/  (backend/pyproject.toml) ──────────────────────
+#   fastapi              Web framework
+#   uvicorn[standard]    ASGI server
+#   pydantic             Request/response schema
+#   pydantic-settings    Đọc config từ .env
+#   python-dotenv        Nạp file .env
+#   sqlalchemy           ORM và quản lý kết nối database
+#   psycopg[binary]      PostgreSQL driver
+#   ai                   Module AI ở trên (dependency nội bộ)
+#
+# ── [dev] — kèm theo cả hai module ──────────────────────────
+#   pytest, pytest-asyncio    Test
+#   httpx                     Test client cho FastAPI
+#   ruff                      Lint + format
+#
+# ── frontend/ ───────────────────────────────────────────────
+#   Không nằm ở đây. Node/npm là hệ sinh thái riêng:
+#       cd frontend && npm install        (xem frontend/package.json)
+#
+# ============================================================
+# ⚠️  Danh sách trên chỉ để ĐỌC. Nơi khai báo THẬT là pyproject.toml
+#     của từng module — Dockerfile cũng cài từ đó, không từ file này.
+#     Thêm thư viện mới => sửa pyproject.toml của module tương ứng.
+# ============================================================
+
+-e ./ai[dev]
+-e ./backend[dev]
+>>>>>>> origin/develop
