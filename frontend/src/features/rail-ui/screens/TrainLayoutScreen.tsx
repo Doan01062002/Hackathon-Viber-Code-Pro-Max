@@ -8,7 +8,7 @@ export function TrainLayoutScreen() {
       {/* Header Section with Quick Stats */}
       <section className="flex justify-between items-end mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-on-surface">
+          <h2 className="text-3xl font-black text-on-surface">
             Seat Optimization & Inventory
           </h2>
           <p className="text-sm text-on-surface-variant">

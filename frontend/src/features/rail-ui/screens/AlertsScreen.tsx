@@ -8,7 +8,7 @@ export function AlertsScreen() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-extrabold text-on-surface">
+        <h2 className="text-3xl font-black text-on-surface">
           System Alerts & Warnings
         </h2>
         <p className="text-sm text-on-surface-variant">

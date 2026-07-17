@@ -8,7 +8,7 @@ export function SimulationScreen() {
       {/* Page Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-on-surface">
+          <h2 className="text-3xl font-black text-on-surface">
             Impact Simulation & Verification
           </h2>
           <p className="text-sm text-on-surface-variant">

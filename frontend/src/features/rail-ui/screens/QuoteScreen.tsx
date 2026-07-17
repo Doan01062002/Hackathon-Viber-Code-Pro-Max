@@ -7,6 +7,16 @@ export function QuoteScreen() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div>
+        <h2 className="text-3xl font-black text-on-surface">
+          Dynamic Pricing Control
+        </h2>
+        <p className="text-sm text-on-surface-variant font-medium">
+          Manage pricing thresholds, strategy constraints, and active bottleneck pricing adjustments
+        </p>
+      </div>
+
       {/* Alerts Banner */}
       <div className="flex gap-4 overflow-x-auto pb-2 custom-scrollbar">
         <div className="flex-shrink-0 flex items-center gap-3 bg-error-container/30 border border-error/20 p-4 rounded-xl min-w-[320px]">

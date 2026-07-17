@@ -8,7 +8,7 @@ export function DashboardScreen() {
       {/* Dashboard Header / Controls */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-on-surface">
+          <h2 className="text-3xl font-black text-on-surface">
             Overview Dashboard
           </h2>
           <p className="text-sm text-on-surface-variant">
