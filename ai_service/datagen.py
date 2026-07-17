@@ -83,11 +83,30 @@ def calendar_factor(d: date):
     return f, is_holiday, is_tet
 
 
+def tet_context(d: date):
+    """(days_to_tet [-30..30], is_pre_tet, is_post_tet, pre/post factor) — 'chiều đi/về' Tết."""
+    dd = int(np.clip((d - _tet_start(d.year)).days, -30, 30))
+    is_pre = int(C.PRE_TET_DAYS[0] <= dd <= C.PRE_TET_DAYS[1])
+    is_post = int(C.POST_TET_DAYS[0] <= dd <= C.POST_TET_DAYS[1])
+    fac = C.PRE_TET_FACTOR if is_pre else (C.POST_TET_FACTOR if is_post else 1.0)
+    return dd, is_pre, is_post, fac
+
+
+def weather_promo(d: date, rng=None, promo_day=None):
+    """(is_rainy, promo). promo_day có thể truyền vào (tất định) hoặc bốc bằng rng."""
+    is_rainy = int(d.month in C.RAINY_MONTHS)
+    if promo_day is None:
+        promo_day = (rng.random() < C.PROMO_PROB) if rng is not None else False
+    return is_rainy, int(bool(promo_day))
+
+
 def lam_for(od, d: date):
     f_dow = C.DOW_FACTOR[d.weekday()]
     f_season = C.season_factor(d.month, od["dest_idx"])
     f_hol, is_hol, is_tet = calendar_factor(d)
-    lam = C.SCALE_K * od["base_od"] * f_dow * f_season * f_hol
+    _, _, _, f_tetdir = tet_context(d)                       # chiều đi/về Tết
+    f_rain = C.RAIN_FACTOR if d.month in C.RAINY_MONTHS else 1.0
+    lam = C.SCALE_K * od["base_od"] * f_dow * f_season * f_hol * f_tetdir * f_rain
     return max(lam, 1e-6), f_dow, f_season, f_hol, is_hol, is_tet
 
 
@@ -112,14 +131,19 @@ def simulate(start: date, days: int, seed: int = 42, focal_offset: int | None = 
         remaining = {stype: np.full(nseg, C.CAPACITY[stype], dtype=int) for stype in C.SEAT_TYPES}
         order = rng.permutation(len(ods))     # thứ tự xử lý OD (công bằng)
         focal_bookings = [] if (focal_date and d == focal_date) else None
+        days_to_tet, is_pre_tet, is_post_tet, _ = tet_context(d)
+        is_rainy, promo = weather_promo(d, rng)
+        promo_lift = C.PROMO_LIFT if promo else 1.0
+        promo_disc = C.PROMO_DISCOUNT if promo else 1.0
 
         for k in order:
             od = ods[k]
             lam, f_dow, f_season, f_hol, is_hol, is_tet = lam_for(od, d)
+            lam *= promo_lift
             demand = int(_nb(rng, lam))
-            # giá hiển thị: biến thiên -> nhận diện co giãn
+            # giá hiển thị: biến thiên -> nhận diện co giãn (khuyến mãi hạ giá)
             weekend = 1.0 if d.weekday() >= 4 else 0.0
-            price_mult = (1 + 0.10 * weekend) * (1 + rng.uniform(-0.15, 0.20))
+            price_mult = promo_disc * (1 + 0.10 * weekend) * (1 + rng.uniform(-0.15, 0.20))
             shown_price = od["base_price"] * price_mult
             # WTP
             willing = 0
@@ -141,6 +165,8 @@ def simulate(start: date, days: int, seed: int = 42, focal_offset: int | None = 
                 service_date=d, od_id=od["od_id"], seat_type=stype,
                 dow=d.weekday(), month=d.month, is_holiday=int(is_hol), is_tet=int(is_tet),
                 is_summer=int(d.month in (6, 7, 8)),
+                days_to_tet=days_to_tet, is_pre_tet=is_pre_tet, is_post_tet=is_post_tet,
+                is_rainy=is_rainy, promo=promo,
                 distance_km=od["distance_km"], base_price=od["base_price"],
                 pop_o=od["pop_o"], pop_d=od["pop_d"],
                 is_hub_o=int(od["is_hub_o"]), is_hub_d=int(od["is_hub_d"]),

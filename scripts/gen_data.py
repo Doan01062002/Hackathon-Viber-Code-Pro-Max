@@ -102,7 +102,10 @@ def main():
         f_hol, is_hol, is_tet = datagen.calendar_factor(d)
         season = ("spring" if d.month in (2, 3, 4) else "summer" if d.month in (5, 6, 7, 8)
                   else "autumn" if d.month in (9, 10, 11) else "winter")
-        wr_cal.writerow([d.isoformat(), is_hol, is_tet, season, "mild", "",
+        promo_day = rng.random() < C.PROMO_PROB
+        weather = "rain" if d.month in C.RAINY_MONTHS else "mild"
+        local_event = "promo" if promo_day else ""
+        wr_cal.writerow([d.isoformat(), is_hol, is_tet, season, weather, local_event,
                          iso(datetime(d.year, d.month, d.day, tzinfo=TZ)),
                          iso(datetime(d.year, d.month, d.day, tzinfo=TZ))])
 
@@ -151,15 +154,18 @@ def main():
         remaining = {s: np.full(nseg, C.CAPACITY[s], int) for s in C.SEAT_TYPES}
         accepted = {s: [] for s in C.SEAT_TYPES}   # (o,d, od_global, price, is_cancel, booked_dt)
         weekend = 1.0 if d.weekday() >= 4 else 0.0
+        promo_lift = C.PROMO_LIFT if promo_day else 1.0
+        promo_disc = C.PROMO_DISCOUNT if promo_day else 1.0
         for k in rng.permutation(len(ods_net)):
             od = ods_net[k]; oid = od_global[k]
-            lam, *_ = datagen.lam_for(od, d)
+            lam, *_ = datagen.lam_for(od, d)          # đã gồm chiều đi/về Tết + mùa mưa
+            lam *= promo_lift
             demand = int(datagen._nb(rng, lam))
             month_demand[d.month][0] += demand; month_demand[d.month][1] += 1
             if demand == 0:
                 continue
             bp = round1k(20000 + C.PRICE_PER_KM[od["seat_type"]] * od["distance_km"])
-            price = round1k(bp * (1 + 0.10 * weekend) * (1 + rng.uniform(-0.15, 0.20)))
+            price = round1k(bp * promo_disc * (1 + 0.10 * weekend) * (1 + rng.uniform(-0.15, 0.20)))
             med = C.WTP_MEDIAN_MULT * bp
             w_ = rng.lognormal(np.log(med), C.WTP_SIGMA_LOG, size=demand)
             segs = od["segments"]; stype = od["seat_type"]

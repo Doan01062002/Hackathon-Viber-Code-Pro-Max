@@ -30,9 +30,12 @@ def _iso(d: str) -> date:
 
 def _feature_rows(ods, d: date):
     _, is_hol, is_tet = datagen.calendar_factor(d)
+    dtt, pre, post, _ = datagen.tet_context(d)
+    is_rainy = int(d.month in C.RAINY_MONTHS)
     return pd.DataFrame([dict(
         od_id=od["od_id"], seat_type=od["seat_type"], dow=d.weekday(), month=d.month,
         is_holiday=int(is_hol), is_tet=int(is_tet), is_summer=int(d.month in (6, 7, 8)),
+        days_to_tet=dtt, is_pre_tet=pre, is_post_tet=post, is_rainy=is_rainy, promo=0,
         distance_km=od["distance_km"], base_price=od["base_price"],
         pop_o=od["pop_o"], pop_d=od["pop_d"],
         is_hub_o=int(od["is_hub_o"]), is_hub_d=int(od["is_hub_d"]),

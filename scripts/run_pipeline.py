@@ -11,11 +11,14 @@ from ai_service import datagen, forecasting, optimization as opt, pricing, confi
 
 def focal_feature_rows(ods, d: date):
     rows = []
+    _, is_hol, is_tet = datagen.calendar_factor(d)
+    dtt, pre, post, _ = datagen.tet_context(d)
+    is_rainy = int(d.month in C.RAINY_MONTHS)
     for od in ods:
-        _, is_hol, is_tet = datagen.calendar_factor(d)
         rows.append(dict(od_id=od["od_id"], seat_type=od["seat_type"],
             dow=d.weekday(), month=d.month, is_holiday=int(is_hol), is_tet=int(is_tet),
             is_summer=int(d.month in (6, 7, 8)),
+            days_to_tet=dtt, is_pre_tet=pre, is_post_tet=post, is_rainy=is_rainy, promo=0,
             distance_km=od["distance_km"], base_price=od["base_price"],
             pop_o=od["pop_o"], pop_d=od["pop_d"],
             is_hub_o=int(od["is_hub_o"]), is_hub_d=int(od["is_hub_d"]),
@@ -43,7 +46,7 @@ def main():
     ev = forecasting.evaluate(fc, test)
     # WAPE tổng hợp theo OD trên toàn cửa sổ test (mức có nghĩa cho lập kế hoạch)
     tp = test.copy(); tp["seat_code"] = 0
-    tp["pred"] = fc.point.predict(forecasting._prep(test)[forecasting.FEATURES])
+    tp["pred"] = fc.point.predict(forecasting._ensure(test)[forecasting.FEATURES].values)
     agg = tp.groupby("od_id").agg(actual=("bookings", lambda s: (s + test.loc[s.index, "soldout"]).sum()),
                                   pred=("pred", "sum"))
     wape_od = float(np.sum(np.abs(agg.pred - agg.actual)) / max(agg.actual.sum(), 1e-9))

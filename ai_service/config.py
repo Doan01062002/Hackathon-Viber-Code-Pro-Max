@@ -52,6 +52,17 @@ NEGBINOM_R = 12.0          # nhiễu nhẹ (thiên hướng học)
 WTP_MEDIAN_MULT = 1.15
 WTP_SIGMA_LOG = 0.25
 
+# ---- Thời tiết & khuyến mãi & chiều đi/về Tết (đặc trưng bổ sung) ----
+RAINY_MONTHS = {9, 10, 11}     # mùa mưa bão miền Trung -> giảm nhẹ cầu
+RAIN_FACTOR = 0.90
+PROMO_PROB = 0.06              # xác suất một ngày có khuyến mãi
+PROMO_LIFT = 1.25             # khuyến mãi kéo cầu lên
+PROMO_DISCOUNT = 0.90         # giá hiển thị giảm còn 90%
+PRE_TET_DAYS = (-12, -1)      # cửa sổ "đi" (trước mùng 1): về quê
+POST_TET_DAYS = (1, 15)       # cửa sổ "về" (sau mùng 1): quay lại thành phố
+PRE_TET_FACTOR = 1.12
+POST_TET_FACTOR = 1.06
+
 BOOKING_HORIZON = 60       # ngày mở bán trước khi chạy
 CANCEL_RATE = 0.07
 BROWSE_MULT = 1.7          # lượt browsing (found, không mua) so với mua
