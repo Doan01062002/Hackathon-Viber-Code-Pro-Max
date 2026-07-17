@@ -1,11 +1,12 @@
 """Hợp đồng JSON cho ai-service (đặt trong contracts/ khi triển khai thật)."""
+
 from __future__ import annotations
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class ForecastRequest(BaseModel):
-    service_date: str            # ISO 8601, ví dụ "2024-02-11"
+    service_date: str  # ISO 8601, ví dụ "2024-02-11"
 
 
 class ForecastItem(BaseModel):
@@ -47,8 +48,8 @@ class OptimizeResponse(BaseModel):
 class PriceRequest(BaseModel):
     od_id: int
     service_date: str
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
+    min_price: float | None = None
+    max_price: float | None = None
 
 
 class PriceResponse(BaseModel):

@@ -52,9 +52,7 @@ def test_ai_log_config_rejects_invalid_values():
 @pytest.mark.asyncio
 async def test_run_agent_emits_lifecycle_events_without_query_content(monkeypatch):
     logger = Mock()
-    fake_agent = Mock(
-        ainvoke=AsyncMock(return_value={"response": "ok", "analysis": "done"})
-    )
+    fake_agent = Mock(ainvoke=AsyncMock(return_value={"response": "ok", "analysis": "done"}))
     monkeypatch.setattr(ai, "get_ai_logger", lambda: logger)
     monkeypatch.setattr(ai, "agent", fake_agent)
 

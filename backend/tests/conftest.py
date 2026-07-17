@@ -1,24 +1,38 @@
+import os
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+import hashlib
 import sys
 import types
-import hashlib
+
 
 class MockXXHash:
     def __init__(self, data=b""):
         self.data = data
+
     def digest(self):
         return hashlib.md5(self.data).digest()
+
     def hexdigest(self):
         return hashlib.md5(self.data).hexdigest()
+
 
 def xxh3_128(data=b"", seed=0):
     if isinstance(data, str):
         data = data.encode()
     return MockXXHash(data)
-    
+
+
 def xxh3_128_hexdigest(data, seed=0):
     if isinstance(data, str):
         data = data.encode()
     return hashlib.md5(data).hexdigest()
+
 
 xxhash_mock = types.ModuleType("xxhash")
 xxhash_mock.xxh3_128 = xxh3_128
