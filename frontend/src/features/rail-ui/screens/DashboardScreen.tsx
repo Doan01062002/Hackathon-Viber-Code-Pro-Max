@@ -1,20 +1,264 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { apiClient } from "@/lib/api/client";
+import {
+  bookingCurve as mockBookingCurve,
+  gapSuggestions,
+  heatmapRows as mockHeatmapRows,
+  odMatrix,
+  rightRailCards,
+  alerts as mockAlerts,
+} from "@/features/rail-ui/mockData";
+
+// interfaces
+interface LegHeatmapItem {
+  segment_id: number;
+  sequence_no: number;
+  origin_station_code: string;
+  destination_station_code: string;
+  capacity: number;
+  remaining: number;
+  seat_type: string;
+  bid_price: number;
+  is_bottleneck: boolean;
+}
+
+interface LegHeatmapResponse {
+  trip_id: number;
+  legs: LegHeatmapItem[];
+}
+
+interface BookingCurvePoint {
+  lead_days: number;
+  cumulative_bookings: number;
+  forecast_demand_point: number;
+}
+
+interface ForecastResponse {
+  trip_id: number;
+  service_date: string;
+  forecasts: any[];
+  booking_curve: BookingCurvePoint[];
+}
+
+function heatClass(value: number) {
+  if (value >= 90) return "text-red-600 font-bold";
+  if (value >= 75) return "text-orange-600 font-bold";
+  return "text-primary font-bold";
+}
+
+// Reusable Interactive Sparkline Component
+interface SparklineProps {
+  data: number[];
+  labels: string[];
+  prefix?: string;
+  suffix?: string;
+  strokeColor: string;
+}
+
+function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeColor }: SparklineProps) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const width = 240;
+  const height = 40;
+  const padding = 6;
+
+  // Calculate points
+  const points = data.map((val, idx) => {
+    const x = padding + (idx / (data.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((val - min) / range) * (height - padding * 2);
+    return { x, y, value: val, label: labels[idx] };
+  });
+
+  const pathD = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+
+  return (
+    <div className="relative w-full mt-2">
+      {/* Min / Max indicators */}
+      <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold mb-1 font-mono">
+        <span>Min: {prefix}{min.toLocaleString()}{suffix}</span>
+        <span>Max: {prefix}{max.toLocaleString()}{suffix}</span>
+      </div>
+
+      <div className="h-10 relative">
+        <svg
+          className="w-full h-full overflow-visible"
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+        >
+          {/* Background gridlines */}
+          <line x1="0" y1={padding} x2={width} y2={padding} stroke="#f1f5f9" strokeDasharray="2 2" strokeWidth="1" />
+          <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke="#f1f5f9" strokeDasharray="2 2" strokeWidth="1" />
+
+          {/* Line Path */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke={strokeColor}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.5"
+          />
+
+          {/* Interaction Zones */}
+          {points.map((p, idx) => (
+            <g key={idx}>
+              {hoverIndex === idx && (
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r="4"
+                  fill={strokeColor}
+                  stroke="#fff"
+                  strokeWidth="1.5"
+                />
+              )}
+              <rect
+                x={idx === 0 ? 0 : points[idx - 1].x + (p.x - points[idx - 1].x) / 2}
+                y="0"
+                width={
+                  idx === 0
+                    ? points[1].x / 2
+                    : idx === data.length - 1
+                    ? width - (points[idx - 1].x + (p.x - points[idx - 1].x) / 2)
+                    : (points[idx + 1].x - points[idx - 1].x) / 2
+                }
+                height={height}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={(e) => {
+                  setHoverIndex(idx);
+                  const svgEl = e.currentTarget.ownerSVGElement;
+                  if (svgEl) {
+                    const rect = svgEl.getBoundingClientRect();
+                    const pctX = p.x / width;
+                    setTooltipPos({
+                      x: pctX * rect.width,
+                      y: (p.y / height) * rect.height - 28,
+                    });
+                  }
+                }}
+                onMouseMove={(e) => {
+                  const svgEl = e.currentTarget.ownerSVGElement;
+                  if (svgEl) {
+                    const rect = svgEl.getBoundingClientRect();
+                    const pctX = p.x / width;
+                    setTooltipPos({
+                      x: pctX * rect.width,
+                      y: (p.y / height) * rect.height - 28,
+                    });
+                  }
+                }}
+                onMouseLeave={() => setHoverIndex(null)}
+              />
+            </g>
+          ))}
+        </svg>
+
+        {/* Dynamic Tooltip */}
+        {hoverIndex !== null && (
+          <div
+            style={{
+              left: `${tooltipPos.x}px`,
+              top: `${tooltipPos.y}px`,
+              transform: "translateX(-50%)",
+            }}
+            className="absolute z-50 pointer-events-none bg-slate-950 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow border border-slate-800 font-mono whitespace-nowrap"
+          >
+            {points[hoverIndex].label}: {prefix}{points[hoverIndex].value.toLocaleString()}{suffix}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function DashboardScreen() {
+  const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
+  const [curve, setCurve] = useState<BookingCurvePoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
+        const [heatmapRes, forecastRes] = await Promise.all([
+          apiClient.get<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1"),
+          apiClient.get<ForecastResponse>("/api/v1/forecast?trip_id=1")
+        ]);
+        
+        setLegs(heatmapRes.legs);
+        setCurve(forecastRes.booking_curve);
+      } catch (err: any) {
+        console.warn("Lỗi khi kết nối API backend, fallback sang dữ liệu mô phỏng:", err);
+        setError("Không thể đồng bộ dữ liệu thời gian thực từ Backend server.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const legsToRender = legs.length > 0 ? legs : null;
+  const curveToRender = curve.length > 0 ? curve : mockBookingCurve;
+
+  // Tính toán metrics động
+  let avgLoad = 84.2;
+  let bottleneckCount = 1;
+  if (legs.length > 0) {
+    const totalCapacity = legs.reduce((acc, leg) => acc + leg.capacity, 0);
+    const totalRemaining = legs.reduce((acc, leg) => acc + leg.remaining, 0);
+    avgLoad = Math.round(((totalCapacity - totalRemaining) / totalCapacity) * 100);
+    bottleneckCount = legs.filter((leg) => leg.is_bottleneck).length;
+  }
+
+  // Cấu hình biểu đồ
+  const maxVal = Math.max(
+    ...curveToRender.map((p) => ("cumulative_bookings" in p ? (p as any).cumulative_bookings : (p as any).actual) || 0),
+    ...curveToRender.map((p) => ("forecast_demand_point" in p ? (p as any).forecast_demand_point : (p as any).forecast) || 0),
+    100
+  );
+
+  function buildPolyline(values: number[]) {
+    const width = 360;
+    const height = 180;
+    if (values.length === 0) return "";
+    return values
+      .map((value, index) => {
+        const x = (index / (values.length - 1)) * width;
+        const y = height - (value / maxVal) * 140 - 12;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }
+
+  const actualPoints = buildPolyline(
+    curveToRender.map((p) => ("cumulative_bookings" in p ? (p as any).cumulative_bookings : (p as any).actual) || 0)
+  );
+  const forecastPoints = buildPolyline(
+    curveToRender.map((p) => ("forecast_demand_point" in p ? (p as any).forecast_demand_point : (p as any).forecast) || 0)
+  );
+
+  // Sparkline data
+  const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Hôm nay"];
+  const revenueTrend = [1.10, 1.12, 1.08, 1.15, 1.13, 1.18, 1.16, 1.22, 1.20, 1.24];
+  const loadTrend = [86.5, 87.2, 86.0, 85.3, 85.5, 84.8, 85.0, 84.2, 84.5, avgLoad];
+  const seatUseTrend = [0.85, 0.88, 0.86, 0.89, 0.87, 0.90, 0.88, 0.91, 0.90, 0.92];
+
   return (
     <div className="space-y-6">
-      {/* Dashboard Header / Controls */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-3xl font-black text-on-surface">
-            Overview Dashboard
-          </h2>
-          <p className="text-sm text-on-surface-variant">
-            Capacity & Yield management console for network operations
-          </p>
-        </div>
+      {/* Header / Controls */}
+      <div className="flex justify-end items-center mb-6">
         <div className="flex items-center space-x-3">
           <div className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2">
             <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
@@ -30,7 +274,122 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* 4 Key Metric Cards (Bento Style) */}
+      {error && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
+          ⚠️ Cảnh báo: {error} Hệ thống tự động chuyển sang chế độ mô phỏng dữ liệu Demo.
+        </div>
+      )}
+
+      {/* Decision and Alert Stack Row */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Huế -> Đà Nẵng Decision Card (Left 8 cols) */}
+        <div className="col-span-12 lg:col-span-8 bg-white border-l-4 border-primary border-y border-r border-outline-variant p-6 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">
+                Ưu tiên xử lý ngay
+              </span>
+              <span className="material-symbols-outlined text-primary scale-75">auto_awesome</span>
+            </div>
+            <h3 className="font-extrabold text-base text-on-surface mb-2">
+              Huế → Đà Nẵng đang là chặng cần can thiệp trước khi mở thêm quota ngắn.
+            </h3>
+            <p className="text-xs text-on-surface-variant leading-relaxed mb-6 font-semibold">
+              Năng lực còn rất thấp trong 18 giờ tới, trong khi nhu cầu ngắn hạn tăng nhanh hơn
+              dự báo. Nếu không điều chỉnh sớm, hệ thống có nguy cơ sold-out giả và bỏ lỡ doanh
+              thu cho ga trung gian.
+            </p>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Mức tải hiện tại</p>
+                <p className="text-lg font-black text-on-surface mt-1">{avgLoad}%</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">Tăng 6% trong 2h gần nhất</p>
+              </div>
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Dự báo tăng thêm</p>
+                <p className="text-lg font-black text-primary mt-1">+8.2%</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">So với giữ nguyên quota</p>
+              </div>
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Tác động doanh thu</p>
+                <p className="text-lg font-black text-green-600 mt-1">+190M</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">Nếu mở bán đúng nhóm ghế</p>
+              </div>
+            </div>
+
+            <ul className="text-xs text-on-surface-variant space-y-1.5 list-disc list-inside font-semibold mb-6">
+              <li>Mở lại quota ngắn cho Vinh → Huế ở toa B2 và B3 trong 90 phút tới.</li>
+              <li>Giữ bid price cao cho luồng dài đi Đà Nẵng để tránh mất doanh thu cơ hội.</li>
+              <li>Chạy mô phỏng nhanh trước khi duyệt để kiểm tra ảnh hưởng lên ga trung gian.</li>
+            </ul>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs">
+              Chạy mô phỏng khuyến nghị
+            </button>
+            <button className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg transition-all text-xs">
+              Mở màn hình báo giá
+            </button>
+          </div>
+        </div>
+
+        {/* Side Stack (Right 4 cols) */}
+        <aside className="col-span-12 lg:col-span-4 space-y-6">
+          {/* Cảnh báo cần xử lý */}
+          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+            <div className="flex justify-between items-center mb-4 border-b border-outline-variant/30 pb-2">
+              <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider">Cảnh báo cần xử lý</h4>
+              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded">
+                03 Nóng
+              </span>
+            </div>
+            <div className="space-y-3">
+              {rightRailCards.quickAlerts.map((item) => (
+                <div className="flex items-start gap-2 text-xs" key={item.title}>
+                  <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${item.severity === "Cao" ? "bg-red-500" : "bg-orange-500"}`} />
+                  <div>
+                    <p className="font-bold text-on-surface">{item.title}</p>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 leading-tight">{item.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Chế độ xem đã lưu */}
+          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+            <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-3 border-b border-outline-variant/30 pb-2">
+              Chế độ xem đã lưu
+            </h4>
+            <div className="space-y-2">
+              {rightRailCards.savedViews.map((item) => (
+                <div className="text-xs" key={item.title}>
+                  <p className="font-bold text-on-surface hover:underline cursor-pointer">{item.title}</p>
+                  <p className="text-[10px] text-on-surface-variant font-medium">{item.meta}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Trạng thái mô phỏng */}
+          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+            <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-2 border-b border-outline-variant/30 pb-2">
+              Trạng thái mô phỏng
+            </h4>
+            <div className="flex justify-between items-center text-xs mb-2">
+              <span className="font-bold text-on-surface">{rightRailCards.simulationStatus.value}</span>
+              <span className="text-[10px] text-on-surface-variant font-semibold">{rightRailCards.simulationStatus.body}</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-primary" style={{ width: "68%" }} />
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* 4 Key Bento Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Metric Card 1 */}
         <div className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200">
@@ -44,19 +403,16 @@ export function DashboardScreen() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-on-surface">$1.24M</span>
-            <span className="text-on-surface-variant text-xs">USD</span>
+            <span className="text-on-surface-variant text-xs font-semibold">USD</span>
           </div>
-          <div className="mt-4 h-12 w-full">
-            {/* Sparkline Mockup */}
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 100 20">
-              <path
-                d="M0 15 L10 12 L20 16 L30 10 L40 14 L50 8 L60 12 L70 5 L80 10 L90 2 L100 5"
-                fill="none"
-                stroke="#3525cd"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={revenueTrend}
+              labels={sparkLabels}
+              prefix="$"
+              suffix="M"
+              strokeColor="#3525cd"
+            />
           </div>
         </div>
 
@@ -71,18 +427,15 @@ export function DashboardScreen() {
             </span>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-on-surface">84.2%</span>
+            <span className="text-2xl font-black text-on-surface">{avgLoad}%</span>
           </div>
-          <div className="mt-4 h-12 w-full">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 100 20">
-              <path
-                d="M0 5 L10 8 L20 4 L30 12 L40 10 L50 15 L60 13 L70 18 L80 15 L90 19 L100 16"
-                fill="none"
-                stroke="#ba1a1a"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={loadTrend}
+              labels={sparkLabels}
+              suffix="%"
+              strokeColor="#ba1a1a"
+            />
           </div>
         </div>
 
@@ -98,22 +451,19 @@ export function DashboardScreen() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-on-surface">0.92</span>
-            <span className="text-on-surface-variant text-xs">ASK</span>
+            <span className="text-on-surface-variant text-xs font-semibold">ASK</span>
           </div>
-          <div className="mt-4 h-12 w-full">
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 100 20">
-              <path
-                d="M0 18 L20 12 L40 15 L60 8 L80 10 L100 2"
-                fill="none"
-                stroke="#3525cd"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            </svg>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={seatUseTrend}
+              labels={sparkLabels}
+              suffix=" ASK"
+              strokeColor="#3525cd"
+            />
           </div>
         </div>
 
-        {/* Metric Card 4: AI Insight Style */}
+        {/* Metric Card 4 */}
         <div className="bg-surface-container border border-primary/20 p-5 rounded-xl ai-accent-border hover:bg-surface-container-high transition-colors duration-200">
           <div className="flex justify-between items-start mb-4">
             <span className="text-[10px] tracking-wider uppercase text-primary font-bold">
@@ -125,7 +475,7 @@ export function DashboardScreen() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-primary">4,122</span>
-            <span className="text-primary/70 text-xs">Seats</span>
+            <span className="text-primary/70 text-xs font-semibold">Seats</span>
           </div>
           <p className="mt-2 text-[11px] text-on-surface-variant leading-tight font-medium">
             AI recommends adding capacity to SE3 for HN-Vinh segment on weekend.
@@ -133,78 +483,69 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Charts & Map Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Revenue & Load Factor Dual Axis */}
+        {/* Dynamic Booking Curve (develop SVG chart) */}
         <div className="lg:col-span-2 bg-white border border-outline-variant rounded-xl p-6">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-base font-bold text-on-surface">
-              Revenue & Load Factor Trends
-            </h3>
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="text-base font-bold text-on-surface">
+                Đường cong đặt vé
+              </h3>
+              <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                Theo dõi thực tế so với dự báo trên cùng một biểu đồ để nhìn ra điểm lệch sớm.
+              </p>
+            </div>
+            <div className="flex items-center space-x-4 text-xs font-semibold">
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-primary" />
-                <span className="text-xs text-on-surface-variant">Revenue</span>
+                <div className="w-3 h-0.5 bg-primary" />
+                <span className="text-on-surface-variant">Thực tế</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-secondary" />
-                <span className="text-xs text-on-surface-variant">Load Factor</span>
+                <div className="w-3 h-0.5 bg-primary/45 border-t border-dashed" />
+                <span className="text-on-surface-variant">Dự báo</span>
               </div>
             </div>
           </div>
-          <div className="h-64 relative w-full flex items-end justify-between px-2">
-            {/* Fake Chart Grid Lines */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
-              <div className="border-t border-black w-full" />
-              <div className="border-t border-black w-full" />
-              <div className="border-t border-black w-full" />
-              <div className="border-t border-black w-full" />
+
+          <div className="flex gap-4 items-stretch h-64">
+            {/* Y axis labels */}
+            <div className="flex flex-col justify-between py-2 text-[9px] text-on-surface-variant font-bold font-mono">
+              <span>{Math.round(maxVal)}</span>
+              <span>{Math.round(maxVal / 2)}</span>
+              <span>0</span>
             </div>
-            {/* Bars & Line Overlay Mockup */}
-            <div className="relative w-full h-full flex items-end justify-around">
-              <div className="w-8 bg-primary/20 rounded-t h-[40%] relative">
-                <div className="absolute -top-1 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/20 rounded-t h-[55%] relative">
-                <div className="absolute -top-4 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/20 rounded-t h-[45%] relative">
-                <div className="absolute -top-2 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/30 rounded-t h-[70%] relative">
-                <div className="absolute -top-8 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/40 rounded-t h-[85%] relative">
-                <div className="absolute -top-2 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/30 rounded-t h-[60%] relative">
-                <div className="absolute -top-6 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/20 rounded-t h-[50%] relative">
-                <div className="absolute -top-1 left-0 w-full h-1 bg-secondary rounded-full" />
-              </div>
-              <div className="w-8 bg-primary/30 rounded-t h-[65%] relative">
-                <div className="absolute -top-5 left-0 w-full h-1 bg-secondary rounded-full" />
+
+            {/* SVG wrapper */}
+            <div className="flex-grow border-l border-b border-outline-variant/60 relative">
+              <svg className="w-full h-full overflow-visible" viewBox="0 0 360 180" preserveAspectRatio="none">
+                {/* grid lines */}
+                <line x1="0" y1="36" x2="360" y2="36" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
+                <line x1="0" y1="90" x2="360" y2="90" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
+                <line x1="0" y1="144" x2="360" y2="144" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
+                
+                {/* paths */}
+                <polyline fill="none" stroke="#3525cd" strokeWidth="2.5" points={actualPoints} />
+                <polyline fill="none" stroke="#3525cd" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.6" points={forecastPoints} />
+              </svg>
+
+              {/* X axis labels */}
+              <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[9px] text-on-surface-variant font-mono font-bold">
+                {curveToRender.map((point, idx) => (
+                  <span key={idx}>
+                    {"lead_days" in point ? `D-${(point as any).lead_days}` : (point as any).day}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
-          <div className="flex justify-between mt-4 px-2 text-[10px] text-on-surface-variant uppercase font-bold">
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
-            <span>Sat</span>
-            <span>Sun</span>
-            <span>Mon</span>
           </div>
         </div>
 
-        {/* Route Heatmap */}
+        {/* Segment Load Factor heat levels */}
         <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col justify-between">
           <div>
             <h3 className="text-base font-bold text-on-surface mb-6">
-              Route Heatmap
+              Tải trọng theo chặng
             </h3>
             <div className="space-y-6">
               {/* Segment */}
@@ -237,16 +578,6 @@ export function DashboardScreen() {
                   <div className="h-full bg-red-500" style={{ width: "98%" }} />
                 </div>
               </div>
-              {/* Segment */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-on-surface-variant font-medium">DN → SG</span>
-                  <span className="font-bold text-primary">64% LF</span>
-                </div>
-                <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: "64%" }} />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -258,91 +589,71 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* Table Row: Trains at Risk */}
+      {/* Heatmap chặng chi tiết (Legs database Table) */}
       <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
         <div className="p-6 border-b border-outline-variant flex justify-between items-center">
-          <h3 className="text-base font-bold text-on-surface">
-            Trains at Risk
-          </h3>
-          <button className="text-xs font-bold text-primary flex items-center space-x-1 hover:underline">
-            <span>View all warnings</span>
-            <span className="material-symbols-outlined text-sm">chevron_right</span>
+          <div>
+            <h3 className="text-base font-bold text-on-surface">Heatmap tải chặng (Chi tiết)</h3>
+            <p className="text-xs text-on-surface-variant font-medium mt-0.5">Nhìn nhanh chặng nào đang nóng lên để mở quota ngắn.</p>
+          </div>
+          <button className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface">
+            Bộ lọc tàu và ngày
           </button>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead>
-              <tr className="bg-surface-container-low border-b border-outline-variant text-[11px] text-on-surface-variant uppercase font-bold">
-                <th className="px-6 py-4">Train ID</th>
-                <th className="px-6 py-4">Departure</th>
-                <th className="px-6 py-4">Route</th>
-                <th className="px-6 py-4">LF %</th>
-                <th className="px-6 py-4">Revenue Status</th>
-                <th className="px-6 py-4">Risk Level</th>
-                <th className="px-6 py-4">Action</th>
+            <thead className="bg-surface-container-low text-[11px] text-on-surface-variant uppercase font-bold">
+              <tr>
+                <th className="px-6 py-4">Chặng hành trình</th>
+                <th className="px-6 py-4">Loại chỗ</th>
+                <th className="px-6 py-4">Tồn kho ghế</th>
+                <th className="px-6 py-4">Hệ số lấp đầy</th>
+                <th className="px-6 py-4">Giá cơ hội (Bid)</th>
+                <th className="px-6 py-4">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-outline-variant">
-              {/* Row 1 */}
-              <tr className="hover:bg-surface-container-lowest transition-colors text-sm">
-                <td className="px-6 py-4 font-bold text-primary">SE1-2405</td>
-                <td className="px-6 py-4 text-on-surface-variant">24 May, 06:00</td>
-                <td className="px-6 py-4">HN - SG</td>
-                <td className="px-6 py-4 font-semibold">96%</td>
-                <td className="px-6 py-4">
-                  <span className="text-green-600 font-bold">$42,200</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="px-2.5 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">
-                    High (Overbooked)
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <button className="p-1.5 rounded hover:bg-surface-container-high transition-colors">
-                    <span className="material-symbols-outlined text-outline">more_vert</span>
-                  </button>
-                </td>
-              </tr>
-              {/* Row 2 */}
-              <tr className="hover:bg-surface-container-lowest transition-colors text-sm">
-                <td className="px-6 py-4 font-bold text-primary">SE3-2405</td>
-                <td className="px-6 py-4 text-on-surface-variant">24 May, 22:15</td>
-                <td className="px-6 py-4">HN - Vinh</td>
-                <td className="px-6 py-4 font-semibold">42%</td>
-                <td className="px-6 py-4">
-                  <span className="text-red-600 font-bold">$8,450</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="px-2.5 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase">
-                    Medium (Low Yield)
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <button className="p-1.5 rounded hover:bg-surface-container-high transition-colors">
-                    <span className="material-symbols-outlined text-outline">more_vert</span>
-                  </button>
-                </td>
-              </tr>
-              {/* Row 3 */}
-              <tr className="hover:bg-surface-container-lowest transition-colors text-sm">
-                <td className="px-6 py-4 font-bold text-primary">SE2-2405</td>
-                <td className="px-6 py-4 text-on-surface-variant">24 May, 19:30</td>
-                <td className="px-6 py-4">SG - HN</td>
-                <td className="px-6 py-4 font-semibold">71%</td>
-                <td className="px-6 py-4">
-                  <span className="text-on-surface font-bold">$29,100</span>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="px-2.5 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold rounded uppercase">
-                    Stable
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <button className="p-1.5 rounded hover:bg-surface-container-high transition-colors">
-                    <span className="material-symbols-outlined text-outline">more_vert</span>
-                  </button>
-                </td>
-              </tr>
+            <tbody className="divide-y divide-outline-variant text-sm font-semibold">
+              {legsToRender ? (
+                legsToRender.map((leg) => {
+                  const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
+                  return (
+                    <tr key={leg.segment_id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 text-on-surface">
+                        {leg.origin_station_code} → {leg.destination_station_code}
+                      </td>
+                      <td className="px-6 py-4 text-on-surface-variant">
+                        {leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"}
+                      </td>
+                      <td className="px-6 py-4 font-mono">{leg.remaining} / {leg.capacity}</td>
+                      <td className={`px-6 py-4 font-mono ${heatClass(load)}`}>{load}%</td>
+                      <td className="px-6 py-4 text-green-600 font-mono">
+                        {leg.bid_price.toLocaleString("vi-VN")} VND
+                      </td>
+                      <td className="px-6 py-4">
+                        {leg.is_bottleneck ? (
+                          <span className="px-2.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] uppercase font-bold">Nút cổ chai</span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] uppercase font-bold">Thường</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                mockHeatmapRows.map((row) => (
+                  <tr key={row.segment} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-on-surface">{row.segment}</td>
+                    <td className="px-6 py-4 text-on-surface-variant">Ngồi mềm</td>
+                    <td className="px-6 py-4 font-mono">152 / 200</td>
+                    <td className={`px-6 py-4 font-mono ${heatClass(row.slots[0])}`}>{row.slots[0]}%</td>
+                    <td className="px-6 py-4 text-green-600 font-mono">350.000 VND</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] uppercase font-bold">Thường</span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

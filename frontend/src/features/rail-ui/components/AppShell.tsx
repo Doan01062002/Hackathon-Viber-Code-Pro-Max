@@ -197,23 +197,9 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
           </div>
         </div>
       </header>
-
       {/* Main Content Area */}
       <main className="ml-56 mt-16 p-8">
         <div>
-          {/* Section Breadcrumbs */}
-          {!pathname.startsWith("/booking") && (
-            <div className="mb-6">
-              <p className="text-xs text-on-surface-variant opacity-70">
-                {pathname.startsWith("/booking") ? "Passenger Portal" : "Revenue Manager"} / {title}
-              </p>
-              {eyebrow && (
-                <p className="text-[10px] text-primary font-bold uppercase mt-1">
-                  {eyebrow}
-                </p>
-              )}
-            </div>
-          )}
           <div className="rail-content">{children}</div>
         </div>
       </main>

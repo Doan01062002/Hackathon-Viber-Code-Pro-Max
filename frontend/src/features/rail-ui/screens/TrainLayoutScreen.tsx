@@ -6,15 +6,7 @@ export function TrainLayoutScreen() {
   return (
     <div className="space-y-6">
       {/* Header Section with Quick Stats */}
-      <section className="flex justify-between items-end mb-6">
-        <div>
-          <h2 className="text-3xl font-black text-on-surface">
-            Seat Optimization & Inventory
-          </h2>
-          <p className="text-sm text-on-surface-variant">
-            Real-time capacity management for Route E-204 (Paris-Marseille)
-          </p>
-        </div>
+      <section className="flex justify-end items-end mb-6">
         <div className="flex gap-2">
           <button className="px-6 py-2 border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-all text-xs">
             Segmenting
