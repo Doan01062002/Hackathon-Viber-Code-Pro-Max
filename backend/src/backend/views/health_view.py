@@ -6,3 +6,4 @@ class HealthResponse(BaseModel):
 
     status: str
     env: str
+    database: str

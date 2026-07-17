@@ -50,5 +50,5 @@ Lệnh này chạy tự động ba bước:
 
 ## 4. Quản lý Tài liệu & Đồng bộ Context
 
-* Mọi tài liệu nghiệp vụ tại `/specs` và các quyết định kiến trúc tại `/adrs` là nguồn sự thật duy nhất (Single Source of Truth).
+* Mọi tài liệu nghiệp vụ tại `/docs/specs` và các quyết định kiến trúc tại `/docs/adrs` là nguồn sự thật duy nhất (Single Source of Truth).
 * Khi thay đổi logic hoặc cấu trúc code, phải cập nhật lại tài liệu tương ứng để đảm bảo AI và con người luôn đọc cùng một context.

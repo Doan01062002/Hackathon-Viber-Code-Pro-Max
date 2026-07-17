@@ -30,4 +30,4 @@
 * **Ngày 7-9:** Xây dựng module tự động gửi cảnh báo. Quét bảng `segment_inventory` để phát hiện chặng có `remaining` dưới $10\%$ sức chứa hoặc quét `gap_combinations` để phát hiện ghế trống chặng ngắn chưa bán được sát ngày chạy.
 * **Ngày 10-11:** Phát triển giao diện tra cứu lịch sử thay đổi `audit_logs` trên Next.js cho Admin ( Revenue Manager có thể xem ai đã thay đổi trần/sàn giá vé của `price_policies`).
 * **Ngày 12-13:** Thực hiện chạy kiểm thử tích hợp cuối cùng, giả lập tải cao để bảo đảm cơ chế khóa dòng tồn kho (`SELECT FOR UPDATE`) hoạt động ổn định và không làm chậm quá trình thanh toán của khách.
-* **Ngày 14:** Đóng gói toàn bộ sản phẩm bàn giao của giải pháp SRRM (mã nguồn, tài liệu specs/adrs/planning/tasks, AI logs) sẵn sàng nộp bài.
+* **Ngày 14:** Đóng gói toàn bộ sản phẩm bàn giao của giải pháp SRRM (mã nguồn, tài liệu trong `docs/`, AI logs) sẵn sàng nộp bài.

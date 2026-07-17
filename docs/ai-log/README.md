@@ -21,7 +21,7 @@ theo yêu cầu của Ban tổ chức:
 
 | File | Ngày | Công cụ | Nội dung chính |
 |---|---|---|---|
-| `2026-07-17-b20a6005.jsonl` | 17/07/2026 | Claude Code (Opus 4.8) | Cấu hình workspace theo chuẩn git repo: specs/, adrs/, planning/, tasks/, docs/ai-log/ dựa trên PRD |
+| `2026-07-17-b20a6005.jsonl` | 17/07/2026 | Claude Code (Opus 4.8) | Cấu hình workspace theo chuẩn git repo: docs/specs, docs/adrs, docs/planning, docs/tasks, docs/ai-log dựa trên PRD |
 | `2026-07-17-gemini-838552a4.jsonl` | 17/07/2026 | Gemini / Antigravity | Đồng bộ hóa tài liệu Specs, ADRs, Sprints, Tasks theo schema DB PostgreSQL mới |
 
 ## Cách xuất phiên
