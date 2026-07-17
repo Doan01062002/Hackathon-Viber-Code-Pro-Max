@@ -39,6 +39,11 @@ data/
 logs/
 *.log
 
+# AI log nộp BTC — phải được commit, không dính rule logs/ *.log ở trên.
+# Xuất bằng: bash scripts/export_ai_log.sh
+!docs/ai-log/
+!docs/ai-log/**
+
 # Test coverage
 htmlcov/
 .coverage
