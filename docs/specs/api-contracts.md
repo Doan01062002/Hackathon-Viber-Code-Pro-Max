@@ -159,3 +159,24 @@ Các REST API được cung cấp tại base URL `/api/v1`. Kiểu dữ liệu s
     "passenger_km_lift_pct": 4.8
   }
   ```
+
+---
+
+## 3. Quote OD integration (BE-07.1 - BE-07.3)
+
+* **Endpoint:** `POST /api/v1/quote`
+* **Request Body:**
+  ```json
+  {
+    "origin": "HN",
+    "destination": "DAN",
+    "service_date": "2026-07-19",
+    "seat_type": "giuong_nam_k6"
+  }
+  ```
+* Backend maps the OD product to `od_product_segments`, sums active bid prices,
+  calls `POST /internal/price` on ai-service, applies the active pricing policy,
+  and accepts only when inventory is available and `final_price >= opportunity_cost`.
+* `origin` and `destination` accept either a station code or its exact name.
+  `trip_id` is optional; when omitted, the earliest matching trip is selected.
+* The legacy `GET /api/v1/quote?od_product_id=...` contract remains available.

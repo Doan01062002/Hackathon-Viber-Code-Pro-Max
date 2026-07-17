@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./data/app.db"
 
+    # AI pricing service
+    ai_service_url: str = "http://localhost:8001"
+    ai_service_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 

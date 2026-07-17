@@ -70,23 +70,6 @@ export const gapSuggestions = [
   },
 ];
 
-export const quoteResult = {
-  origin: "Hà Nội",
-  destination: "Đà Nẵng",
-  seatType: "Giường nằm K6",
-  finalPrice: "1.540.000 VND",
-  availability: "Còn 18 chỗ",
-  opportunityCost: "1.220.000 VND",
-  bottleneck: "Huế → Đà Nẵng",
-  explanation:
-    "Giá được đẩy lên vì chặng Huế → Đà Nẵng gần đầy chỗ. Hệ thống ưu tiên giữ ghế cho luồng dài và khuyến nghị giảm mức khuyến mãi hiện tại.",
-  alternatives: [
-    { label: "SE7 · Khung giờ thấp điểm", price: "1.380.000 VND", note: "Còn 33 chỗ" },
-    { label: "Đi Đà Nẵng rồi nối chuyến", price: "1.250.000 VND", note: "Cần đổi toa tại Huế" },
-    { label: "Ngồi mềm điều hòa", price: "920.000 VND", note: "Còn 51 chỗ" },
-  ],
-};
-
 export const simulationSummary = {
   policy: "Cuối tuần tháng 7 nhu cầu cao",
   revenueLift: "+8,2%",

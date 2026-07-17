@@ -45,9 +45,17 @@ class OptimizeResponse(BaseModel):
     n_od: int
 
 
+class SegmentPriceInput(BaseModel):
+    segment_id: int
+    bid_price: float
+
+
 class PriceRequest(BaseModel):
     od_id: int
     service_date: str
+    seat_type: str | None = None
+    base_price: float | None = None
+    segments: list[SegmentPriceInput] | None = None
     min_price: float | None = None
     max_price: float | None = None
 
