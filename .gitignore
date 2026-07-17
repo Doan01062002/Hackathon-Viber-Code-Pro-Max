@@ -22,6 +22,8 @@ env/
 .idea/
 # Quyền Claude Code riêng của từng máy — không chia sẻ
 .claude/settings.local.json
+service_account.json
+scratch/
 *.swp
 *.swo
 *~
@@ -32,6 +34,7 @@ Thumbs.db
 
 # Data (never commit large data)
 data/
+eval/
 *.db
 *.sqlite3
 
