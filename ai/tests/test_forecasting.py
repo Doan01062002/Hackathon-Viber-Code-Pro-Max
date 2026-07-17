@@ -5,8 +5,6 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-import pytest
-
 from ai_service import datagen
 from ai_service import forecasting as F
 
