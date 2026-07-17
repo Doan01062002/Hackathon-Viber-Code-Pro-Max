@@ -66,4 +66,7 @@ export const apiClient = {
 
   post: <TResponse>(path: string, body: unknown, options?: RequestOptions) =>
     request<TResponse>(path, { method: "POST", body: JSON.stringify(body), headers: options?.headers }, options),
+
+  put: <TResponse>(path: string, body: unknown, options?: RequestOptions) =>
+    request<TResponse>(path, { method: "PUT", body: JSON.stringify(body), headers: options?.headers }, options),
 };
