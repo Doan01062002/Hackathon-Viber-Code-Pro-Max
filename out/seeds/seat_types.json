@@ -1,0 +1,12 @@
+[
+  {
+    "code": "ngoi_mem",
+    "name": "Ngoi mem dieu hoa",
+    "is_active": true
+  },
+  {
+    "code": "giuong_nam_k6",
+    "name": "Giuong nam khoang 6",
+    "is_active": true
+  }
+]
