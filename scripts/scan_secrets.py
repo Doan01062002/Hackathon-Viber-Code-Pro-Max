@@ -33,7 +33,12 @@ PATTERNS = {
     "Slack token": re.compile(r"\bxox[baprs.0-9a-zA-Z_-]{10,}"),
     "Notion token": re.compile(r"\bntn_\w{30,}\b"),
     "Vercel token": re.compile(r"\bvcp_\w{30,}\b"),
-    "Private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "Private key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[a-zA-Z0-9\s+/=\\n]+-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "GCP Project ID": re.compile(r'"project_id":\s*"[^"]+"'),
+    "GCP Private Key ID": re.compile(r'"private_key_id":\s*"[^"]+"'),
+    "GCP Client Email": re.compile(r'"client_email":\s*"[^"]+"'),
+    "GCP Client ID": re.compile(r'"client_id":\s*"[^"]+"'),
+    "GCP Type": re.compile(r'"type":\s*"service_account"'),
 }
 
 # Dòng .env kiểu FOO_API_KEY=<giá trị thật>. Bỏ qua placeholder.

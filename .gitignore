@@ -22,6 +22,7 @@ env/
 .idea/
 # Quyền Claude Code riêng của từng máy — không chia sẻ
 .claude/settings.local.json
+service_account.json
 *.swp
 *.swo
 *~

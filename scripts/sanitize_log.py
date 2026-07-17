@@ -21,6 +21,7 @@ def sanitize(input_path, output_path):
         content = fh.read()
 
     if findings:
+        import json
         # Sắp xếp các phát hiện theo độ dài chuỗi giảm dần để tránh thay thế một phần
         sorted_findings = sorted(findings, key=lambda x: len(x[2]), reverse=True)
         
@@ -37,8 +38,12 @@ def sanitize(input_path, output_path):
             else:
                 masked = "REDACTED"
             
-            # Thay thế tất cả các lần xuất hiện của secret trong file
+            # Thay thế cả bản thường (unescaped) và bản đã escape trong JSON
             content = content.replace(val, masked)
+            
+            escaped_val = json.dumps(val)[1:-1]
+            escaped_masked = json.dumps(masked)[1:-1]
+            content = content.replace(escaped_val, escaped_masked)
             
     # Ghi ra tệp đích
     with open(output_path, "w", encoding="utf-8") as fh:
