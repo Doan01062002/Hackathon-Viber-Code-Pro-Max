@@ -1,0 +1,330 @@
+openapi: 3.0.3
+info:
+  title: Smart Rail Revenue Management (SRRM) - OpenAPI Contracts
+  description: Tài liệu đặc tả API chuẩn hóa cho tích hợp Frontend, Backend và AI Service của dự án SRRM.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Backend Server API
+  - url: http://localhost:8001
+    description: Internal AI Service API
+
+paths:
+  # --- BACKEND ENDPOINTS ---
+  /chat:
+    post:
+      tags:
+        - Chat
+      summary: Tương tác với trợ lý ảo AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Tin nhắn của người dùng
+                session_id:
+                  type: string
+                  description: ID phiên chat
+              required:
+                - message
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                  role:
+                    type: string
+                  content:
+                    type: string
+                  action_type:
+                    type: string
+                  payload:
+                    type: object
+
+  /analytics/legs-heatmap:
+    get:
+      tags:
+        - Analytics
+      summary: Lấy biểu đồ nhiệtLegs Heatmap của chuyến tàu
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /pricing/quote:
+    get:
+      tags:
+        - Pricing
+      summary: Yêu cầu đề xuất giá động cho sản phẩm OD
+      parameters:
+        - name: od_product_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve:
+    post:
+      tags:
+        - Optimize
+      summary: Đẩy job chạy ngầm tối ưu hóa phân bổ hạn ngạch (DLP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trip_id:
+                  type: integer
+              required:
+                - trip_id
+      responses:
+        "200":
+          description: Đã đưa vào hàng đợi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /optimize/resolve/jobs/{job_id}:
+    get:
+      tags:
+        - Optimize
+      summary: Kiểm tra tiến độ/trạng thái của job tối ưu hóa
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve/versions:
+    get:
+      tags:
+        - Optimize
+      summary: Lấy danh sách các phiên bản chạy tối ưu của chuyến tàu
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve/rollback:
+    post:
+      tags:
+        - Optimize
+      summary: Khôi phục cấu hình tối ưu của chuyến tàu về phiên bản chạy trước
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trip_id:
+                  type: integer
+                target_version:
+                  type: string
+              required:
+                - trip_id
+                - target_version
+      responses:
+        "200":
+          description: Thành công
+
+  /simulation/compare:
+    get:
+      tags:
+        - Simulation
+      summary: Chạy và so sánh chính sách mô phỏng giá với dữ liệu lịch sử
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: policy_id
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /policy/limits:
+    get:
+      tags:
+        - Policy
+      summary: Lấy danh sách giới hạn chính sách giá (Yêu cầu RBAC Header)
+      parameters:
+        - name: od_product_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /policy/limits/{policy_id}:
+    put:
+      tags:
+        - Policy
+      summary: Cập nhật giới hạn chính sách giá (Yêu cầu RBAC Header)
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                min_price:
+                  type: number
+                max_price:
+                  type: number
+                max_step_change:
+                  type: number
+                status:
+                  type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /audit/logs:
+    get:
+      tags:
+        - Audit
+      summary: Truy vấn nhật ký kiểm toán hệ thống (Yêu cầu RBAC Header)
+      parameters:
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: entity_type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  # --- INTERNAL AI SERVICE ENDPOINTS ---
+  /internal/forecast:
+    post:
+      tags:
+        - AI-Internal
+      summary: Tạo dự báo nhu cầu cho một ngày
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_date:
+                  type: string
+              required:
+                - service_date
+      responses:
+        "200":
+          description: Thành công
+
+  /internal/optimize:
+    post:
+      tags:
+        - AI-Internal
+      summary: Chạy tối ưu hóa DLP để sinh bid prices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_date:
+                  type: string
+              required:
+                - service_date
+      responses:
+        "200":
+          description: Thành công
+
+  /internal/price:
+    post:
+      tags:
+        - AI-Internal
+      summary: Định giá động sản phẩm OD
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                od_id:
+                  type: integer
+                service_date:
+                  type: string
+                min_price:
+                  type: number
+                max_price:
+                  type: number
+              required:
+                - od_id
+                - service_date
+      responses:
+        "200":
+          description: Thành công

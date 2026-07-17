@@ -287,3 +287,115 @@ class OptimizeService:
             "bid_prices_updated_count": bid_prices_count,
             "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công.",
         }
+
+    def get_run_versions(self, trip_id: int, db: Session) -> list[dict[str, Any]]:
+        """Lấy danh sách các phiên bản chạy (run_version) của chuyến tàu."""
+        # 1. Kiểm tra sự tồn tại của trip
+        trip_exists = db.execute(
+            text("SELECT id FROM trips WHERE id = :trip_id"),
+            {"trip_id": trip_id}
+        ).fetchone()
+        if not trip_exists:
+            raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
+
+        # 2. Truy vấn các run_version duy nhất trong bảng bid_prices cho chuyến tàu này
+        query = text("""
+            SELECT DISTINCT bp.run_version, MAX(bp.calculated_at) as calculated_at, bp.is_active
+            FROM bid_prices bp
+            JOIN segments s ON bp.segment_id = s.id
+            WHERE s.trip_id = :trip_id
+            GROUP BY bp.run_version, bp.is_active
+            ORDER BY calculated_at DESC
+        """)
+        rows = db.execute(query, {"trip_id": trip_id}).fetchall()
+        
+        # Nhóm lại để tránh trùng lặp do is_active
+        versions_map = {}
+        for r in rows:
+            version = r[0]
+            calc_at = r[1].isoformat() if r[1] else None
+            is_active = bool(r[2])
+            
+            if version not in versions_map:
+                versions_map[version] = {
+                    "run_version": version,
+                    "calculated_at": calc_at,
+                    "is_active": is_active
+                }
+            elif is_active:
+                versions_map[version]["is_active"] = True
+                
+        return sorted(list(versions_map.values()), key=lambda x: x["calculated_at"] or "", reverse=True)
+
+    def rollback_to_version(self, trip_id: int, target_version: str, db: Session) -> dict[str, Any]:
+        """Khôi phục (rollback) cấu hình tối ưu của chuyến tàu về một phiên bản trước đó."""
+        # 1. Kiểm tra sự tồn tại của trip
+        trip_exists = db.execute(
+            text("SELECT id FROM trips WHERE id = :trip_id"),
+            {"trip_id": trip_id}
+        ).fetchone()
+        if not trip_exists:
+            raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
+
+        # 2. Xác minh xem target_version có tồn tại cho trip này không
+        ver_check = db.execute(
+            text("""
+                SELECT COUNT(*) FROM bid_prices bp
+                JOIN segments s ON bp.segment_id = s.id
+                WHERE s.trip_id = :trip_id AND bp.run_version = :ver
+            """),
+            {"trip_id": trip_id, "ver": target_version}
+        ).fetchone()
+        
+        if ver_check[0] == 0:
+            raise ValueError(f"Không tìm thấy phiên bản tối ưu '{target_version}' cho chuyến tàu {trip_id}")
+
+        # 3. Thực hiện hoán đổi (swap) phiên bản hoạt động trong một transaction
+        # Deactivate all bid_prices of this trip
+        db.execute(
+            text("""
+                UPDATE bid_prices
+                SET is_active = FALSE
+                WHERE segment_id IN (SELECT id FROM segments WHERE trip_id = :trip_id)
+            """),
+            {"trip_id": trip_id}
+        )
+        
+        # Activate target version in bid_prices
+        db.execute(
+            text("""
+                UPDATE bid_prices
+                SET is_active = TRUE
+                WHERE run_version = :ver
+            """),
+            {"ver": target_version}
+        )
+        
+        # Deactivate all quotas of this trip
+        db.execute(
+            text("""
+                UPDATE quotas
+                SET is_active = FALSE
+                WHERE od_product_id IN (SELECT id FROM od_products WHERE trip_id = :trip_id)
+            """),
+            {"trip_id": trip_id}
+        )
+        
+        # Activate target version in quotas
+        db.execute(
+            text("""
+                UPDATE quotas
+                SET is_active = TRUE
+                WHERE run_version = :ver
+            """),
+            {"ver": target_version}
+        )
+
+        db.commit()
+        
+        return {
+            "status": "success",
+            "trip_id": trip_id,
+            "rolled_back_to": target_version,
+            "message": f"Đã khôi phục thành công cấu hình tối ưu của chuyến tàu {trip_id} về phiên bản '{target_version}'."
+        }
