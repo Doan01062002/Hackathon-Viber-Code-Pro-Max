@@ -50,4 +50,3 @@ def get_database_status() -> str:
 def dispose_engine() -> None:
     if get_engine.cache_info().currsize:
         get_engine().dispose()
-
