@@ -1,17 +1,18 @@
 import asyncio
 import logging
-import os
 from typing import Any
 
 import httpx
+
+from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
 
 class AIClient:
     def __init__(self, base_url: str | None = None):
-        # Đọc base_url từ biến môi trường hoặc mặc định là http://localhost:8001
-        self.base_url = base_url or os.getenv("AI_SERVICE_URL", "http://localhost:8001")
+        # Mặc định lấy URL ai-service từ settings (đồng bộ với phần còn lại của backend)
+        self.base_url = base_url or get_settings().ai_service_url
         # In-memory cache cho bid prices/optimization theo service_date
         self._opt_cache: dict[str, dict[str, Any]] = {}
 

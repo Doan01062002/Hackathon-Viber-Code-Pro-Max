@@ -5,6 +5,7 @@ WORKDIR /app
 COPY pyproject.toml ./pyproject.toml
 COPY src/ ./src/
 COPY ai_service/ ./ai_service/
+COPY models/ ./models/
 
 RUN pip install --no-cache-dir .
 
