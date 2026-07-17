@@ -1,12 +1,47 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { MetricGrid, SectionCard } from "@/features/rail-ui/components/Primitives";
+import { apiClient } from "@/lib/api/client";
 import {
-  bookingCurve,
+  bookingCurve as mockBookingCurve,
   gapSuggestions,
-  heatmapRows,
+  heatmapRows as mockHeatmapRows,
   odMatrix,
   rightRailCards,
-  topMetrics,
 } from "@/features/rail-ui/mockData";
+
+// Giao diện dữ liệu Heatmap từ API
+interface LegHeatmapItem {
+  segment_id: number;
+  sequence_no: number;
+  origin_station_code: string;
+  destination_station_code: string;
+  capacity: number;
+  remaining: number;
+  seat_type: string;
+  bid_price: number;
+  is_bottleneck: boolean;
+}
+
+interface LegHeatmapResponse {
+  trip_id: number;
+  legs: LegHeatmapItem[];
+}
+
+// Giao diện dữ liệu Booking Curve từ API
+interface BookingCurvePoint {
+  lead_days: number;
+  cumulative_bookings: number;
+  forecast_demand_point: number;
+}
+
+interface ForecastResponse {
+  trip_id: number;
+  service_date: string;
+  forecasts: any[];
+  booking_curve: BookingCurvePoint[];
+}
 
 function heatClass(value: number) {
   if (value >= 95) return "heat-critical";
@@ -21,24 +56,91 @@ function severityClass(value: string) {
   return "severity-thap";
 }
 
-function buildPolyline(values: number[]) {
-  const width = 360;
-  const height = 180;
-  return values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - (value / 100) * 140 - 12;
-      return `${x},${y}`;
-    })
-    .join(" ");
-}
-
 export function DashboardScreen() {
-  const actualPoints = buildPolyline(bookingCurve.map((point) => point.actual));
-  const forecastPoints = buildPolyline(bookingCurve.map((point) => point.forecast));
+  const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
+  const [curve, setCurve] = useState<BookingCurvePoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
+        // Lấy đồng thời heatmap chặng và booking curve dự báo
+        const [heatmapRes, forecastRes] = await Promise.all([
+          apiClient.get<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1"),
+          apiClient.get<ForecastResponse>("/api/v1/forecast?trip_id=1")
+        ]);
+        
+        setLegs(heatmapRes.legs);
+        setCurve(forecastRes.booking_curve);
+      } catch (err: any) {
+        console.warn("Lỗi khi kết nối API backend, fallback sang dữ liệu mô phỏng:", err);
+        setError("Không thể đồng bộ dữ liệu thời gian thực từ Backend server.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const legsToRender = legs.length > 0 ? legs : null;
+  const curveToRender = curve.length > 0 ? curve : mockBookingCurve;
+
+  // Tính toán Top Metrics động dựa trên dữ liệu DB thực tế
+  let avgLoad = 78;
+  let bottleneckCount = 1;
+  if (legs.length > 0) {
+    const totalCapacity = legs.reduce((acc, leg) => acc + leg.capacity, 0);
+    const totalRemaining = legs.reduce((acc, leg) => acc + leg.remaining, 0);
+    avgLoad = Math.round(((totalCapacity - totalRemaining) / totalCapacity) * 100);
+    bottleneckCount = legs.filter((leg) => leg.is_bottleneck).length;
+  }
+
+  const topMetrics = [
+    { label: legsToRender ? "Tải TB Thực tế" : "Tải trung bình", value: `${avgLoad}%`, detail: legsToRender ? "Tính trên tất cả chặng" : "Tăng 4 điểm so với hôm qua", tone: "good" },
+    { label: "Doanh thu dự kiến", value: "2,84 tỷ", detail: "Đạt 103% kế hoạch ngày", tone: "neutral" },
+    { label: legsToRender ? "Chặng Bottleneck" : "Chặng rủi ro", value: bottleneckCount.toString().padStart(2, "0"), detail: legsToRender ? "Cần điều phối bid price" : "Huế → Đà Nẵng đang gần đầy", tone: bottleneckCount > 0 ? "danger" : "good" },
+    { label: "Cảnh báo mở", value: "12", detail: "03 cảnh báo cần xử lý ngay", tone: "danger" },
+  ];
+
+  // Tìm điểm cực đại để vẽ trục y biểu đồ tự động
+  const maxVal = Math.max(
+    ...curveToRender.map((point) => ("cumulative_bookings" in point ? (point as any).cumulative_bookings : (point as any).actual)),
+    ...curveToRender.map((point) => ("forecast_demand_point" in point ? (point as any).forecast_demand_point : (point as any).forecast)),
+    100
+  );
+
+  function buildPolyline(values: number[]) {
+    const width = 360;
+    const height = 180;
+    if (values.length === 0) return "";
+    return values
+      .map((value, index) => {
+        const x = (index / (values.length - 1)) * width;
+        const y = height - (value / maxVal) * 140 - 12;
+        return `${x},${y}`;
+      })
+      .join(" ");
+  }
+
+  const actualPoints = buildPolyline(
+    curveToRender.map((point) => ("cumulative_bookings" in point ? (point as any).cumulative_bookings : (point as any).actual))
+  );
+  const forecastPoints = buildPolyline(
+    curveToRender.map((point) => ("forecast_demand_point" in point ? (point as any).forecast_demand_point : (point as any).forecast))
+  );
 
   return (
     <div className="page-stack">
+      {error && (
+        <div className="banner banner-warning" style={{ backgroundColor: "#3a2a18", borderLeft: "4px solid #d97706", padding: "12px", borderRadius: "6px", color: "#f59e0b", fontSize: "14px", marginBottom: "8px" }}>
+          ⚠️ <strong>Cảnh báo:</strong> {error} Hệ thống tự động chuyển sang chế độ mô phỏng dữ liệu Demo.
+        </div>
+      )}
+
       <section className="dashboard-toolbar">
         <div className="command-bar">
           <span className="command-icon" aria-hidden="true">
@@ -80,7 +182,7 @@ export function DashboardScreen() {
             <div className="decision-stat-grid">
               <article className="decision-stat">
                 <span>Mức tải hiện tại</span>
-                <strong>97%</strong>
+                <strong>{legsToRender ? `${avgLoad}%` : "97%"}</strong>
                 <small>Tăng 6% trong 2 giờ gần nhất</small>
               </article>
               <article className="decision-stat">
@@ -190,27 +292,66 @@ export function DashboardScreen() {
           <div className="table-wrap">
             <table className="data-table heatmap-table">
               <thead>
-                <tr>
-                  <th>Chặng</th>
-                  <th>06h</th>
-                  <th>09h</th>
-                  <th>12h</th>
-                  <th>15h</th>
-                  <th>18h</th>
-                  <th>21h</th>
-                </tr>
+                {legsToRender ? (
+                  <tr>
+                    <th>Chặng hành trình</th>
+                    <th>Loại chỗ</th>
+                    <th>Tồn kho ghế</th>
+                    <th>Hệ số lấp đầy</th>
+                    <th>Giá cơ hội (Bid)</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                ) : (
+                  <tr>
+                    <th>Chặng</th>
+                    <th>06h</th>
+                    <th>09h</th>
+                    <th>12h</th>
+                    <th>15h</th>
+                    <th>18h</th>
+                    <th>21h</th>
+                  </tr>
+                )}
               </thead>
               <tbody>
-                {heatmapRows.map((row) => (
-                  <tr key={row.segment}>
-                    <th scope="row">{row.segment}</th>
-                    {row.slots.map((slot, index) => (
-                      <td key={`${row.segment}-${index}`} className={heatClass(slot)}>
-                        {slot}%
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {legsToRender ? (
+                  legsToRender.map((leg) => {
+                    const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
+                    return (
+                      <tr key={leg.segment_id}>
+                        <th scope="row" style={{ color: "#fff" }}>
+                          {leg.origin_station_code} → {leg.destination_station_code}
+                        </th>
+                        <td>{leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"}</td>
+                        <td>{leg.remaining} / {leg.capacity}</td>
+                        <td className={heatClass(load)} style={{ fontWeight: "bold" }}>
+                          {load}%
+                        </td>
+                        <td style={{ color: "#10b981", fontWeight: "bold" }}>
+                          {leg.bid_price.toLocaleString()} VND
+                        </td>
+                        <td>
+                          {leg.is_bottleneck ? (
+                            <span className="priority-badge severity-cao">Nút cổ chai</span>
+                          ) : (
+                            <span className="priority-badge severity-thap">Thường</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  mockHeatmapRows.map((row) => (
+                    <tr key={row.segment}>
+                      <th scope="row">{row.segment}</th>
+                      {row.slots.map((slot, index) => (
+                        <td key={`${row.segment}-${index}`} className={heatClass(slot)}>
+                          {slot}%
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -222,9 +363,9 @@ export function DashboardScreen() {
         >
           <div className="curve-chart">
             <div className="curve-axis-labels">
-              <span>100%</span>
-              <span>50%</span>
-              <span>0%</span>
+              <span>{Math.round(maxVal)}</span>
+              <span>{Math.round(maxVal / 2)}</span>
+              <span>0</span>
             </div>
 
             <div className="curve-svg-wrap">
@@ -237,8 +378,10 @@ export function DashboardScreen() {
               </svg>
 
               <div className="curve-x-axis">
-                {bookingCurve.map((point) => (
-                  <span key={point.day}>{point.day}</span>
+                {curveToRender.map((point) => (
+                  <span key={"lead_days" in point ? (point as any).lead_days : (point as any).day}>
+                    {"lead_days" in point ? `D-${(point as any).lead_days}` : (point as any).day}
+                  </span>
                 ))}
               </div>
             </div>
