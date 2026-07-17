@@ -49,11 +49,16 @@ logs/
 *.log
 artifacts/ai-logs/
 docs/task-board-csv/
+docs/ai-log/sessions/
 
 # AI log nộp BTC — phải được commit, không dính rule logs/ *.log ở trên.
 # Xuất bằng: bash scripts/export_ai_log.sh
 !docs/ai-log/
-!docs/ai-log/**
+!docs/ai-log/README.md
+!docs/ai-log/tools-used.md
+!docs/ai-log/screenshots/
+!docs/ai-log/screenshots/**
+!docs/ai-log/.secret-allowlist
 
 # Test coverage
 htmlcov/
