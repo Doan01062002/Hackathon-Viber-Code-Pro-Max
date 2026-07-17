@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
+    # ai-service — Khối 1-2-3 (forecast/optimize/price), xem ai/ai_service/app.py
+    ai_service_url: str = "http://localhost:8001"
+    ai_service_timeout_s: float = 10.0
+
 
 @lru_cache
 def get_settings() -> Settings:

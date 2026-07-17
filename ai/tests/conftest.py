@@ -1,6 +1,14 @@
 import hashlib
+import os
 import sys
 import types
+
+# ai_service/ nằm cạnh src/ (chưa phải package cài đặt qua pyproject.toml `where=["src"]`),
+# nên test cần tự thêm thư mục ai/ vào sys.path để `import ai_service` hoạt động —
+# giống cách scripts/train.py đã làm.
+_AI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _AI_DIR not in sys.path:
+    sys.path.insert(0, _AI_DIR)
 
 
 class MockXXHash:

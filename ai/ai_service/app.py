@@ -7,9 +7,11 @@ backend đẩy snapshot dữ liệu vào payload thay vì ai-service tự sinh.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import pickle
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import date
 
@@ -27,15 +29,20 @@ from .schemas import (
     ForecastResponse,
     OptimizeRequest,
     OptimizeResponse,
+    PriceExplanation,
     PriceRequest,
     PriceResponse,
+    Quota,
 )
 
 STATE = {}
 
 
 def _iso(d: str) -> date:
-    return date.fromisoformat(d)
+    try:
+        return date.fromisoformat(d)
+    except ValueError as exc:
+        raise HTTPException(422, f"service_date không hợp lệ (cần ISO 8601, vd '2024-02-11'): {d}") from exc
 
 
 def _feature_rows(ods, d: date):
@@ -111,36 +118,68 @@ def forecast(req: ForecastRequest):
     return ForecastResponse(service_date=req.service_date, model_version=STATE["forecaster"].version, items=items)
 
 
-def _optimize(d: date):
+def _lambda_fingerprint(lam: dict) -> str:
+    """Hash nhu cầu dự báo hiện tại — dùng để phát hiện input đổi giữa 2 lần resolve.
+    Làm tròn 4 chữ số để tránh nhiễu số thực gây warm-start sai (coi là đổi trong khi
+    thực chất không đổi)."""
+    payload = repr(sorted((k, round(v, 4)) for k, v in lam.items()))
+    return hashlib.md5(payload.encode()).hexdigest()
+
+
+def _optimize(d: date, force_resolve: bool = False) -> tuple[dict, bool]:
+    """Trả về (solution, warm_started). warm_started=True nghĩa là input (nhu cầu dự
+    báo) không đổi so với lần giải gần nhất cho cùng service_date, nên tái dùng nguyên
+    lời giải cũ thay vì giải lại DLP — đây là chiến lược warm-start ở mức MVP: bài
+    toán đủ nhỏ (1-3 tàu) nên giải lại từ đầu khi có thay đổi vẫn đạt K7 (gần real-time)
+    mà không cần warm-start basis thật của bộ giải LP (scipy HiGHS không hỗ trợ qua
+    API công khai)."""
     key = d.isoformat()
-    if key in STATE["opt_cache"]:
-        return STATE["opt_cache"][key]
     ods = STATE["meta"]["od_products"]
     nseg = len(STATE["meta"]["segments"])
     pred = STATE["forecaster"].predict(_feature_rows(ods, d))
     lam = dict(zip(pred["od_id"], pred["lambda_hat"]))
+    fp = _lambda_fingerprint(lam)
+
+    cached = STATE["opt_cache"].get(key)
+    if not force_resolve and cached is not None and cached["fingerprint"] == fp:
+        return cached["sol"], True
+
     t0 = time.time()
     sol = opt.solve_bid_prices(ods, lam, nseg)
     sol["solve_ms"] = (time.time() - t0) * 1000
-    STATE["opt_cache"][key] = sol
-    return sol
+    sol["run_version"] = f"{key}-{uuid.uuid4().hex[:12]}"
+    STATE["opt_cache"][key] = {"fingerprint": fp, "sol": sol}
+    return sol, False
 
 
 @app.post("/internal/optimize", response_model=OptimizeResponse)
 def optimize(req: OptimizeRequest):
     d = _iso(req.service_date)
-    sol = _optimize(d)
+    sol, warm_started = _optimize(d, force_resolve=req.force_resolve)
     bps = [
         BidPrice(segment_id=seg, seat_type=st, bid_price=round(v, 0))
         for (seg, st), v in sol["bid_prices"].items()
         if v > 0
     ]
+    quotas = [
+        Quota(
+            origin_idx=STATE["ods"][od_id]["origin_idx"],
+            dest_idx=STATE["ods"][od_id]["dest_idx"],
+            seat_type=STATE["ods"][od_id]["seat_type"],
+            quota=round(q, 3),
+        )
+        for od_id, q in sol["quotas"].items()
+        if q > 0
+    ]
     n_rej = sum(1 for a in sol["accept"].values() if not a["accept"])
     return OptimizeResponse(
         service_date=req.service_date,
+        run_version=sol["run_version"],
+        warm_started=warm_started,
         solve_ms=round(sol["solve_ms"], 1),
         revenue_lp=round(sol["revenue_lp"], 0),
         bid_prices=bps,
+        quotas=quotas,
         n_rejected=n_rej,
         n_od=len(sol["accept"]),
     )
@@ -151,10 +190,18 @@ def price(req: PriceRequest):
     if req.od_id not in STATE["ods"]:
         raise HTTPException(404, "od_id không tồn tại")
     d = _iso(req.service_date)
-    sol = _optimize(d)
+    sol, _warm_started = _optimize(d)
     od = STATE["ods"][req.od_id]
     policy = None
     if req.min_price is not None and req.max_price is not None:
         policy = {"min_price": req.min_price, "max_price": req.max_price}
     q = pricing.price_od(od, sol["bid_prices"], STATE["eps"], policy)
-    return PriceResponse(**q)
+    return PriceResponse(
+        od_id=q["od_id"],
+        seat_type=q["seat_type"],
+        opportunity_cost=q["opportunity_cost"],
+        proposed_price=q["proposed_price"],
+        final_price=q["final_price"],
+        decision=q["decision"],
+        explanation=PriceExplanation(**q["explanation"]),
+    )
