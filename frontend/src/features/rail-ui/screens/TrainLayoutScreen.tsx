@@ -8,7 +8,7 @@ import type { CoachDto, SeatPlanDto } from "@/features/rail-ui/api/seatApi";
 function seatClass(value: string) {
   if (value === "selected") return "seat-selected";
   if (value === "held") return "seat-held";
-  if (value === "blocked") return "seat-blocked";
+  if (value === "blocked" || value === "confirmed") return "seat-blocked";
   return "seat-available";
 }
 
