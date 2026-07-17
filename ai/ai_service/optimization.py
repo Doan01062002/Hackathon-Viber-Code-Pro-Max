@@ -2,7 +2,9 @@
 A) DLP (scipy HiGHS) -> bid price (biến đối ngẫu) + quota.
 B) Gán ghế (interval partitioning) + ghép đoạn trống (best-fit).
 """
+
 from __future__ import annotations
+
 import numpy as np
 from scipy.optimize import linprog
 
@@ -48,8 +50,7 @@ def solve_bid_prices(od_products, lambda_hat, nseg, capacity=C.CAPACITY):
     for od in od_products:
         oc = sum(bid_prices[(seg, od["seat_type"])] for seg in od["segments"])
         accept[od["od_id"]] = dict(opportunity_cost=oc, accept=bool(od["base_price"] >= oc))
-    return dict(bid_prices=bid_prices, quotas=quotas, accept=accept,
-                revenue_lp=float(fares @ res.x))
+    return dict(bid_prices=bid_prices, quotas=quotas, accept=accept, revenue_lp=float(fares @ res.x))
 
 
 # ---------- Gán ghế: interval partitioning ----------
@@ -59,14 +60,15 @@ def assign_seats(bookings):
     Số ghế dùng = tải chồng lấn cực đại (tối ưu)."""
     plans = {}
     for stype in C.SEAT_TYPES:
-        items = sorted([b for b in bookings if b["seat_type"] == stype],
-                       key=lambda b: (b["origin_idx"], b["dest_idx"]))
-        seats = []          # mỗi seat: (free_from, list booking)
+        items = sorted([b for b in bookings if b["seat_type"] == stype], key=lambda b: (b["origin_idx"], b["dest_idx"]))
+        seats = []  # mỗi seat: (free_from, list booking)
         for b in items:
             placed = False
             for s in seats:
-                if s["free_from"] <= b["origin_idx"]:      # ghế rảnh tại ga lên
-                    s["book"].append(b); s["free_from"] = b["dest_idx"]; placed = True
+                if s["free_from"] <= b["origin_idx"]:  # ghế rảnh tại ga lên
+                    s["book"].append(b)
+                    s["free_from"] = b["dest_idx"]
+                    placed = True
                     break
             if not placed:
                 seats.append(dict(free_from=b["dest_idx"], book=[b]))
@@ -103,16 +105,21 @@ def find_gap_combinations(seat_plan, sellable_ods, nstations):
                 cursor = max(cursor, b["dest_idx"])
             if cursor < nstations - 1:
                 free.append((cursor, nstations - 1))
-            for (a, z) in free:
+            for a, z in free:
                 if z - a < 1:
                     continue
                 # best-fit: OD nằm gọn trong [a,z], dài nhất
-                cands = [od for od in by_type.get(stype, [])
-                         if od["origin_idx"] >= a and od["dest_idx"] <= z]
+                cands = [od for od in by_type.get(stype, []) if od["origin_idx"] >= a and od["dest_idx"] <= z]
                 if cands:
                     best = max(cands, key=lambda od: od["dest_idx"] - od["origin_idx"])
-                    gaps.append(dict(seat_type=stype, seat_index=si,
-                                     from_idx=a, to_idx=z,
-                                     suggest_od_id=best["od_id"],
-                                     suggest_span=(best["origin_idx"], best["dest_idx"])))
+                    gaps.append(
+                        dict(
+                            seat_type=stype,
+                            seat_index=si,
+                            from_idx=a,
+                            to_idx=z,
+                            suggest_od_id=best["od_id"],
+                            suggest_span=(best["origin_idx"], best["dest_idx"]),
+                        )
+                    )
     return gaps

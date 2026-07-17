@@ -64,11 +64,7 @@ def configure_ai_logging(settings: AISettings | None = None) -> logging.Logger:
         logger.propagate = False
 
         handler = next(
-            (
-                current
-                for current in logger.handlers
-                if getattr(current, _HANDLER_MARKER, False)
-            ),
+            (current for current in logger.handlers if getattr(current, _HANDLER_MARKER, False)),
             None,
         )
         if handler is None:

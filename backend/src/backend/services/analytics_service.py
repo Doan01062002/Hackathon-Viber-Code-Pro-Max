@@ -1,29 +1,28 @@
 from datetime import date, datetime
-from typing import List, Optional
+
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
 from backend.views.analytics_view import (
+    BookingCurvePoint,
+    ForecastItem,
+    ForecastResponse,
     LegHeatmapItem,
     LegHeatmapResponse,
-    ForecastItem,
-    BookingCurvePoint,
-    ForecastResponse,
 )
+
 
 class AnalyticsService:
     def get_legs_heatmap(self, trip_id: int, db: Session) -> LegHeatmapResponse:
         # 1. Kiểm tra trip_id tồn tại
-        trip_check = db.execute(
-            text("SELECT id FROM trips WHERE id = :trip_id"),
-            {"trip_id": trip_id}
-        ).fetchone()
-        
+        trip_check = db.execute(text("SELECT id FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}).fetchone()
+
         if not trip_check:
             raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
 
         # 2. Truy vấn thông tin các chặng, sức chứa, tồn kho và giá vé cơ hội hoạt động
         query = text("""
-            SELECT 
+            SELECT
                 seg.id AS segment_id,
                 seg.sequence_no,
                 st_orig.code AS origin_station_code,
@@ -38,14 +37,14 @@ class AnalyticsService:
             JOIN segment_capacities sc ON seg.id = sc.segment_id
             JOIN segment_inventory si ON (sc.segment_id = si.segment_id AND sc.seat_type = si.seat_type)
             LEFT JOIN bid_prices bp ON (
-                seg.id = bp.segment_id 
-                AND sc.seat_type = bp.seat_type 
+                seg.id = bp.segment_id
+                AND sc.seat_type = bp.seat_type
                 AND bp.is_active = TRUE
             )
             WHERE seg.trip_id = :trip_id
             ORDER BY seg.sequence_no ASC, sc.seat_type ASC
         """)
-        
+
         rows = db.execute(query, {"trip_id": trip_id}).mappings().all()
 
         legs = []
@@ -82,18 +81,17 @@ class AnalyticsService:
 
         return LegHeatmapResponse(trip_id=trip_id, legs=legs)
 
-    def get_forecast_data(self, trip_id: int, seat_type: Optional[str], db: Session) -> ForecastResponse:
+    def get_forecast_data(self, trip_id: int, seat_type: str | None, db: Session) -> ForecastResponse:
         # 1. Lấy thông tin trip & service_date
         trip_row = db.execute(
-            text("SELECT id, service_date FROM trips WHERE id = :trip_id"),
-            {"trip_id": trip_id}
+            text("SELECT id, service_date FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}
         ).fetchone()
 
         if not trip_row:
             raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
 
         trip_id_db, service_date_val = trip_row
-        
+
         # Đảm bảo service_date là kiểu datetime.date
         if isinstance(service_date_val, str):
             service_date = datetime.strptime(service_date_val, "%Y-%m-%d").date()
@@ -105,7 +103,7 @@ class AnalyticsService:
 
         # 2. Truy vấn danh sách dự báo (Forecast items) cho các sản phẩm OD của trip
         forecast_query = text("""
-            SELECT 
+            SELECT
                 odp.id AS od_product_id,
                 st_orig.code AS origin_station_code,
                 st_dest.code AS destination_station_code,
@@ -123,15 +121,12 @@ class AnalyticsService:
               AND (CAST(:seat_type AS VARCHAR) IS NULL OR odp.seat_type = :seat_type)
             ORDER BY odp.id ASC, df.lead_days DESC
         """)
-        
-        forecast_rows = db.execute(
-            forecast_query, 
-            {"trip_id": trip_id, "seat_type": seat_type}
-        ).mappings().all()
+
+        forecast_rows = db.execute(forecast_query, {"trip_id": trip_id, "seat_type": seat_type}).mappings().all()
 
         forecasts = []
         forecast_by_lead_day = {}  # lead_days -> sum(demand_point)
-        
+
         for row in forecast_rows:
             lead = row["lead_days"]
             demand = float(row["demand_point"])
@@ -153,7 +148,7 @@ class AnalyticsService:
 
         # 3. Truy vấn các bookings đã xác nhận (confirmed)
         booking_query = text("""
-            SELECT 
+            SELECT
                 b.id,
                 b.booked_at
             FROM bookings b
@@ -162,11 +157,8 @@ class AnalyticsService:
               AND b.status = 'confirmed'
               AND (CAST(:seat_type AS VARCHAR) IS NULL OR odp.seat_type = :seat_type)
         """)
-        
-        booking_rows = db.execute(
-            booking_query, 
-            {"trip_id": trip_id, "seat_type": seat_type}
-        ).mappings().all()
+
+        booking_rows = db.execute(booking_query, {"trip_id": trip_id, "seat_type": seat_type}).mappings().all()
 
         # Tính lead day cho từng booking
         booking_lead_days = []
@@ -182,7 +174,7 @@ class AnalyticsService:
                 booked_date = booked_at_val
             else:
                 booked_date = datetime.strptime(str(booked_at_val)[:10], "%Y-%m-%d").date()
-                
+
             lead_day = (service_date - booked_date).days
             booking_lead_days.append(lead_day)
 
@@ -193,7 +185,7 @@ class AnalyticsService:
             cum_bookings = sum(1 for ld in booking_lead_days if ld >= t)
             # Lấy dự báo nhu cầu tích lũy tại lead_days = t
             fc_demand = float(forecast_by_lead_day.get(t, 0.0))
-            
+
             booking_curve.append(
                 BookingCurvePoint(
                     lead_days=t,
