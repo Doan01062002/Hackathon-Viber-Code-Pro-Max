@@ -1,0 +1,3413 @@
+<!-- Seat Optimization -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SRRM AI - Seat Optimization</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#c4c7c9",
+              "surface-container-high": "#dce9ff",
+              "on-primary": "#ffffff",
+              secondary: "#565e74",
+              "error-container": "#ffdad6",
+              "on-primary-fixed": "#0f0069",
+              "surface-dim": "#cbdbf5",
+              "on-primary-fixed-variant": "#3323cc",
+              "tertiary-container": "#5e6163",
+              "on-background": "#0b1c30",
+              "outline-variant": "#c7c4d8",
+              tertiary: "#46494b",
+              "surface-bright": "#f8f9ff",
+              background: "#f8f9ff",
+              "tertiary-fixed": "#e0e3e5",
+              "on-error-container": "#93000a",
+              primary: "#3525cd",
+              "on-surface-variant": "#464555",
+              outline: "#777587",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#e5eeff",
+              "surface-container-highest": "#d3e4fe",
+              "primary-container": "#4f46e5",
+              "secondary-fixed-dim": "#bec6e0",
+              "surface-container-low": "#eff4ff",
+              "inverse-surface": "#213145",
+              "secondary-fixed": "#dae2fd",
+              "primary-fixed-dim": "#c3c0ff",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#dadcde",
+              "surface-tint": "#4d44e3",
+              "on-surface": "#0b1c30",
+              "on-secondary-fixed": "#131b2e",
+              "primary-fixed": "#e2dfff",
+              "secondary-container": "#dae2fd",
+              "on-primary-container": "#dad7ff",
+              "surface-variant": "#d3e4fe",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#191c1e",
+              "on-tertiary-fixed-variant": "#444749",
+              "inverse-primary": "#c3c0ff",
+              error: "#ba1a1a",
+              "on-secondary-fixed-variant": "#3f465c",
+              "on-secondary": "#ffffff",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#5c647a",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              base: "4px",
+              "stack-md": "1rem",
+              "container-padding": "2rem",
+              gutter: "1.5rem",
+              "stack-lg": "2rem",
+              "stack-sm": "0.5rem",
+            },
+            fontFamily: {
+              "headline-lg-mobile": ["Inter"],
+              "body-md": ["Inter"],
+              "headline-md": ["Inter"],
+              "label-sm": ["JetBrains Mono"],
+              "headline-lg": ["Inter"],
+              "display-lg": ["Inter"],
+              "body-lg": ["Inter"],
+            },
+            fontSize: {
+              "headline-lg-mobile": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "label-sm": [
+                "12px",
+                {
+                  lineHeight: "16px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-lg": [
+                "30px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "-0.01em",
+                  fontWeight: "600",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "1.2",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: #f8f9ff;
+        color: #0b1c30;
+        overflow-x: hidden;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #eff4ff;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #c7c4d8;
+        border-radius: 10px;
+      }
+      .train-car {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .train-car:hover {
+        transform: translateY(-2px);
+      }
+      .glass-effect {
+        backdrop-filter: blur(8px);
+        background: rgba(255, 255, 255, 0.7);
+      }
+      .bid-price-indicator {
+        animation: pulse-subtle 3s infinite ease-in-out;
+      }
+      @keyframes pulse-subtle {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+    </style>
+  </head>
+  <body class="font-body-md text-body-md">
+    <!-- SideNavBar Shell -->
+    <aside
+      class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline flex flex-col py-stack-lg z-50"
+    >
+      <div class="px-6 mb-10">
+        <h1
+          class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim"
+        >
+          SRRM AI
+        </h1>
+        <p class="text-on-surface-variant opacity-70 font-label-sm text-[10px]">
+          Rail Revenue Management
+        </p>
+      </div>
+      <nav class="flex-grow space-y-2">
+        <!-- Navigation Items -->
+        <div class="px-4">
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out rounded-lg"
+            href="#"
+          >
+            <span class="material-symbols-outlined">dashboard</span>
+            <span>Overview</span>
+          </a>
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out rounded-lg"
+            href="#"
+          >
+            <span class="material-symbols-outlined">trending_up</span>
+            <span>Forecasting</span>
+          </a>
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary bg-surface-container-high cursor-pointer duration-200 ease-in-out"
+            href="#"
+          >
+            <span
+              class="material-symbols-outlined"
+              style="font-variation-settings: &quot;FILL&quot; 1"
+              >insights</span
+            >
+            <span>Optimization</span>
+          </a>
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out rounded-lg"
+            href="#"
+          >
+            <span class="material-symbols-outlined">payments</span>
+            <span>Pricing</span>
+          </a>
+        </div>
+      </nav>
+      <div class="px-4 mt-auto space-y-2">
+        <button
+          class="w-full py-3 bg-primary text-on-primary rounded-xl font-bold text-label-sm shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all"
+        >
+          Generate Report
+        </button>
+        <div class="pt-4 border-t border-outline-variant">
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors rounded-lg"
+            href="#"
+          >
+            <span class="material-symbols-outlined">settings</span>
+            <span>Settings</span>
+          </a>
+          <a
+            class="flex items-center gap-3 px-4 py-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors rounded-lg"
+            href="#"
+          >
+            <span class="material-symbols-outlined">help_outline</span>
+            <span>Support</span>
+          </a>
+        </div>
+        <div class="flex items-center gap-3 px-4 py-4 mt-2">
+          <img
+            class="w-8 h-8 rounded-full bg-surface-container-highest"
+            data-alt="Professional headshot of a senior rail operations administrator, soft studio lighting, high-end corporate aesthetic, neutral background, sharp focus."
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcaWGkMGSlfdSbZpcl7uvv_GMlm-69Dc8roJ9Mu4gxrm3kekOE1Fuod-yisy0jt6nLjqGMLkC6qEPmtyWJdu8YP4c-ogy74ljysoAYRJmM1uzMpj0kyxTLH4i7RpHix3mI25ilCn1lV82r3WykYOsUt8o7MPvk72_GQBc0PZ4_C3vocTpESy54l0fLLxuj1Rv-pNkOxlHNAgxvrLiu0A-dZT4ycszZ7mWP2pPSUc9QidKUJwYJ86MOtPKGRCI-sMq4SKPNwhVbqXaw"
+          />
+          <div class="overflow-hidden">
+            <p class="font-bold text-on-surface truncate">Admin User</p>
+            <p class="text-[10px] text-on-surface-variant">Administrator</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <!-- TopNavBar Shell -->
+    <header
+      class="flex justify-between items-center h-16 px-container-padding w-full ml-64 bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline fixed top-0 z-40"
+    >
+      <div class="flex items-center gap-8">
+        <span
+          class="font-headline-md text-headline-md font-black text-on-surface dark:text-surface-bright"
+          >SRRM Enterprise AI</span
+        >
+        <div class="relative group">
+          <span
+            class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline"
+            >search</span
+          >
+          <input
+            class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-full text-label-sm w-64 focus:w-80 focus:border-primary transition-all focus:outline-none"
+            placeholder="Search routes or inventory..."
+            type="text"
+          />
+        </div>
+      </div>
+      <div class="flex items-center gap-6">
+        <nav class="flex gap-8">
+          <a
+            class="text-on-surface-variant dark:text-secondary-fixed-dim font-label-sm text-label-sm hover:text-primary transition-all"
+            href="#"
+            >Network</a
+          >
+          <a
+            class="text-primary dark:text-primary-fixed-dim border-b-2 border-primary font-bold pb-1 font-label-sm text-label-sm"
+            href="#"
+            >Inventory</a
+          >
+          <a
+            class="text-on-surface-variant dark:text-secondary-fixed-dim font-label-sm text-label-sm hover:text-primary transition-all"
+            href="#"
+            >Analytics</a
+          >
+        </nav>
+        <div class="h-6 w-px bg-outline-variant"></div>
+        <div class="flex items-center gap-4">
+          <button
+            class="flex items-center gap-2 px-4 py-1.5 bg-primary-container text-on-primary-container rounded-lg font-bold text-label-sm hover:brightness-110 transition-all scale-95 active:scale-90"
+          >
+            <span class="material-symbols-outlined text-sm">filter_alt</span>
+            Apply Filters
+          </button>
+          <div class="flex gap-2">
+            <span
+              class="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant"
+              >notifications</span
+            >
+            <span
+              class="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant"
+              >history</span
+            >
+            <span
+              class="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant"
+              >account_circle</span
+            >
+          </div>
+        </div>
+      </div>
+    </header>
+    <!-- Main Canvas -->
+    <main class="ml-64 mt-16 p-container-padding">
+      <!-- Header Section with Quick Stats -->
+      <section class="mb-stack-lg flex justify-between items-end">
+        <div>
+          <h2 class="font-headline-lg text-headline-lg text-on-surface">
+            Seat Optimization &amp; Inventory
+          </h2>
+          <p class="text-on-surface-variant">
+            Real-time capacity management for Route E-204 (Paris-Marseille)
+          </p>
+        </div>
+        <div class="flex gap-stack-sm">
+          <button
+            class="px-6 py-2 border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-all text-label-sm"
+          >
+            Segmenting
+          </button>
+          <button
+            class="px-6 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-label-sm shadow-md"
+          >
+            Reallocating Quotas
+          </button>
+        </div>
+      </section>
+      <!-- Bento Grid Layout -->
+      <div class="grid grid-cols-12 gap-gutter">
+        <!-- Train Capacity Map (Full Width Visual) -->
+        <div
+          class="col-span-12 bg-white border border-outline-variant rounded-xl p-6 shadow-sm"
+        >
+          <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-primary">train</span>
+              Train Capacity Map: High-Speed Unit #8421
+            </h3>
+            <div class="flex gap-4 text-label-sm">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-primary rounded-sm"></div>
+                Reserved
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-secondary-container rounded-sm"></div>
+                Available
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 bg-error-container rounded-sm"></div>
+                High Bid Lock
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
+            <!-- Engine -->
+            <div
+              class="min-w-[80px] h-20 bg-slate-100 rounded-l-full flex items-center justify-center border-2 border-slate-200"
+            >
+              <span class="material-symbols-outlined text-slate-400"
+                >speed</span
+              >
+            </div>
+            <!-- Car 1 (First Class) -->
+            <div
+              class="min-w-[140px] h-20 bg-surface-container-low border border-primary/20 rounded-lg p-2 train-car flex flex-col justify-between"
+            >
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-primary"
+                  >CAR 01 (F)</span
+                >
+                <span
+                  class="text-[10px] px-1 bg-primary-container text-white rounded"
+                  >92%</span
+                >
+              </div>
+              <div class="grid grid-cols-4 gap-1">
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-secondary-container rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+              </div>
+            </div>
+            <!-- Car 2 (First Class) -->
+            <div
+              class="min-w-[140px] h-20 bg-surface-container-low border border-primary/20 rounded-lg p-2 train-car flex flex-col justify-between"
+            >
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-bold text-primary"
+                  >CAR 02 (F)</span
+                >
+                <span
+                  class="text-[10px] px-1 bg-primary-container text-white rounded"
+                  >78%</span
+                >
+              </div>
+              <div class="grid grid-cols-4 gap-1">
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-secondary-container rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-primary rounded-full"></div>
+                <div class="h-2 bg-secondary-container rounded-full"></div>
+                <div class="h-2 bg-secondary-container rounded-full"></div>
+              </div>
+            </div>
+            <!-- Car 3 (Bar) -->
+            <div
+              class="min-w-[100px] h-20 bg-tertiary-fixed rounded-lg p-2 flex flex-col items-center justify-center border border-outline-variant"
+            >
+              <span
+                class="material-symbols-outlined text-on-tertiary-fixed-variant"
+                >local_cafe</span
+              >
+              <span class="text-[8px] font-bold uppercase mt-1">Bistro</span>
+            </div>
+            <!-- Cars 4-8 (Standard) -->
+            <div class="flex gap-2">
+              <div
+                class="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between"
+              >
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] font-bold text-on-surface-variant"
+                    >CAR 04</span
+                  ><span
+                    class="text-[10px] px-1 bg-error-container text-error rounded"
+                    >98%</span
+                  >
+                </div>
+                <div class="grid grid-cols-4 gap-1">
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-error-container rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                </div>
+              </div>
+              <div
+                class="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between"
+              >
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] font-bold text-on-surface-variant"
+                    >CAR 05</span
+                  ><span
+                    class="text-[10px] px-1 bg-secondary-container text-on-secondary-container rounded"
+                    >45%</span
+                  >
+                </div>
+                <div class="grid grid-cols-4 gap-1">
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                </div>
+              </div>
+              <div
+                class="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between"
+              >
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] font-bold text-on-surface-variant"
+                    >CAR 06</span
+                  ><span
+                    class="text-[10px] px-1 bg-secondary-container text-on-secondary-container rounded"
+                    >62%</span
+                  >
+                </div>
+                <div class="grid grid-cols-4 gap-1">
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-primary rounded-full"></div>
+                  <div class="h-2 bg-secondary-container rounded-full"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Seat Inventory Table (Left Side) -->
+        <div
+          class="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm"
+        >
+          <div
+            class="p-6 border-b border-outline-variant flex justify-between items-center"
+          >
+            <h3 class="font-bold text-on-surface">Seat Inventory Allocation</h3>
+            <div class="flex gap-2">
+              <span
+                class="px-2 py-1 bg-surface-container-low text-primary rounded text-[10px] font-bold"
+                >LONG LEG (80%)</span
+              >
+              <span
+                class="px-2 py-1 bg-secondary-container text-on-secondary-container rounded text-[10px] font-bold"
+                >SHORT LEG (20%)</span
+              >
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead
+                class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm"
+              >
+                <tr>
+                  <th class="px-6 py-4">SEGMENT</th>
+                  <th class="px-6 py-4">CLASS</th>
+                  <th class="px-6 py-4">ALLOCATED</th>
+                  <th class="px-6 py-4">BOOKED</th>
+                  <th class="px-6 py-4">BID PRICE</th>
+                  <th class="px-6 py-4 text-right">OPTIMIZATION</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-outline-variant">
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-6 py-4 font-medium">
+                    Paris → Marseille (Long)
+                  </td>
+                  <td class="px-6 py-4">
+                    <span
+                      class="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded"
+                      >Business</span
+                    >
+                  </td>
+                  <td class="px-6 py-4">120 Seats</td>
+                  <td class="px-6 py-4">
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                      <div
+                        class="bg-primary h-1.5 rounded-full"
+                        style="width: 85%"
+                      ></div>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant"
+                      >102 / 120 (85%)</span
+                    >
+                  </td>
+                  <td class="px-6 py-4 font-label-sm">€245.00</td>
+                  <td class="px-6 py-4 text-right">
+                    <span class="text-error font-bold text-[11px]"
+                      >+12.4% Recommended</span
+                    >
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-6 py-4 font-medium">Paris → Lyon (Short)</td>
+                  <td class="px-6 py-4">
+                    <span
+                      class="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded"
+                      >Standard</span
+                    >
+                  </td>
+                  <td class="px-6 py-4">400 Seats</td>
+                  <td class="px-6 py-4">
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                      <div
+                        class="bg-primary h-1.5 rounded-full"
+                        style="width: 42%"
+                      ></div>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant"
+                      >168 / 400 (42%)</span
+                    >
+                  </td>
+                  <td class="px-6 py-4 font-label-sm">€89.00</td>
+                  <td class="px-6 py-4 text-right">
+                    <span class="text-primary font-bold text-[11px]"
+                      >-5.0% Flash Sale</span
+                    >
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-6 py-4 font-medium">
+                    Lyon → Marseille (Short)
+                  </td>
+                  <td class="px-6 py-4">
+                    <span
+                      class="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded"
+                      >Standard</span
+                    >
+                  </td>
+                  <td class="px-6 py-4">400 Seats</td>
+                  <td class="px-6 py-4">
+                    <div class="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                      <div
+                        class="bg-primary h-1.5 rounded-full"
+                        style="width: 95%"
+                      ></div>
+                    </div>
+                    <span class="text-[10px] text-on-surface-variant"
+                      >380 / 400 (95%)</span
+                    >
+                  </td>
+                  <td class="px-6 py-4 font-label-sm">€115.00</td>
+                  <td class="px-6 py-4 text-right">
+                    <span class="text-error font-bold text-[11px]"
+                      >Cap Reached</span
+                    >
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Gap Combining & Recommendations (Right Side) -->
+        <div class="col-span-12 lg:col-span-4 space-y-gutter">
+          <!-- AI Recommendation Card -->
+          <div
+            class="bg-white border-l-4 border-primary border-y border-r border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden"
+          >
+            <div class="absolute top-0 right-0 p-2 opacity-5">
+              <span class="material-symbols-outlined text-6xl"
+                >auto_awesome</span
+              >
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+              <span class="material-symbols-outlined text-primary text-sm"
+                >auto_awesome</span
+              >
+              <h3 class="font-bold text-on-surface">
+                Gap Combining Opportunities
+              </h3>
+            </div>
+            <p class="text-body-md text-on-surface-variant mb-4">
+              AI found 12 available "gaps" that can be merged into new
+              end-to-end tickets.
+            </p>
+            <div class="space-y-3">
+              <div
+                class="p-3 bg-surface-container-low rounded-lg border border-primary/10"
+              >
+                <div class="flex justify-between items-start mb-2">
+                  <span class="font-bold text-[12px] text-on-surface"
+                    >Paris-Lyon + Lyon-Marseille</span
+                  >
+                  <span class="text-primary font-bold text-[12px]"
+                    >€1,240 Est. Gain</span
+                  >
+                </div>
+                <p class="text-[11px] text-on-surface-variant">
+                  4 Seats free in Car 5 across both segments. Auto-merge
+                  recommended.
+                </p>
+                <button
+                  class="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all"
+                >
+                  Execute Merge
+                </button>
+              </div>
+              <div
+                class="p-3 bg-surface-container-low rounded-lg border border-primary/10"
+              >
+                <div class="flex justify-between items-start mb-2">
+                  <span class="font-bold text-[12px] text-on-surface"
+                    >Lille-Paris + Paris-Nice</span
+                  >
+                  <span class="text-primary font-bold text-[12px]"
+                    >€890 Est. Gain</span
+                  >
+                </div>
+                <p class="text-[11px] text-on-surface-variant">
+                  2 Business class seats align perfectly at Gare de Lyon node.
+                </p>
+                <button
+                  class="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all"
+                >
+                  Execute Merge
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Bid Price Trend Chart Placeholder -->
+          <div
+            class="bg-white border border-outline-variant rounded-xl p-6 shadow-sm"
+          >
+            <div class="flex justify-between items-center mb-6">
+              <h3 class="font-bold text-on-surface">Bid Price Trend</h3>
+              <span class="material-symbols-outlined text-on-surface-variant"
+                >show_chart</span
+              >
+            </div>
+            <div class="h-40 w-full relative flex items-end gap-2 px-2">
+              <!-- Simulated Chart Bars/Lines -->
+              <div
+                class="flex-1 bg-primary/20 h-[40%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              >
+                <div
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block"
+                >
+                  €180
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-primary/20 h-[55%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              >
+                <div
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block"
+                >
+                  €195
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-primary/20 h-[75%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              >
+                <div
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block"
+                >
+                  €210
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-primary/20 h-[60%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              >
+                <div
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block"
+                >
+                  €200
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-primary h-[90%] rounded-t-sm relative group cursor-pointer bid-price-indicator"
+              >
+                <div
+                  class="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold"
+                >
+                  €245
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-primary/20 h-[85%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              ></div>
+              <div
+                class="flex-1 bg-primary/20 h-[95%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all"
+              ></div>
+            </div>
+            <div
+              class="flex justify-between mt-2 font-label-sm text-[10px] text-on-surface-variant"
+            >
+              <span>T-30 Days</span>
+              <span>Today</span>
+              <span>Departure</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Footer Simulation -->
+      <footer
+        class="mt-stack-lg pt-stack-md border-t border-outline-variant flex justify-between items-center text-on-surface-variant opacity-60"
+      >
+        <p class="text-[12px]">
+          © 2024 SRRM Enterprise AI. All rights reserved.
+        </p>
+        <div class="flex gap-4">
+          <a class="text-[12px] hover:underline" href="#"
+            >API Status: Operational</a
+          >
+          <a class="text-[12px] hover:underline" href="#">Documentation</a>
+        </div>
+      </footer>
+    </main>
+    <!-- Floating AI Assistant Button (Suppressed as per rules for detailed page, but illustrative of brand) -->
+    <div class="fixed bottom-8 right-8 z-50">
+      <button
+        class="w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group"
+      >
+        <span class="material-symbols-outlined text-3xl">psychology</span>
+        <div
+          class="absolute bottom-full right-0 mb-4 bg-white border border-outline-variant p-3 rounded-xl shadow-xl w-48 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+        >
+          <p class="text-[11px] font-medium text-on-surface">
+            "I've identified a 4% yield increase opportunity by shifting 12
+            seats from Lyon-Marseille to end-to-end Paris-Marseille."
+          </p>
+        </div>
+      </button>
+    </div>
+    <script>
+      // Micro-interaction for car highlights
+      document.querySelectorAll(".train-car").forEach((car) => {
+        car.addEventListener("click", () => {
+          // Flash animation for feedback
+          car.style.backgroundColor = "#dce9ff";
+          setTimeout(() => {
+            car.style.backgroundColor = "";
+          }, 300);
+        });
+      });
+
+      // Simple tab/pill switcher for Inventory Table
+      function filterLegs(type) {
+        console.log("Filtering inventory by:", type);
+        // Implementation for filtering logic would go here
+      }
+    </script>
+  </body>
+</html>
+
+<!-- Dynamic Pricing -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SRRM Enterprise AI - Dynamic Pricing</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+        display: inline-block;
+        line-height: 1;
+        text-transform: none;
+        letter-spacing: normal;
+        word-wrap: normal;
+        white-space: nowrap;
+        direction: ltr;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(203, 212, 224, 0.5);
+      }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#c4c7c9",
+              "surface-container-high": "#dce9ff",
+              "on-primary": "#ffffff",
+              secondary: "#565e74",
+              "error-container": "#ffdad6",
+              "on-primary-fixed": "#0f0069",
+              "surface-dim": "#cbdbf5",
+              "on-primary-fixed-variant": "#3323cc",
+              "tertiary-container": "#5e6163",
+              "on-background": "#0b1c30",
+              "outline-variant": "#c7c4d8",
+              tertiary: "#46494b",
+              "surface-bright": "#f8f9ff",
+              background: "#f8f9ff",
+              "tertiary-fixed": "#e0e3e5",
+              "on-error-container": "#93000a",
+              primary: "#3525cd",
+              "on-surface-variant": "#464555",
+              outline: "#777587",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#e5eeff",
+              "surface-container-highest": "#d3e4fe",
+              "primary-container": "#4f46e5",
+              "secondary-fixed-dim": "#bec6e0",
+              "surface-container-low": "#eff4ff",
+              "inverse-surface": "#213145",
+              "secondary-fixed": "#dae2fd",
+              "primary-fixed-dim": "#c3c0ff",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#dadcde",
+              "surface-tint": "#4d44e3",
+              "on-surface": "#0b1c30",
+              "on-secondary-fixed": "#131b2e",
+              "primary-fixed": "#e2dfff",
+              "secondary-container": "#dae2fd",
+              "on-primary-container": "#dad7ff",
+              "surface-variant": "#d3e4fe",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#191c1e",
+              "on-tertiary-fixed-variant": "#444749",
+              "inverse-primary": "#c3c0ff",
+              error: "#ba1a1a",
+              "on-secondary-fixed-variant": "#3f465c",
+              "on-secondary": "#ffffff",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#5c647a",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              base: "4px",
+              "stack-md": "1rem",
+              "container-padding": "2rem",
+              gutter: "1.5rem",
+              "stack-lg": "2rem",
+              "stack-sm": "0.5rem",
+            },
+            fontFamily: {
+              "headline-lg-mobile": ["Inter"],
+              "body-md": ["Inter"],
+              "headline-md": ["Inter"],
+              "label-sm": ["JetBrains Mono"],
+              "headline-lg": ["Inter"],
+              "display-lg": ["Inter"],
+              "body-lg": ["Inter"],
+            },
+            fontSize: {
+              "headline-lg-mobile": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "label-sm": [
+                "12px",
+                {
+                  lineHeight: "16px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-lg": [
+                "30px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "-0.01em",
+                  fontWeight: "600",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "1.2",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-background text-on-surface font-body-md selection:bg-primary-fixed selection:text-on-primary-fixed overflow-hidden h-screen flex"
+  >
+    <!-- SideNavBar -->
+    <aside
+      class="h-screen w-64 fixed left-0 top-0 flex flex-col py-stack-lg bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline z-50"
+    >
+      <div class="px-6 mb-8">
+        <h1
+          class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim"
+        >
+          SRRM AI
+        </h1>
+        <p
+          class="text-[11px] uppercase tracking-widest text-on-surface-variant font-medium mt-1"
+        >
+          Rail Revenue Management
+        </p>
+      </div>
+      <nav class="flex-1 px-3 space-y-1">
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out hover:bg-surface-container-high text-on-surface-variant dark:text-secondary-fixed-dim group"
+        >
+          <span class="material-symbols-outlined">dashboard</span>
+          <span class="font-body-md text-body-md">Overview</span>
+        </div>
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out hover:bg-surface-container-high text-on-surface-variant dark:text-secondary-fixed-dim group"
+        >
+          <span class="material-symbols-outlined">trending_up</span>
+          <span class="font-body-md text-body-md">Forecasting</span>
+        </div>
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out hover:bg-surface-container-high text-on-surface-variant dark:text-secondary-fixed-dim group"
+        >
+          <span class="material-symbols-outlined">insights</span>
+          <span class="font-body-md text-body-md">Optimization</span>
+        </div>
+        <!-- Active State for Pricing -->
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary bg-surface-container-highest"
+        >
+          <span class="material-symbols-outlined">payments</span>
+          <span class="font-body-md text-body-md">Pricing</span>
+        </div>
+      </nav>
+      <div
+        class="px-4 mt-auto space-y-1 pt-6 border-t border-outline-variant/30"
+      >
+        <button
+          class="w-full bg-primary text-white py-3 rounded-lg font-bold hover:brightness-110 transition-all mb-4 text-sm"
+        >
+          Generate Report
+        </button>
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out hover:bg-surface-container-high text-on-surface-variant"
+        >
+          <span class="material-symbols-outlined">settings</span>
+          <span class="font-body-md text-body-md">Settings</span>
+        </div>
+        <div
+          class="flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer duration-200 ease-in-out hover:bg-surface-container-high text-on-surface-variant"
+        >
+          <span class="material-symbols-outlined">help_outline</span>
+          <span class="font-body-md text-body-md">Support</span>
+        </div>
+        <div
+          class="flex items-center gap-3 p-4 mt-4 bg-surface-container rounded-xl"
+        >
+          <div
+            class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden"
+          >
+            <img
+              class="w-full h-full object-cover"
+              data-alt="A clean, professional headshot of a mature male rail operations administrator, soft studio lighting, sharp focus, neutral background, cinematic photography style."
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBt7BdandVwO4-Q76pK8xpv8Cna0LPMQRH_T7F-wiMWpKi5J6svNE_-pjOx_OU_WG7pFjnqZfiAA_OtVBbfk0oO8gbP_-sw8dlKh4rP_kOsob-Y9sSrAG03Dw0y3w3KEXBxSxNyz5qCWohEc4qIqsL9e1pxVL-HjlpHBKGe-wPPiYFK0E6BM5oj0zKSgdUxYm7FHPeZunuQxnvDkj97BVhiAwi7j7lwmAWavFTWO6aUqsjaiMVO-K2uFZxbxXbW3n6frZmKt5q-Fu-z"
+            />
+          </div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-bold truncate">Admin Portal</p>
+            <p class="text-[10px] text-on-surface-variant truncate">
+              Standard Access
+            </p>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col ml-64 overflow-hidden">
+      <!-- TopNavBar -->
+      <header
+        class="flex justify-between items-center h-16 px-container-padding w-full bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline sticky top-0 z-40"
+      >
+        <div class="flex items-center gap-8">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-3xl"
+              >terminal</span
+            >
+            <h2
+              class="font-headline-md text-headline-md font-black text-on-surface dark:text-surface-bright"
+            >
+              SRRM Enterprise AI
+            </h2>
+          </div>
+          <nav class="hidden md:flex items-center gap-6">
+            <a
+              class="text-on-surface-variant font-label-sm text-label-sm hover:text-primary transition-all pb-1"
+              href="#"
+              >Network</a
+            >
+            <a
+              class="text-on-surface-variant font-label-sm text-label-sm hover:text-primary transition-all pb-1"
+              href="#"
+              >Inventory</a
+            >
+            <a
+              class="text-primary border-b-2 border-primary font-bold font-label-sm text-label-sm pb-1"
+              href="#"
+              >Analytics</a
+            >
+          </nav>
+        </div>
+        <div class="flex items-center gap-6">
+          <div class="relative group">
+            <input
+              class="bg-surface-container-low border-none rounded-full px-10 py-2 text-sm focus:ring-2 focus:ring-primary w-64 transition-all"
+              placeholder="Search pricing entities..."
+              type="text"
+            />
+            <span
+              class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg"
+              >search</span
+            >
+          </div>
+          <div class="flex items-center gap-4">
+            <button
+              class="material-symbols-outlined p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant relative"
+            >
+              notifications
+              <span
+                class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"
+              ></span>
+            </button>
+            <button
+              class="material-symbols-outlined p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant"
+            >
+              history
+            </button>
+            <button
+              class="flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container rounded-lg font-bold text-xs scale-95 active:scale-90 transition-transform"
+            >
+              <span class="material-symbols-outlined text-sm">filter_list</span>
+              Apply Filters
+            </button>
+          </div>
+        </div>
+      </header>
+      <!-- Page Content -->
+      <div class="flex-1 overflow-y-auto p-gutter bg-surface-container-low/30">
+        <!-- Dashboard Grid Layout -->
+        <div class="grid grid-cols-12 gap-gutter max-w-[1600px] mx-auto">
+          <!-- Alerts Banner -->
+          <div class="col-span-12 flex gap-4 overflow-x-auto pb-4">
+            <div
+              class="flex-shrink-0 flex items-center gap-3 bg-error-container/30 border border-error/20 p-4 rounded-xl min-w-[320px]"
+            >
+              <div
+                class="w-10 h-10 rounded-full bg-error flex items-center justify-center text-white"
+              >
+                <span class="material-symbols-outlined">warning</span>
+              </div>
+              <div>
+                <p class="font-bold text-sm text-error">
+                  Bottleneck: Leg LDN-MAN
+                </p>
+                <p class="text-xs text-on-error-container">
+                  Load factor at 96%. Suggest +15% price shift.
+                </p>
+              </div>
+            </div>
+            <div
+              class="flex-shrink-0 flex items-center gap-3 bg-primary-container/10 border border-primary/20 p-4 rounded-xl min-w-[320px]"
+            >
+              <div
+                class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white"
+              >
+                <span class="material-symbols-outlined">bolt</span>
+              </div>
+              <div>
+                <p class="font-bold text-sm text-primary">
+                  Opportunity: PAR-LYO
+                </p>
+                <p class="text-xs text-on-primary-container">
+                  Competitor outage detected. Optimize yield.
+                </p>
+              </div>
+            </div>
+            <div
+              class="flex-shrink-0 flex items-center gap-3 bg-secondary-container/30 border border-secondary/20 p-4 rounded-xl min-w-[320px]"
+            >
+              <div
+                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white"
+              >
+                <span class="material-symbols-outlined">trending_down</span>
+              </div>
+              <div>
+                <p class="font-bold text-sm text-secondary">
+                  Low Demand: MAD-BAR
+                </p>
+                <p class="text-xs text-on-secondary-container">
+                  Price ceiling holding too high. Soften -8%.
+                </p>
+              </div>
+            </div>
+          </div>
+          <!-- Main Pricing Table Section -->
+          <section class="col-span-12 lg:col-span-8 space-y-gutter">
+            <div
+              class="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm"
+            >
+              <div
+                class="p-6 border-b border-outline-variant flex justify-between items-center"
+              >
+                <div>
+                  <h3 class="font-headline-md text-headline-md font-bold">
+                    Pricing Control Center
+                  </h3>
+                  <p class="text-on-surface-variant text-xs">
+                    OD (Origin-Destination) Pair Recommendations
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    class="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    class="px-3 py-1.5 bg-primary text-white rounded-md text-xs font-bold hover:brightness-110 transition-all"
+                  >
+                    Accept All Suggestions
+                  </button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead class="bg-surface-container-low">
+                    <tr>
+                      <th
+                        class="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                      >
+                        OD Pair / Service
+                      </th>
+                      <th
+                        class="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-center"
+                      >
+                        Current
+                      </th>
+                      <th
+                        class="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-center"
+                      >
+                        AI Suggest
+                      </th>
+                      <th
+                        class="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                      >
+                        Opportunity Cost (Bid Price)
+                      </th>
+                      <th
+                        class="px-6 py-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                      >
+                        Status
+                      </th>
+                      <th class="px-6 py-4"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-outline-variant/30">
+                    <tr
+                      class="hover:bg-surface-container-low transition-colors group"
+                    >
+                      <td class="px-6 py-5">
+                        <p class="font-bold text-sm">London ↔ Manchester</p>
+                        <p class="text-xs text-on-surface-variant">
+                          S-Class High Speed
+                        </p>
+                      </td>
+                      <td class="px-6 py-5 text-center text-sm font-medium">
+                        £84.50
+                      </td>
+                      <td class="px-6 py-5 text-center">
+                        <span
+                          class="bg-primary-container/10 text-primary px-2 py-1 rounded font-bold text-sm"
+                          >£98.00</span
+                        >
+                      </td>
+                      <td class="px-6 py-5">
+                        <div class="flex items-center gap-2">
+                          <div
+                            class="w-16 h-1.5 bg-surface-container rounded-full overflow-hidden"
+                          >
+                            <div
+                              class="h-full bg-primary"
+                              style="width: 85%"
+                            ></div>
+                          </div>
+                          <span class="text-xs font-bold text-primary"
+                            >£112.40</span
+                          >
+                        </div>
+                        <p class="text-[10px] text-on-surface-variant mt-1">
+                          Leg saturation at 92% capacity
+                        </p>
+                      </td>
+                      <td class="px-6 py-5">
+                        <span
+                          class="inline-flex items-center gap-1 bg-error/10 text-error px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"
+                          ></span>
+                          High Bottleneck
+                        </span>
+                      </td>
+                      <td class="px-6 py-5 text-right">
+                        <button
+                          class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          more_vert
+                        </button>
+                      </td>
+                    </tr>
+                    <tr
+                      class="hover:bg-surface-container-low transition-colors group"
+                    >
+                      <td class="px-6 py-5">
+                        <p class="font-bold text-sm">Paris ↔ Lyon</p>
+                        <p class="text-xs text-on-surface-variant">
+                          TGV Direct
+                        </p>
+                      </td>
+                      <td class="px-6 py-5 text-center text-sm font-medium">
+                        €112.00
+                      </td>
+                      <td class="px-6 py-5 text-center">
+                        <span
+                          class="bg-primary-container/10 text-primary px-2 py-1 rounded font-bold text-sm"
+                          >€118.50</span
+                        >
+                      </td>
+                      <td class="px-6 py-5">
+                        <div class="flex items-center gap-2">
+                          <div
+                            class="w-16 h-1.5 bg-surface-container rounded-full overflow-hidden"
+                          >
+                            <div
+                              class="h-full bg-primary"
+                              style="width: 45%"
+                            ></div>
+                          </div>
+                          <span class="text-xs font-bold text-primary"
+                            >€124.00</span
+                          >
+                        </div>
+                        <p class="text-[10px] text-on-surface-variant mt-1">
+                          Normal demand elasticity
+                        </p>
+                      </td>
+                      <td class="px-6 py-5">
+                        <span
+                          class="inline-flex items-center gap-1 bg-surface-container-highest text-on-surface-variant px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full bg-on-surface-variant"
+                          ></span>
+                          Stable
+                        </span>
+                      </td>
+                      <td class="px-6 py-5 text-right">
+                        <button
+                          class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          more_vert
+                        </button>
+                      </td>
+                    </tr>
+                    <tr
+                      class="hover:bg-surface-container-low transition-colors group"
+                    >
+                      <td class="px-6 py-5">
+                        <p class="font-bold text-sm">Madrid ↔ Barcelona</p>
+                        <p class="text-xs text-on-surface-variant">
+                          AVE Express
+                        </p>
+                      </td>
+                      <td class="px-6 py-5 text-center text-sm font-medium">
+                        €95.00
+                      </td>
+                      <td class="px-6 py-5 text-center">
+                        <span
+                          class="bg-tertiary-fixed-dim/30 text-tertiary-container px-2 py-1 rounded font-bold text-sm"
+                          >€87.50</span
+                        >
+                      </td>
+                      <td class="px-6 py-5">
+                        <div class="flex items-center gap-2">
+                          <div
+                            class="w-16 h-1.5 bg-surface-container rounded-full overflow-hidden"
+                          >
+                            <div
+                              class="h-full bg-tertiary-container"
+                              style="width: 20%"
+                            ></div>
+                          </div>
+                          <span
+                            class="text-xs font-bold text-tertiary-container"
+                            >€64.20</span
+                          >
+                        </div>
+                        <p class="text-[10px] text-on-surface-variant mt-1">
+                          Low inventory utilization
+                        </p>
+                      </td>
+                      <td class="px-6 py-5">
+                        <span
+                          class="inline-flex items-center gap-1 bg-secondary-container/30 text-secondary-container px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full bg-secondary"
+                          ></span>
+                          Underperforming
+                        </span>
+                      </td>
+                      <td class="px-6 py-5 text-right">
+                        <button
+                          class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          more_vert
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Simulation Panel -->
+            <div
+              class="bg-white border border-outline-variant rounded-xl p-6 shadow-sm"
+            >
+              <div class="flex items-center justify-between mb-6">
+                <div>
+                  <h3 class="font-bold text-lg flex items-center gap-2">
+                    <span
+                      class="material-symbols-outlined text-primary"
+                      style="font-variation-settings: &quot;FILL&quot; 1"
+                      >analytics</span
+                    >
+                    Impact Simulation Panel
+                  </h3>
+                  <p class="text-on-surface-variant text-xs">
+                    Simulate revenue and load factor for adjusted pricing
+                    strategies
+                  </p>
+                </div>
+                <div
+                  class="flex items-center gap-2 text-xs font-bold bg-surface-container-low p-2 rounded-lg"
+                >
+                  <span class="w-2 h-2 rounded-full bg-primary"></span> Current
+                  <span
+                    class="w-2 h-2 rounded-full bg-secondary-container border border-primary ml-2"
+                  ></span>
+                  Simulated
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div
+                  class="h-48 relative border-l-2 border-b-2 border-outline-variant flex items-end px-4 gap-8"
+                >
+                  <!-- Simulated Charts via CSS -->
+                  <div
+                    class="flex-1 flex flex-col items-center justify-end group"
+                  >
+                    <div class="w-full flex items-end gap-1 px-4">
+                      <div
+                        class="bg-primary/20 w-full h-32 rounded-t transition-all group-hover:h-36"
+                      ></div>
+                      <div
+                        class="bg-primary w-full h-40 rounded-t transition-all group-hover:h-44"
+                      ></div>
+                    </div>
+                    <p
+                      class="mt-2 text-[10px] font-bold text-on-surface-variant uppercase"
+                    >
+                      Revenue (MM)
+                    </p>
+                    <p class="text-xs font-bold text-primary">+12.4% Est.</p>
+                  </div>
+                  <div
+                    class="flex-1 flex flex-col items-center justify-end group"
+                  >
+                    <div class="w-full flex items-end gap-1 px-4">
+                      <div
+                        class="bg-secondary/20 w-full h-24 rounded-t transition-all group-hover:h-28"
+                      ></div>
+                      <div
+                        class="bg-secondary w-full h-20 rounded-t transition-all group-hover:h-18"
+                      ></div>
+                    </div>
+                    <p
+                      class="mt-2 text-[10px] font-bold text-on-surface-variant uppercase"
+                    >
+                      Load Factor
+                    </p>
+                    <p class="text-xs font-bold text-secondary">
+                      -4.2% Optimization
+                    </p>
+                  </div>
+                  <div
+                    class="absolute inset-0 pointer-events-none flex flex-col justify-between py-2 pl-[-20px]"
+                  >
+                    <span
+                      class="border-t border-dashed border-outline-variant/30 w-full"
+                    ></span>
+                    <span
+                      class="border-t border-dashed border-outline-variant/30 w-full"
+                    ></span>
+                    <span
+                      class="border-t border-dashed border-outline-variant/30 w-full"
+                    ></span>
+                  </div>
+                </div>
+                <div class="flex flex-col justify-center space-y-4">
+                  <div
+                    class="bg-surface-container-low p-4 rounded-xl border border-primary/20 relative overflow-hidden"
+                  >
+                    <div
+                      class="absolute top-0 left-0 w-1 h-full bg-primary"
+                    ></div>
+                    <p
+                      class="text-xs font-bold text-primary mb-1 uppercase tracking-tighter"
+                    >
+                      AI Insight
+                    </p>
+                    <p class="text-sm">
+                      Accepting all pricing recommendations will result in an
+                      estimated yield increase of
+                      <span class="font-bold">€1.2M</span> over the next 14
+                      days, primarily driven by peak Friday departures.
+                    </p>
+                  </div>
+                  <div class="flex gap-4">
+                    <button
+                      class="flex-1 py-3 bg-primary text-white rounded-lg font-bold text-sm hover:shadow-lg transition-all"
+                    >
+                      Execute All Suggestions
+                    </button>
+                    <button
+                      class="px-6 py-3 border border-outline-variant rounded-lg font-bold text-sm hover:bg-surface-container transition-all"
+                    >
+                      Fine Tune
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <!-- Sidebar Rules Engine -->
+          <aside class="col-span-12 lg:col-span-4 space-y-gutter">
+            <div
+              class="bg-surface-container-highest/50 border border-primary/10 rounded-xl p-6 glass-card"
+            >
+              <div class="flex items-center gap-2 mb-6">
+                <span class="material-symbols-outlined text-primary"
+                  >rule_settings</span
+                >
+                <h3 class="font-bold text-lg">Pricing Rule Engine</h3>
+              </div>
+              <div class="space-y-6">
+                <!-- Rule: Price Floor/Ceiling -->
+                <div class="space-y-3">
+                  <div class="flex justify-between items-center">
+                    <label
+                      class="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+                      >Price Range Constraint</label
+                    >
+                    <span class="material-symbols-outlined text-sm cursor-help"
+                      >info</span
+                    >
+                  </div>
+                  <div class="grid grid-cols-2 gap-4">
+                    <div
+                      class="bg-white p-3 border border-outline-variant rounded-lg"
+                    >
+                      <p class="text-[10px] text-on-surface-variant mb-1">
+                        Floor (Min)
+                      </p>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold">€</span>
+                        <input
+                          class="border-none p-0 w-full font-bold focus:ring-0 text-sm"
+                          type="text"
+                          value="45.00"
+                        />
+                      </div>
+                    </div>
+                    <div
+                      class="bg-white p-3 border border-outline-variant rounded-lg"
+                    >
+                      <p class="text-[10px] text-on-surface-variant mb-1">
+                        Ceiling (Max)
+                      </p>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold">€</span>
+                        <input
+                          class="border-none p-0 w-full font-bold focus:ring-0 text-sm"
+                          type="text"
+                          value="450.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Rule: Delta Constraint -->
+                <div class="space-y-3">
+                  <label
+                    class="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+                    >Max Daily Delta (%)</label
+                  >
+                  <input
+                    class="w-full accent-primary bg-surface-container h-2 rounded-full appearance-none cursor-pointer"
+                    type="range"
+                  />
+                  <div class="flex justify-between text-[10px] font-bold">
+                    <span>5%</span>
+                    <span class="text-primary">Current: 15%</span>
+                    <span>30%</span>
+                  </div>
+                </div>
+                <!-- Rule: Strategy Select -->
+                <div class="space-y-3">
+                  <label
+                    class="text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+                    >Optimization Strategy</label
+                  >
+                  <div class="space-y-2">
+                    <label
+                      class="flex items-center gap-3 p-3 bg-white border-2 border-primary rounded-lg cursor-pointer transition-all"
+                    >
+                      <input
+                        checked=""
+                        class="text-primary focus:ring-primary"
+                        name="strategy"
+                        type="radio"
+                      />
+                      <div>
+                        <p class="text-sm font-bold">Revenue Maximizer</p>
+                        <p class="text-[10px] text-on-surface-variant">
+                          Prioritizes high-yield premium bookings
+                        </p>
+                      </div>
+                    </label>
+                    <label
+                      class="flex items-center gap-3 p-3 bg-white border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-all"
+                    >
+                      <input
+                        class="text-primary focus:ring-primary"
+                        name="strategy"
+                        type="radio"
+                      />
+                      <div>
+                        <p class="text-sm font-bold">Load Factor Filler</p>
+                        <p class="text-[10px] text-on-surface-variant">
+                          Aggressive pricing to fill empty seats
+                        </p>
+                      </div>
+                    </label>
+                    <label
+                      class="flex items-center gap-3 p-3 bg-white border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-all"
+                    >
+                      <input
+                        class="text-primary focus:ring-primary"
+                        name="strategy"
+                        type="radio"
+                      />
+                      <div>
+                        <p class="text-sm font-bold">Competitive Parity</p>
+                        <p class="text-[10px] text-on-surface-variant">
+                          Tracks competitor moves within 2% margin
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <button
+                  class="w-full py-4 bg-on-background text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all"
+                >
+                  <span class="material-symbols-outlined text-sm"
+                    >published_with_changes</span
+                  >
+                  Update Engine Rules
+                </button>
+              </div>
+            </div>
+            <!-- Contextual Map Component -->
+            <div
+              class="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm h-64 relative group"
+            >
+              <img
+                class="w-full h-full object-cover"
+                data-alt="A sophisticated minimalist digital map displaying rail network lines connecting London, Paris, and Madrid. The map uses a sleek slate and navy blue color scheme with glowing neon indigo paths indicating high-demand routes and red pulsing dots for bottleneck segments. The aesthetic is clean, technical, and data-centric."
+                data-location="London"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqefbziBtF-K_WFMPtQn5LoS4TRXshMSMORahY21cRunFCAS-YIGVYOapfQPJs_AVTnCAAOIvB4JmcTGxKcMvoE9inf24681pb8l_PTPzNQy4nHdsaxk1pqUGEPmMNBqoB-GPFiXrKkzMVVdYLW5m3wn-z7nzBhIAhzge2n5DIF_iPrLuB-6MTh-i4kpwtsfjRb529jgpp9l6kPZ3AZRilbpzO34_FLgDy--x43QtVqGi__FnW0G1pyd8X45cCLP7L-NmERI4PPWS2"
+              />
+              <div
+                class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"
+              ></div>
+              <div class="absolute bottom-4 left-4 text-white">
+                <p
+                  class="text-xs font-bold uppercase tracking-widest opacity-80"
+                >
+                  Active Network Overlay
+                </p>
+                <p class="text-sm font-medium">
+                  Monitoring 4 active bottlenecks
+                </p>
+              </div>
+              <button
+                class="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40 transition-all"
+              >
+                <span class="material-symbols-outlined">fullscreen</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+    <script>
+      // Simple micro-interaction for table rows
+      document.querySelectorAll("tr").forEach((row) => {
+        row.addEventListener("click", () => {
+          // Potential for opening a detail drawer
+          console.log("Row clicked for optimization details");
+        });
+      });
+
+      // Mock simulation toggle
+      const simulateBtn = document.querySelector(
+        'button:contains("Fine Tune")',
+      );
+      if (simulateBtn) {
+        simulateBtn.addEventListener("click", () => {
+          alert(
+            "Simulation engine recalculating based on updated parameters...",
+          );
+        });
+      }
+    </script>
+  </body>
+</html>
+
+<!-- Dashboard Overview -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SRRM Enterprise AI - Overview Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .ai-accent-border {
+        position: relative;
+      }
+      .ai-accent-border::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        background: linear-gradient(180deg, #3525cd 0%, #4f46e5 100%);
+        border-radius: 4px 0 0 4px;
+      }
+      /* Custom Scrollbar for high-density data */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f8f9ff;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #c7c4d8;
+        border-radius: 10px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #777587;
+      }
+    </style>
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#c4c7c9",
+              "surface-container-high": "#dce9ff",
+              "on-primary": "#ffffff",
+              secondary: "#565e74",
+              "error-container": "#ffdad6",
+              "on-primary-fixed": "#0f0069",
+              "surface-dim": "#cbdbf5",
+              "on-primary-fixed-variant": "#3323cc",
+              "tertiary-container": "#5e6163",
+              "on-background": "#0b1c30",
+              "outline-variant": "#c7c4d8",
+              tertiary: "#46494b",
+              "surface-bright": "#f8f9ff",
+              background: "#f8f9ff",
+              "tertiary-fixed": "#e0e3e5",
+              "on-error-container": "#93000a",
+              primary: "#3525cd",
+              "on-surface-variant": "#464555",
+              outline: "#777587",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#e5eeff",
+              "surface-container-highest": "#d3e4fe",
+              "primary-container": "#4f46e5",
+              "secondary-fixed-dim": "#bec6e0",
+              "surface-container-low": "#eff4ff",
+              "inverse-surface": "#213145",
+              "secondary-fixed": "#dae2fd",
+              "primary-fixed-dim": "#c3c0ff",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#dadcde",
+              "surface-tint": "#4d44e3",
+              "on-surface": "#0b1c30",
+              "on-secondary-fixed": "#131b2e",
+              "primary-fixed": "#e2dfff",
+              "secondary-container": "#dae2fd",
+              "on-primary-container": "#dad7ff",
+              "surface-variant": "#d3e4fe",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#191c1e",
+              "on-tertiary-fixed-variant": "#444749",
+              "inverse-primary": "#c3c0ff",
+              error: "#ba1a1a",
+              "on-secondary-fixed-variant": "#3f465c",
+              "on-secondary": "#ffffff",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#5c647a",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              base: "4px",
+              "stack-md": "1rem",
+              "container-padding": "2rem",
+              gutter: "1.5rem",
+              "stack-lg": "2rem",
+              "stack-sm": "0.5rem",
+            },
+            fontFamily: {
+              "headline-lg-mobile": ["Inter"],
+              "body-md": ["Inter"],
+              "headline-md": ["Inter"],
+              "label-sm": ["JetBrains Mono"],
+              "headline-lg": ["Inter"],
+              "display-lg": ["Inter"],
+              "body-lg": ["Inter"],
+            },
+            fontSize: {
+              "headline-lg-mobile": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "label-sm": [
+                "12px",
+                {
+                  lineHeight: "16px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-lg": [
+                "30px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "-0.01em",
+                  fontWeight: "600",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "1.2",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-background text-on-surface font-body-md">
+    <!-- SideNavBar -->
+    <nav
+      class="h-screen w-64 fixed left-0 top-0 bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline flex flex-col py-stack-lg z-[60]"
+    >
+      <div class="px-6 mb-10">
+        <h1
+          class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim"
+        >
+          SRRM AI
+        </h1>
+        <p
+          class="text-label-sm font-label-sm text-on-surface-variant opacity-70"
+        >
+          Rail Revenue Management
+        </p>
+      </div>
+      <div class="flex-grow space-y-1">
+        <!-- Active Tab: Overview -->
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary hover:bg-surface-container-high transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="dashboard"
+            >dashboard</span
+          >
+          <span class="font-body-md">Overview</span>
+        </a>
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="trending_up"
+            >trending_up</span
+          >
+          <span class="font-body-md">Forecasting</span>
+        </a>
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="insights"
+            >insights</span
+          >
+          <span class="font-body-md">Optimization</span>
+        </a>
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="payments"
+            >payments</span
+          >
+          <span class="font-body-md">Pricing</span>
+        </a>
+      </div>
+      <div class="px-4 mb-8">
+        <button
+          class="w-full py-3 bg-primary text-on-primary rounded-lg font-bold shadow-sm hover:opacity-90 transition-opacity"
+        >
+          Generate Report
+        </button>
+      </div>
+      <div class="border-t border-outline-variant pt-4 space-y-1">
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors cursor-pointer"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="settings"
+            >settings</span
+          >
+          <span class="font-body-md">Settings</span>
+        </a>
+        <a
+          class="flex items-center px-6 py-3 space-x-3 text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors cursor-pointer"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="help_outline"
+            >help_outline</span
+          >
+          <span class="font-body-md">Support</span>
+        </a>
+      </div>
+    </nav>
+    <!-- TopNavBar -->
+    <header
+      class="flex justify-between items-center h-16 px-container-padding w-[calc(100%-16rem)] ml-64 fixed top-0 bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline z-50"
+    >
+      <div class="flex items-center space-x-8">
+        <span
+          class="font-headline-md text-headline-md font-black text-on-surface dark:text-surface-bright"
+          >SRRM Enterprise AI</span
+        >
+        <div class="flex space-x-6">
+          <a
+            class="text-on-surface-variant dark:text-secondary-fixed-dim pb-1 font-label-sm text-label-sm hover:text-primary transition-all"
+            href="#"
+            >Network</a
+          >
+          <a
+            class="text-on-surface-variant dark:text-secondary-fixed-dim pb-1 font-label-sm text-label-sm hover:text-primary transition-all"
+            href="#"
+            >Inventory</a
+          >
+          <a
+            class="text-on-surface-variant dark:text-secondary-fixed-dim pb-1 font-label-sm text-label-sm hover:text-primary transition-all"
+            href="#"
+            >Analytics</a
+          >
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="relative">
+          <span
+            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline"
+            data-icon="search"
+            >search</span
+          >
+          <input
+            class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-1.5 text-body-md w-64 focus:ring-2 focus:ring-primary"
+            placeholder="Search system..."
+            type="text"
+          />
+        </div>
+        <button
+          class="px-4 py-1.5 border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-all active:scale-95"
+        >
+          Apply Filters
+        </button>
+        <div class="flex items-center space-x-2 ml-4">
+          <button
+            class="p-2 text-on-surface-variant hover:text-primary transition-transform active:scale-90"
+          >
+            <span class="material-symbols-outlined" data-icon="notifications"
+              >notifications</span
+            >
+          </button>
+          <button
+            class="p-2 text-on-surface-variant hover:text-primary transition-transform active:scale-90"
+          >
+            <span class="material-symbols-outlined" data-icon="history"
+              >history</span
+            >
+          </button>
+          <div
+            class="h-8 w-8 rounded-full overflow-hidden ml-2 bg-surface-container-highest border border-outline-variant"
+          >
+            <img
+              class="w-full h-full object-cover"
+              data-alt="Professional close-up headshot of a revenue management administrator in a modern office, wearing professional attire, soft cinematic lighting, neutral business environment background, high resolution photography style."
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCMl3nLCK82bcIKEAAsoLV-A9D53lp4JvadS1NESydz-DhhTSXvTcEiwDvniFVkrE5g2SJxb1gGr9j0fYVdUWNdByTeBSaCWZ2Hod9CmR8lGQqTreqKwgsySuSa-1f96ICFspqgD41yVgH-EJCxFTSglaLj5sV-SVaSMiz0eQ0AYWw89pFohj3wmm77D62MgnUvAhVXR8ocpMSofDwzXOslM88DgvL0poH4qt5mF7Z46Swp6SgC8qVrew8KtjfKbHjLmpzrh3_snCz"
+            />
+          </div>
+        </div>
+      </div>
+    </header>
+    <!-- Main Content -->
+    <main class="ml-64 pt-20 p-container-padding min-h-screen">
+      <!-- Dashboard Header / Controls -->
+      <div class="flex justify-between items-end mb-stack-lg">
+        <div>
+          <h2 class="font-headline-lg text-headline-lg text-on-surface mb-1">
+            Overview Dashboard
+          </h2>
+          <p class="text-on-surface-variant body-md">
+            System-wide performance for
+            <span class="font-bold">May 24, 2024</span>
+          </p>
+        </div>
+        <div
+          class="flex space-x-3 bg-surface-container-low p-1 rounded-lg border border-outline-variant"
+        >
+          <select
+            class="bg-transparent border-none text-label-sm font-label-sm text-on-surface focus:ring-0 cursor-pointer"
+          >
+            <option>All Routes (HN-SG)</option>
+          </select>
+          <div class="w-px h-6 bg-outline-variant self-center"></div>
+          <select
+            class="bg-transparent border-none text-label-sm font-label-sm text-on-surface focus:ring-0 cursor-pointer"
+          >
+            <option>Train ID: SE1, SE2, SE3</option>
+          </select>
+        </div>
+      </div>
+      <!-- 4 Key Metric Cards (Bento Style) -->
+      <div
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter mb-gutter"
+      >
+        <!-- Metric Card 1 -->
+        <div
+          class="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200"
+        >
+          <div class="flex justify-between items-start mb-4">
+            <span
+              class="text-label-sm font-label-sm uppercase text-on-surface-variant"
+              >Total Revenue</span
+            >
+            <span
+              class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold"
+              >+12.4%</span
+            >
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <span class="font-display-lg text-[28px] font-bold">$1.24M</span>
+            <span class="text-on-surface-variant text-label-sm">USD</span>
+          </div>
+          <div class="mt-4 h-12 w-full">
+            <!-- Sparkline Mockup -->
+            <svg class="w-full h-full overflow-visible" viewbox="0 0 100 20">
+              <path
+                d="M0 15 L10 12 L20 16 L30 10 L40 14 L50 8 L60 12 L70 5 L80 10 L90 2 L100 5"
+                fill="none"
+                stroke="#3525cd"
+                stroke-linecap="round"
+                stroke-width="2"
+              ></path>
+            </svg>
+          </div>
+        </div>
+        <!-- Metric Card 2 -->
+        <div
+          class="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200"
+        >
+          <div class="flex justify-between items-start mb-4">
+            <span
+              class="text-label-sm font-label-sm uppercase text-on-surface-variant"
+              >Avg Load Factor</span
+            >
+            <span
+              class="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-bold"
+              >-2.1%</span
+            >
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <span class="font-display-lg text-[28px] font-bold">84.2%</span>
+          </div>
+          <div class="mt-4 h-12 w-full">
+            <svg class="w-full h-full overflow-visible" viewbox="0 0 100 20">
+              <path
+                d="M0 5 L10 8 L20 4 L30 12 L40 10 L50 15 L60 13 L70 18 L80 15 L90 19 L100 16"
+                fill="none"
+                stroke="#ba1a1a"
+                stroke-linecap="round"
+                stroke-width="2"
+              ></path>
+            </svg>
+          </div>
+        </div>
+        <!-- Metric Card 3 -->
+        <div
+          class="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200"
+        >
+          <div class="flex justify-between items-start mb-4">
+            <span
+              class="text-label-sm font-label-sm uppercase text-on-surface-variant"
+              >Seat-km Utilization</span
+            >
+            <span
+              class="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold"
+              >+5.8%</span
+            >
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <span class="font-display-lg text-[28px] font-bold">0.92</span>
+            <span class="text-on-surface-variant text-label-sm">ASK</span>
+          </div>
+          <div class="mt-4 h-12 w-full">
+            <svg class="w-full h-full overflow-visible" viewbox="0 0 100 20">
+              <path
+                d="M0 18 L20 12 L40 15 L60 8 L80 10 L100 2"
+                fill="none"
+                stroke="#3525cd"
+                stroke-linecap="round"
+                stroke-width="2"
+              ></path>
+            </svg>
+          </div>
+        </div>
+        <!-- Metric Card 4: AI Insight Style -->
+        <div
+          class="bg-surface-container border border-primary/20 p-5 rounded-xl ai-accent-border hover:bg-surface-container-high transition-colors duration-200"
+        >
+          <div class="flex justify-between items-start mb-4">
+            <span
+              class="text-label-sm font-label-sm uppercase text-primary font-bold"
+              >Unfulfilled Demand</span
+            >
+            <span
+              class="material-symbols-outlined text-primary scale-75"
+              data-icon="auto_awesome"
+              >auto_awesome</span
+            >
+          </div>
+          <div class="flex items-baseline space-x-2">
+            <span class="font-display-lg text-[28px] font-bold text-primary"
+              >4,122</span
+            >
+            <span class="text-primary/70 text-label-sm">Seats</span>
+          </div>
+          <p class="mt-2 text-[11px] text-on-surface-variant leading-tight">
+            AI recommends adding capacity to SE3 for HN-Vinh segment on weekend.
+          </p>
+        </div>
+      </div>
+      <!-- Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter mb-gutter">
+        <!-- Revenue & Load Factor Dual Axis -->
+        <div
+          class="lg:col-span-2 bg-white border border-outline-variant rounded-xl p-6"
+        >
+          <div class="flex justify-between items-center mb-8">
+            <h3 class="font-headline-md text-[18px] text-on-surface">
+              Revenue &amp; Load Factor Trends
+            </h3>
+            <div class="flex items-center space-x-4">
+              <div class="flex items-center space-x-2">
+                <div class="w-3 h-3 rounded-full bg-primary"></div>
+                <span class="text-label-sm text-on-surface-variant"
+                  >Revenue</span
+                >
+              </div>
+              <div class="flex items-center space-x-2">
+                <div class="w-3 h-3 rounded-full bg-secondary"></div>
+                <span class="text-label-sm text-on-surface-variant"
+                  >Load Factor</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="h-64 relative w-full flex items-end justify-between px-2">
+            <!-- Fake Chart Grid Lines -->
+            <div
+              class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10"
+            >
+              <div class="border-t border-black w-full"></div>
+              <div class="border-t border-black w-full"></div>
+              <div class="border-t border-black w-full"></div>
+              <div class="border-t border-black w-full"></div>
+            </div>
+            <!-- Bars & Line Overlay Mockup -->
+            <div class="relative w-full h-full flex items-end justify-around">
+              <div class="w-8 bg-primary/20 rounded-t h-[40%] relative">
+                <div
+                  class="absolute -top-1 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/20 rounded-t h-[55%] relative">
+                <div
+                  class="absolute -top-4 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/20 rounded-t h-[45%] relative">
+                <div
+                  class="absolute -top-2 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/30 rounded-t h-[70%] relative">
+                <div
+                  class="absolute -top-8 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/40 rounded-t h-[85%] relative">
+                <div
+                  class="absolute -top-2 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/30 rounded-t h-[60%] relative">
+                <div
+                  class="absolute -top-6 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/20 rounded-t h-[50%] relative">
+                <div
+                  class="absolute -top-1 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+              <div class="w-8 bg-primary/30 rounded-t h-[65%] relative">
+                <div
+                  class="absolute -top-5 left-0 w-full h-1 bg-secondary rounded-full"
+                ></div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="flex justify-between mt-4 px-2 text-[10px] font-label-sm text-on-surface-variant uppercase"
+          >
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span
+            ><span>Fri</span><span>Sat</span><span>Sun</span><span>Mon</span>
+          </div>
+        </div>
+        <!-- Route Heatmap -->
+        <div class="bg-white border border-outline-variant rounded-xl p-6">
+          <h3 class="font-headline-md text-[18px] text-on-surface mb-6">
+            Route Heatmap
+          </h3>
+          <div class="space-y-6">
+            <!-- Segment -->
+            <div>
+              <div class="flex justify-between text-label-sm mb-1">
+                <span class="text-on-surface-variant">HN → Vinh</span>
+                <span class="font-bold text-primary">92% LF</span>
+              </div>
+              <div
+                class="h-3 w-full bg-surface-container rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-primary" style="width: 92%"></div>
+              </div>
+            </div>
+            <!-- Segment -->
+            <div>
+              <div class="flex justify-between text-label-sm mb-1">
+                <span class="text-on-surface-variant">Vinh → Hue</span>
+                <span class="font-bold text-primary">78% LF</span>
+              </div>
+              <div
+                class="h-3 w-full bg-surface-container rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-primary" style="width: 78%"></div>
+              </div>
+            </div>
+            <!-- Segment -->
+            <div>
+              <div class="flex justify-between text-label-sm mb-1">
+                <span class="text-on-surface-variant">Hue → DN</span>
+                <span class="font-bold text-red-600">98% LF</span>
+              </div>
+              <div
+                class="h-3 w-full bg-surface-container rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-red-500" style="width: 98%"></div>
+              </div>
+            </div>
+            <!-- Segment -->
+            <div>
+              <div class="flex justify-between text-label-sm mb-1">
+                <span class="text-on-surface-variant">DN → SG</span>
+                <span class="font-bold text-primary">64% LF</span>
+              </div>
+              <div
+                class="h-3 w-full bg-surface-container rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-primary" style="width: 64%"></div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="mt-10 p-4 bg-surface-container-low rounded-lg border border-dashed border-outline-variant"
+          >
+            <p class="text-[11px] text-on-surface-variant italic">
+              Critical bottleneck detected at
+              <span class="font-bold">Hue-DN</span>. Higher yield available
+              through segment re-allocation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <!-- Table Row: Trains at Risk -->
+      <div
+        class="bg-white border border-outline-variant rounded-xl overflow-hidden"
+      >
+        <div
+          class="p-6 border-b border-outline-variant flex justify-between items-center"
+        >
+          <h3 class="font-headline-md text-[18px] text-on-surface">
+            Trains at Risk
+          </h3>
+          <button
+            class="text-label-sm font-label-sm text-primary flex items-center space-x-1 hover:underline"
+          >
+            <span>View all warnings</span>
+            <span
+              class="material-symbols-outlined text-sm"
+              data-icon="chevron_right"
+              >chevron_right</span
+            >
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr
+                class="bg-surface-container-low border-b border-outline-variant"
+              >
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Train ID
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Departure
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Route
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  LF %
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Revenue Status
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Risk Level
+                </th>
+                <th
+                  class="px-6 py-3 font-label-sm text-label-sm text-on-surface-variant uppercase"
+                >
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant">
+              <!-- Row 1 -->
+              <tr class="hover:bg-surface-container-lowest transition-colors">
+                <td class="px-6 py-4 font-bold text-primary">SE1-2405</td>
+                <td class="px-6 py-4 text-body-md">24 May, 06:00</td>
+                <td class="px-6 py-4 text-body-md">HN - SG</td>
+                <td class="px-6 py-4 text-body-md">96%</td>
+                <td class="px-6 py-4">
+                  <span class="text-green-600 font-bold">$42,200</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="px-2 py-1 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase"
+                    >High (Overbooked)</span
+                  >
+                </td>
+                <td class="px-6 py-4">
+                  <button
+                    class="p-1.5 rounded hover:bg-surface-container-high transition-colors"
+                  >
+                    <span
+                      class="material-symbols-outlined text-outline"
+                      data-icon="more_vert"
+                      >more_vert</span
+                    >
+                  </button>
+                </td>
+              </tr>
+              <!-- Row 2 -->
+              <tr class="hover:bg-surface-container-lowest transition-colors">
+                <td class="px-6 py-4 font-bold text-primary">SE3-2405</td>
+                <td class="px-6 py-4 text-body-md">24 May, 22:15</td>
+                <td class="px-6 py-4 text-body-md">HN - Vinh</td>
+                <td class="px-6 py-4 text-body-md">42%</td>
+                <td class="px-6 py-4">
+                  <span class="text-red-600 font-bold">$8,450</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="px-2 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold rounded uppercase"
+                    >Medium (Low Yield)</span
+                  >
+                </td>
+                <td class="px-6 py-4">
+                  <button
+                    class="p-1.5 rounded hover:bg-surface-container-high transition-colors"
+                  >
+                    <span
+                      class="material-symbols-outlined text-outline"
+                      data-icon="more_vert"
+                      >more_vert</span
+                    >
+                  </button>
+                </td>
+              </tr>
+              <!-- Row 3 -->
+              <tr class="hover:bg-surface-container-lowest transition-colors">
+                <td class="px-6 py-4 font-bold text-primary">SE2-2405</td>
+                <td class="px-6 py-4 text-body-md">24 May, 19:30</td>
+                <td class="px-6 py-4 text-body-md">SG - HN</td>
+                <td class="px-6 py-4 text-body-md">71%</td>
+                <td class="px-6 py-4">
+                  <span class="text-on-surface font-bold">$29,100</span>
+                </td>
+                <td class="px-6 py-4">
+                  <span
+                    class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-[10px] font-bold rounded uppercase"
+                    >Stable</span
+                  >
+                </td>
+                <td class="px-6 py-4">
+                  <button
+                    class="p-1.5 rounded hover:bg-surface-container-high transition-colors"
+                  >
+                    <span
+                      class="material-symbols-outlined text-outline"
+                      data-icon="more_vert"
+                      >more_vert</span
+                    >
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+    <!-- FAB (Hidden based on context rule but here for completeness if needed) -->
+    <!-- Suppressed based on "Settings, Profile, Details, and Transactional" but since this is Home Dashboard it could stay, let's keep it minimal for AI optimization actions -->
+    <button
+      class="fixed bottom-8 right-8 bg-primary text-on-primary h-14 w-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50"
+    >
+      <span
+        class="material-symbols-outlined"
+        data-icon="auto_fix_high"
+        style="font-variation-settings: &quot;FILL&quot; 1"
+        >auto_fix_high</span
+      >
+    </button>
+    <script>
+      // Micro-interactions
+      document.querySelectorAll(".group").forEach((el) => {
+        el.addEventListener("mouseenter", () => {
+          // Potential for dynamic JS effects if needed
+        });
+      });
+    </script>
+  </body>
+</html>
+
+<!-- Demand Forecasting -->
+<!doctype html>
+
+<html class="light" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>SRRM AI - Demand Forecasting</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;family=JetBrains+Mono:wght@500&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+      rel="stylesheet"
+    />
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed-dim": "#c4c7c9",
+              "surface-container-high": "#dce9ff",
+              "on-primary": "#ffffff",
+              secondary: "#565e74",
+              "error-container": "#ffdad6",
+              "on-primary-fixed": "#0f0069",
+              "surface-dim": "#cbdbf5",
+              "on-primary-fixed-variant": "#3323cc",
+              "tertiary-container": "#5e6163",
+              "on-background": "#0b1c30",
+              "outline-variant": "#c7c4d8",
+              tertiary: "#46494b",
+              "surface-bright": "#f8f9ff",
+              background: "#f8f9ff",
+              "tertiary-fixed": "#e0e3e5",
+              "on-error-container": "#93000a",
+              primary: "#3525cd",
+              "on-surface-variant": "#464555",
+              outline: "#777587",
+              "surface-container-lowest": "#ffffff",
+              "surface-container": "#e5eeff",
+              "surface-container-highest": "#d3e4fe",
+              "primary-container": "#4f46e5",
+              "secondary-fixed-dim": "#bec6e0",
+              "surface-container-low": "#eff4ff",
+              "inverse-surface": "#213145",
+              "secondary-fixed": "#dae2fd",
+              "primary-fixed-dim": "#c3c0ff",
+              "on-tertiary": "#ffffff",
+              "inverse-on-surface": "#eaf1ff",
+              "on-tertiary-container": "#dadcde",
+              "surface-tint": "#4d44e3",
+              "on-surface": "#0b1c30",
+              "on-secondary-fixed": "#131b2e",
+              "primary-fixed": "#e2dfff",
+              "secondary-container": "#dae2fd",
+              "on-primary-container": "#dad7ff",
+              "surface-variant": "#d3e4fe",
+              "on-error": "#ffffff",
+              "on-tertiary-fixed": "#191c1e",
+              "on-tertiary-fixed-variant": "#444749",
+              "inverse-primary": "#c3c0ff",
+              error: "#ba1a1a",
+              "on-secondary-fixed-variant": "#3f465c",
+              "on-secondary": "#ffffff",
+              surface: "#f8f9ff",
+              "on-secondary-container": "#5c647a",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            spacing: {
+              base: "4px",
+              "stack-md": "1rem",
+              "container-padding": "2rem",
+              gutter: "1.5rem",
+              "stack-lg": "2rem",
+              "stack-sm": "0.5rem",
+            },
+            fontFamily: {
+              "headline-lg-mobile": ["Inter"],
+              "body-md": ["Inter"],
+              "headline-md": ["Inter"],
+              "label-sm": ["JetBrains Mono"],
+              "headline-lg": ["Inter"],
+              "display-lg": ["Inter"],
+              "body-lg": ["Inter"],
+            },
+            fontSize: {
+              "headline-lg-mobile": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+              "headline-md": [
+                "24px",
+                { lineHeight: "32px", fontWeight: "600" },
+              ],
+              "label-sm": [
+                "12px",
+                {
+                  lineHeight: "16px",
+                  letterSpacing: "0.05em",
+                  fontWeight: "500",
+                },
+              ],
+              "headline-lg": [
+                "30px",
+                {
+                  lineHeight: "36px",
+                  letterSpacing: "-0.01em",
+                  fontWeight: "600",
+                },
+              ],
+              "display-lg": [
+                "48px",
+                {
+                  lineHeight: "1.2",
+                  letterSpacing: "-0.02em",
+                  fontWeight: "700",
+                },
+              ],
+              "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 400,
+          "GRAD" 0,
+          "opsz" 24;
+      }
+      .active-icon {
+        font-variation-settings: "FILL" 1;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      .bento-grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 24px;
+      }
+
+      .heat-cell {
+        transition: all 0.2s ease-in-out;
+      }
+      .heat-cell:hover {
+        transform: scale(1.1);
+        z-index: 10;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(203, 219, 245, 0.5);
+      }
+
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-in {
+        animation: fadeInUp 0.6s ease-out forwards;
+      }
+    </style>
+  </head>
+  <body class="bg-surface text-on-surface font-body-md">
+    <!-- SideNavBar (Shared Component) -->
+    <aside
+      class="h-screen w-64 fixed left-0 top-0 flex flex-col py-stack-lg bg-surface-container-low dark:bg-surface-dim border-r border-outline-variant dark:border-outline z-[60]"
+    >
+      <div class="px-6 mb-10">
+        <h1
+          class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim"
+        >
+          SRRM AI
+        </h1>
+        <p
+          class="font-label-sm text-label-sm text-on-surface-variant opacity-70"
+        >
+          Rail Revenue Management
+        </p>
+      </div>
+      <nav class="flex-1 px-4 space-y-2">
+        <!-- Labels from JSON: ["Overview", "Forecasting", "Optimization", "Pricing"] -->
+        <a
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="dashboard"
+            >dashboard</span
+          >
+          <span class="font-body-md">Overview</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-primary dark:text-primary-fixed-dim font-bold border-r-4 border-primary bg-surface-container-high dark:bg-surface-container-highest cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span
+            class="material-symbols-outlined active-icon"
+            data-icon="trending_up"
+            style="font-variation-settings: &quot;FILL&quot; 1"
+            >trending_up</span
+          >
+          <span class="font-body-md">Forecasting</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="insights"
+            >insights</span
+          >
+          <span class="font-body-md">Optimization</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors cursor-pointer duration-200 ease-in-out"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="payments"
+            >payments</span
+          >
+          <span class="font-body-md">Pricing</span>
+        </a>
+      </nav>
+      <div class="px-4 mt-auto space-y-2">
+        <button
+          class="w-full bg-primary text-on-primary py-3 px-4 rounded-lg font-bold hover:opacity-90 transition-opacity mb-6"
+        >
+          Generate Report
+        </button>
+        <a
+          class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="settings"
+            >settings</span
+          >
+          <span class="font-label-sm">Settings</span>
+        </a>
+        <a
+          class="flex items-center gap-3 px-4 py-2 rounded-lg text-on-surface-variant dark:text-secondary-fixed-dim hover:bg-surface-container-high transition-colors"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="help_outline"
+            >help_outline</span
+          >
+          <span class="font-label-sm">Support</span>
+        </a>
+      </div>
+    </aside>
+    <!-- Main Content Area -->
+    <main class="ml-64 min-h-screen">
+      <!-- TopNavBar (Shared Component) -->
+      <header
+        class="flex justify-between items-center h-16 px-container-padding w-full sticky top-0 z-50 bg-surface dark:bg-on-background border-b border-outline-variant dark:border-outline"
+      >
+        <div class="flex items-center gap-8">
+          <h2
+            class="font-headline-md text-headline-md font-black text-on-surface dark:text-surface-bright"
+          >
+            Demand Forecasting
+          </h2>
+          <div class="relative hidden lg:block">
+            <span
+              class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline"
+              data-icon="search"
+              >search</span
+            >
+            <input
+              class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-full text-label-sm w-80 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+              placeholder="Search corridors, trains, or ODs..."
+              type="text"
+            />
+          </div>
+        </div>
+        <nav class="flex items-center gap-6">
+          <a
+            class="font-label-sm text-label-sm text-on-surface-variant dark:text-secondary-fixed-dim pb-1 hover:text-primary transition-all"
+            href="#"
+            >Network</a
+          >
+          <a
+            class="font-label-sm text-label-sm text-on-surface-variant dark:text-secondary-fixed-dim pb-1 hover:text-primary transition-all"
+            href="#"
+            >Inventory</a
+          >
+          <a
+            class="font-label-sm text-label-sm text-primary dark:text-primary-fixed-dim border-b-2 border-primary font-bold pb-1"
+            href="#"
+            >Analytics</a
+          >
+          <div class="h-6 w-px bg-outline-variant mx-2"></div>
+          <div class="flex items-center gap-4">
+            <button
+              class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all scale-95 active:scale-90"
+              data-icon="notifications"
+            >
+              notifications
+            </button>
+            <button
+              class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all scale-95 active:scale-90"
+              data-icon="history"
+            >
+              history
+            </button>
+            <div
+              class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant"
+            >
+              <img
+                class="w-full h-full object-cover"
+                data-alt="A professional high-definition headshot of a corporate railway administrator with a clean, focused expression. The lighting is bright and modern, set against a blurred office background with subtle blue and gray tones, echoing a sophisticated enterprise software environment."
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdV3wCCuJke0KBNu7YD4oYCJmPHT53yEjlLJLsBjBRVCuIjcocomr6WHdmXeszQQDgFcaY4Wr2BZ9bbhNjPvzIxxAPOTWe9dSHpRgMZ3ayRhtjZRsviRaB5hk3mBVwUcNkti9bS9_9vSEHMpsscvQdvT2UDETqZSJVzygaqIycbdGZfk4kM6qXA4ShdjlTnkjAPwCm37k9s-tk4RZD7O5_ho0VTptDCmLk6M3I9eOkufWMKiJVxEFrhssIs224EPzqtg1S7FOP11My"
+              />
+            </div>
+          </div>
+        </nav>
+      </header>
+      <!-- Analytics Content -->
+      <div class="p-container-padding space-y-gutter animate-fade-in">
+        <!-- Page Header / Controls -->
+        <div
+          class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+        >
+          <div>
+            <h3 class="font-headline-lg text-headline-lg text-on-surface">
+              Corridor: Northeast Mainline
+            </h3>
+            <p class="text-on-surface-variant">
+              Forecast Date Range: Oct 01 - Dec 31, 2024
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div
+              class="flex bg-surface-container-low p-1 rounded-lg border border-outline-variant"
+            >
+              <button
+                class="px-4 py-1.5 rounded-md bg-white shadow-sm text-label-sm font-bold text-primary"
+              >
+                Constrained
+              </button>
+              <button
+                class="px-4 py-1.5 rounded-md text-label-sm text-on-surface-variant hover:text-on-surface transition-colors"
+              >
+                Unconstrained
+              </button>
+            </div>
+            <button
+              class="flex items-center gap-2 bg-primary text-on-primary px-6 py-2 rounded-lg font-bold text-label-sm shadow-md hover:bg-primary-container transition-all"
+            >
+              <span class="material-symbols-outlined text-sm" data-icon="tune"
+                >tune</span
+              >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+        <!-- Bento Grid Layout -->
+        <div class="bento-grid">
+          <!-- Main Chart: Booking Curve (8 Columns) -->
+          <div
+            class="col-span-12 lg:col-span-8 glass-card rounded-xl p-6 shadow-sm"
+          >
+            <div class="flex items-center justify-between mb-8">
+              <div>
+                <h4
+                  class="font-headline-md text-headline-md text-on-surface mb-1"
+                >
+                  Booking Curve (Pickup)
+                </h4>
+                <p class="text-label-sm text-on-surface-variant">
+                  Current Load Factor vs. Historical Average
+                </p>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                  <span class="w-3 h-3 rounded-full bg-primary"></span>
+                  <span class="text-label-sm">2024 Actual</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="w-3 h-3 rounded-full bg-tertiary-fixed-dim"
+                  ></span>
+                  <span class="text-label-sm">2023 Final</span>
+                </div>
+              </div>
+            </div>
+            <!-- Simplified Chart Visual -->
+            <div class="relative h-64 w-full mt-4 flex items-end gap-1">
+              <!-- Y Axis labels -->
+              <div
+                class="absolute left-0 top-0 h-full flex flex-col justify-between text-[10px] text-outline pr-2 border-r border-outline-variant"
+              >
+                <span>100%</span><span>75%</span><span>50%</span><span>25%</span
+                ><span>0%</span>
+              </div>
+              <!-- Grid Lines -->
+              <div
+                class="absolute inset-0 left-8 flex flex-col justify-between pointer-events-none"
+              >
+                <div
+                  class="border-t border-outline-variant opacity-30 w-full h-px"
+                ></div>
+                <div
+                  class="border-t border-outline-variant opacity-30 w-full h-px"
+                ></div>
+                <div
+                  class="border-t border-outline-variant opacity-30 w-full h-px"
+                ></div>
+                <div
+                  class="border-t border-outline-variant opacity-30 w-full h-px"
+                ></div>
+                <div
+                  class="border-t border-outline-variant opacity-30 w-full h-px"
+                ></div>
+              </div>
+              <!-- Chart Area -->
+              <div class="flex-1 ml-8 h-full relative overflow-hidden">
+                <svg
+                  class="w-full h-full"
+                  preserveaspectratio="none"
+                  viewbox="0 0 1000 200"
+                >
+                  <!-- Historical Line -->
+                  <path
+                    d="M0,180 Q150,170 300,140 T600,80 T900,30 T1000,10"
+                    fill="none"
+                    stroke="#c4c7c9"
+                    stroke-dasharray="6,4"
+                    stroke-width="3"
+                  ></path>
+                  <!-- Current Line -->
+                  <path
+                    d="M0,195 Q150,185 300,155 T600,95 T800,60"
+                    fill="none"
+                    stroke="#3525cd"
+                    stroke-width="4"
+                  ></path>
+                  <circle cx="800" cy="60" fill="#3525cd" r="6"></circle>
+                </svg>
+                <!-- Forecast Projection -->
+                <div
+                  class="absolute top-0 right-0 h-full w-[20%] bg-primary opacity-5 border-l-2 border-dashed border-primary"
+                ></div>
+              </div>
+            </div>
+            <div
+              class="ml-16 mt-4 flex justify-between text-label-sm text-outline"
+            >
+              <span>D-90</span><span>D-60</span><span>D-45</span
+              ><span>D-30</span><span>D-15</span><span>Departure</span>
+            </div>
+          </div>
+          <!-- Forecast Breakdown by Class (4 Columns) -->
+          <div
+            class="col-span-12 lg:col-span-4 glass-card rounded-xl p-6 shadow-sm flex flex-col"
+          >
+            <h4 class="font-headline-md text-headline-md text-on-surface mb-6">
+              Class Breakdown
+            </h4>
+            <div class="space-y-6 flex-1">
+              <!-- Soft Seat -->
+              <div class="space-y-2">
+                <div class="flex justify-between text-label-sm">
+                  <span class="font-bold">Soft Seat</span>
+                  <span class="text-primary font-bold">84% Forecasted</span>
+                </div>
+                <div
+                  class="w-full bg-surface-container h-3 rounded-full overflow-hidden"
+                >
+                  <div class="bg-primary h-full w-[84%] rounded-full"></div>
+                </div>
+                <p class="text-[10px] text-on-surface-variant">
+                  +4.2% vs Last Week
+                </p>
+              </div>
+              <!-- Sleeper -->
+              <div class="space-y-2">
+                <div class="flex justify-between text-label-sm">
+                  <span class="font-bold">Sleeper</span>
+                  <span class="text-primary font-bold">92% Forecasted</span>
+                </div>
+                <div
+                  class="w-full bg-surface-container h-3 rounded-full overflow-hidden"
+                >
+                  <div class="bg-primary h-full w-[92%] rounded-full"></div>
+                </div>
+                <p class="text-[10px] text-on-surface-variant">
+                  +1.8% vs Last Week
+                </p>
+              </div>
+              <!-- VIP Lounge -->
+              <div class="space-y-2">
+                <div class="flex justify-between text-label-sm">
+                  <span class="font-bold">VIP Lounge</span>
+                  <span class="text-primary font-bold">67% Forecasted</span>
+                </div>
+                <div
+                  class="w-full bg-surface-container h-3 rounded-full overflow-hidden"
+                >
+                  <div class="bg-primary h-full w-[67%] rounded-full"></div>
+                </div>
+                <p
+                  class="text-[10px] text-on-surface-variant font-medium text-error"
+                >
+                  -2.1% vs Last Week
+                </p>
+              </div>
+            </div>
+            <div class="mt-6 pt-6 border-t border-outline-variant flex gap-4">
+              <div class="text-center flex-1">
+                <div class="text-headline-md font-bold text-on-surface">
+                  1.2k
+                </div>
+                <div class="text-[10px] text-outline uppercase tracking-wider">
+                  Unconstrained
+                </div>
+              </div>
+              <div class="text-center flex-1 border-l border-outline-variant">
+                <div class="text-headline-md font-bold text-primary">942</div>
+                <div class="text-[10px] text-outline uppercase tracking-wider">
+                  Estimated Sales
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- OD Demand Heatmap (12 Columns) -->
+          <div class="col-span-12 glass-card rounded-xl p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-8">
+              <div>
+                <h4 class="font-headline-md text-headline-md text-on-surface">
+                  Origin-Destination (OD) Heatmap
+                </h4>
+                <p class="text-label-sm text-on-surface-variant">
+                  Density of demand across segments
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-label-sm text-outline">Low</span>
+                <div
+                  class="w-32 h-3 bg-gradient-to-r from-surface-container-low via-primary-fixed-dim to-primary rounded-full"
+                ></div>
+                <span class="text-label-sm text-outline">High</span>
+              </div>
+            </div>
+            <div class="overflow-x-auto scrollbar-hide">
+              <div class="min-w-[800px]">
+                <!-- Matrix Header -->
+                <div class="grid grid-cols-10 gap-2 mb-2">
+                  <div class="col-span-1"></div>
+                  <div class="text-center font-label-sm text-outline">NYC</div>
+                  <div class="text-center font-label-sm text-outline">PHL</div>
+                  <div class="text-center font-label-sm text-outline">WIL</div>
+                  <div class="text-center font-label-sm text-outline">BAL</div>
+                  <div class="text-center font-label-sm text-outline">WAS</div>
+                  <div class="text-center font-label-sm text-outline">RCH</div>
+                  <div class="text-center font-label-sm text-outline">RAL</div>
+                  <div class="text-center font-label-sm text-outline">CLT</div>
+                  <div class="text-center font-label-sm text-outline">ATL</div>
+                </div>
+                <!-- Matrix Body -->
+                <div class="space-y-2">
+                  <!-- Row NYC -->
+                  <div class="grid grid-cols-10 gap-2 items-center">
+                    <div class="font-label-sm text-outline">NYC</div>
+                    <div
+                      class="h-10 rounded bg-surface-container opacity-20"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary-container opacity-40"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary-container opacity-60"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-80"
+                    ></div>
+                    <div class="h-10 rounded heat-cell bg-primary"></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-90"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-70"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-60"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-50"
+                    ></div>
+                  </div>
+                  <!-- Row WAS -->
+                  <div class="grid grid-cols-10 gap-2 items-center">
+                    <div class="font-label-sm text-outline">WAS</div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-90"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-60"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-40"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-30"
+                    ></div>
+                    <div
+                      class="h-10 rounded bg-surface-container opacity-20"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-60"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-80"
+                    ></div>
+                    <div class="h-10 rounded heat-cell bg-primary"></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-90"
+                    ></div>
+                  </div>
+                  <!-- Row ATL -->
+                  <div class="grid grid-cols-10 gap-2 items-center">
+                    <div class="font-label-sm text-outline">ATL</div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-50"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-40"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-30"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-50"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-70"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-80"
+                    ></div>
+                    <div
+                      class="h-10 rounded heat-cell bg-primary opacity-90"
+                    ></div>
+                    <div class="h-10 rounded heat-cell bg-primary"></div>
+                    <div
+                      class="h-10 rounded bg-surface-container opacity-20"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Lead Time Distribution (6 Columns) -->
+          <div
+            class="col-span-12 lg:col-span-6 glass-card rounded-xl p-6 shadow-sm"
+          >
+            <h4 class="font-headline-md text-headline-md text-on-surface mb-6">
+              Demand by Lead Time
+            </h4>
+            <div class="h-48 flex items-end gap-2">
+              <div
+                class="flex-1 bg-surface-container-high rounded-t-lg relative group"
+              >
+                <div
+                  class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-on-background text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  12%
+                </div>
+                <div class="bg-primary h-[40%] w-full rounded-t-lg"></div>
+                <div
+                  class="absolute top-full mt-2 left-0 right-0 text-center text-[10px] text-outline"
+                >
+                  0-7 Days
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-surface-container-high rounded-t-lg relative group"
+              >
+                <div
+                  class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-on-background text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  28%
+                </div>
+                <div class="bg-primary h-[70%] w-full rounded-t-lg"></div>
+                <div
+                  class="absolute top-full mt-2 left-0 right-0 text-center text-[10px] text-outline"
+                >
+                  8-21 Days
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-surface-container-high rounded-t-lg relative group"
+              >
+                <div
+                  class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-on-background text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  45%
+                </div>
+                <div class="bg-primary h-[90%] w-full rounded-t-lg"></div>
+                <div
+                  class="absolute top-full mt-2 left-0 right-0 text-center text-[10px] text-outline"
+                >
+                  22-45 Days
+                </div>
+              </div>
+              <div
+                class="flex-1 bg-surface-container-high rounded-t-lg relative group"
+              >
+                <div
+                  class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-on-background text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  15%
+                </div>
+                <div class="bg-primary h-[35%] w-full rounded-t-lg"></div>
+                <div
+                  class="absolute top-full mt-2 left-0 right-0 text-center text-[10px] text-outline"
+                >
+                  45-90 Days
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- AI Recommendations (6 Columns) -->
+          <div
+            class="col-span-12 lg:col-span-6 glass-card rounded-xl p-6 shadow-sm border-l-4 border-primary"
+          >
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                class="material-symbols-outlined text-primary"
+                data-icon="auto_awesome"
+                >auto_awesome</span
+              >
+              <h4 class="font-headline-md text-headline-md text-on-surface">
+                AI Insights
+              </h4>
+            </div>
+            <div class="space-y-4">
+              <div class="p-3 bg-primary-fixed bg-opacity-30 rounded-lg">
+                <p class="text-body-md font-medium text-on-primary-fixed">
+                  Unconstrained demand for Sleeper class is up 12% for
+                  Thanksgiving week. Recommendation: Release 15 additional
+                  inventory slots from hold.
+                </p>
+              </div>
+              <div
+                class="p-3 bg-surface-container-low rounded-lg border border-outline-variant"
+              >
+                <p class="text-body-md text-on-surface-variant italic">
+                  "We detected a 4-day advance booking surge on NYC-WAS
+                  corridor, likely due to a regional tech conference. Adjusting
+                  pricing ladder +5% for next 48 hours."
+                </p>
+              </div>
+              <button
+                class="w-full py-2 border-2 border-primary text-primary font-bold rounded-lg hover:bg-primary hover:text-on-primary transition-all"
+              >
+                Accept All Recommendations
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+    <!-- Contextual FAB for generating reports or quick actions -->
+    <button
+      class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[70] lg:hidden"
+    >
+      <span class="material-symbols-outlined" data-icon="add">add</span>
+    </button>
+    <script>
+      // Micro-interactions for heatmap cells
+      document.querySelectorAll(".heat-cell").forEach((cell) => {
+        cell.addEventListener("mouseenter", () => {
+          const opacity = window.getComputedStyle(cell).opacity;
+          cell.setAttribute("data-orig-opacity", opacity);
+          cell.style.opacity = "1";
+        });
+        cell.addEventListener("mouseleave", () => {
+          const orig = cell.getAttribute("data-orig-opacity");
+          cell.style.opacity = orig;
+        });
+      });
+
+      // Simple tab switching for Constrained/Unconstrained
+      const toggleBtns = document.querySelectorAll(
+        ".bg-surface-container-low button",
+      );
+      toggleBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          toggleBtns.forEach((b) => {
+            b.classList.remove(
+              "bg-white",
+              "shadow-sm",
+              "text-primary",
+              "font-bold",
+            );
+            b.classList.add("text-on-surface-variant");
+          });
+          btn.classList.add(
+            "bg-white",
+            "shadow-sm",
+            "text-primary",
+            "font-bold",
+          );
+          btn.classList.remove("text-on-surface-variant");
+        });
+      });
+    </script>
+  </body>
+</html>

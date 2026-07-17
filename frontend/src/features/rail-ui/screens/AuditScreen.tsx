@@ -1,61 +1,57 @@
-import { SectionCard } from "@/features/rail-ui/components/Primitives";
+"use client";
+
+import React from "react";
 import { auditLogs } from "@/features/rail-ui/mockData";
 
 export function AuditScreen() {
   return (
-    <div className="page-stack">
-      <SectionCard title="Bộ lọc kiểm toán" subtitle="Lọc theo người thao tác, hành động và thời điểm thay đổi.">
-        <div className="form-grid">
-          <label className="field">
-            <span>Người thao tác</span>
-            <input className="input" defaultValue="Tất cả" />
-          </label>
-          <label className="field">
-            <span>Hành động</span>
-            <input className="input" defaultValue="Tất cả" />
-          </label>
-          <label className="field">
-            <span>Ngày</span>
-            <input className="input" defaultValue="17/07/2026" />
-          </label>
-        </div>
-      </SectionCard>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-extrabold text-on-surface">
+          System Audit Trail
+        </h2>
+        <p className="text-sm text-on-surface-variant">
+          Complete history of quota updates, override actions, and engine rules modifications
+        </p>
+      </div>
 
-      <SectionCard
-        title="Bảng nhật ký kiểm toán"
-        subtitle="Theo dõi rõ actor, before, after để truy vết mọi thay đổi quan trọng."
-      >
-        <div className="table-wrap">
-          <table className="data-table audit-table">
-            <thead>
+      {/* Main Table */}
+      <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-outline-variant flex justify-between items-center bg-white">
+          <h3 className="font-bold text-on-surface">Audit Logs</h3>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-sm">search</span>
+            <input
+              className="pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-full text-xs w-64 focus:ring-1 focus:ring-primary focus:outline-none"
+              placeholder="Search audit trail..."
+              type="text"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-surface-container-low text-xs text-on-surface-variant font-bold uppercase">
               <tr>
-                <th>Actor</th>
-                <th>Hành động</th>
-                <th>Thực thể</th>
-                <th>Thời gian</th>
+                <th className="px-6 py-4">Actor</th>
+                <th className="px-6 py-4">Action</th>
+                <th className="px-6 py-4">Entity</th>
+                <th className="px-6 py-4 text-right">Timestamp</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-outline-variant/30 text-sm">
               {auditLogs.map((item) => (
-                <tr key={`${item.actor}-${item.time}`}>
-                  <th scope="row">{item.actor}</th>
-                  <td>{item.action}</td>
-                  <td>{item.entity}</td>
-                  <td>{item.time}</td>
+                <tr className="hover:bg-surface-container-low transition-colors" key={`${item.actor}-${item.time}`}>
+                  <td className="px-6 py-4 font-bold text-primary">{item.actor}</td>
+                  <td className="px-6 py-4 text-on-surface font-semibold">{item.action}</td>
+                  <td className="px-6 py-4 text-on-surface-variant font-medium">{item.entity}</td>
+                  <td className="px-6 py-4 text-right text-on-surface-variant font-mono font-medium">{item.time}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </SectionCard>
-
-      <div className="two-up">
-        <SectionCard title="Dữ liệu trước thay đổi" subtitle="Giá trị hệ thống ghi nhận trước khi cập nhật.">
-          <pre className="code-block">{auditLogs[0]?.before}</pre>
-        </SectionCard>
-        <SectionCard title="Dữ liệu sau thay đổi" subtitle="Giá trị mới để đối chiếu và xác thực quyết định.">
-          <pre className="code-block">{auditLogs[0]?.after}</pre>
-        </SectionCard>
       </div>
     </div>
   );

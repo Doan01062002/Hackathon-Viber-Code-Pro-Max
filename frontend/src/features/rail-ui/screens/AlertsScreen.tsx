@@ -1,52 +1,70 @@
-import { SectionCard } from "@/features/rail-ui/components/Primitives";
-import { alerts } from "@/features/rail-ui/mockData";
+"use client";
 
-function severityClass(value: string) {
-  return value === "Trung bình" ? "severity-trung-binh" : "severity-cao";
-}
+import React from "react";
+import { alerts } from "@/features/rail-ui/mockData";
 
 export function AlertsScreen() {
   return (
-    <div className="page-stack">
-      <SectionCard
-        title="Bộ lọc cảnh báo"
-        subtitle="Lọc theo mức độ, loại vấn đề và nhóm chặng để xử lý theo ưu tiên."
-      >
-        <div className="scenario-strip">
-          <button className="scenario-chip scenario-chip-active" type="button">
-            Tất cả
-          </button>
-          <button className="scenario-chip" type="button">
-            Sắp cháy vé
-          </button>
-          <button className="scenario-chip" type="button">
-            Trống cao
-          </button>
-          <button className="scenario-chip" type="button">
-            Quota cần xem lại
-          </button>
-        </div>
-      </SectionCard>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-extrabold text-on-surface">
+          System Alerts & Warnings
+        </h2>
+        <p className="text-sm text-on-surface-variant">
+          Real-time capacity bottlenecks, quota alerts, and yield warning signals
+        </p>
+      </div>
 
-      <SectionCard
-        title="Danh sách cảnh báo"
-        subtitle="Tập trung vào cảnh báo đáng xử lý ngay trong ca trực hiện tại."
-      >
-        <div className="stack-list">
-          {alerts.map((alert) => (
-            <article className={`alert-card ${severityClass(alert.severity)}`} key={alert.title}>
-              <div>
-                <span className="alert-pill">{alert.severity}</span>
-                <strong>{alert.title}</strong>
-                <p>{alert.detail}</p>
+      {/* Alerts List */}
+      <div className="space-y-4">
+        {alerts.map((alert) => {
+          const isHigh = alert.severity === "Cao";
+          return (
+            <div
+              key={alert.title}
+              className={`p-5 rounded-xl border flex justify-between items-start gap-4 transition-colors duration-200 ${
+                isHigh
+                  ? "bg-error-container/10 border-error/20 hover:bg-error-container/20"
+                  : "bg-surface border-outline-variant hover:bg-surface-container-low"
+              }`}
+            >
+              <div className="flex gap-4">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isHigh ? "bg-error text-white" : "bg-secondary text-white"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {isHigh ? "warning" : "info"}
+                  </span>
+                </div>
+                <div>
+                  <p className={`font-bold text-sm ${isHigh ? "text-error" : "text-on-surface"}`}>
+                    {alert.title}
+                  </p>
+                  <p className="text-xs text-on-surface-variant font-semibold mt-1 leading-relaxed">
+                    {alert.detail}
+                  </p>
+                </div>
               </div>
-              <button className="btn btn-ghost" type="button">
-                Xem chi tiết
-              </button>
-            </article>
-          ))}
-        </div>
-      </SectionCard>
+
+              <div className="flex items-center gap-3">
+                <span
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    isHigh ? "bg-error/15 text-error" : "bg-secondary-container text-on-secondary-container"
+                  }`}
+                >
+                  {alert.severity}
+                </span>
+                <button className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface">
+                  Resolve
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
