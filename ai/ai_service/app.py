@@ -195,7 +195,7 @@ def price(req: PriceRequest):
     policy = None
     if req.min_price is not None and req.max_price is not None:
         policy = {"min_price": req.min_price, "max_price": req.max_price}
-    q = pricing.price_od(od, sol["bid_prices"], STATE["eps"], policy)
+    q = pricing.price_od(od, sol["bid_prices"], STATE["eps"], policy, segment_load=sol.get("segment_load"))
     return PriceResponse(
         od_id=q["od_id"],
         seat_type=q["seat_type"],
