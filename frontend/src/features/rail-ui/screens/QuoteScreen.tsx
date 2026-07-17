@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -31,6 +31,23 @@ export function QuoteScreen() {
   const [quote, setQuote] = useState<PricingQuoteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const origin = params.get("origin");
+    const destination = params.get("destination");
+    const seatType = params.get("seatType");
+    const date = params.get("date");
+    
+    if (origin || destination || seatType || date) {
+      setRequest({
+        origin: origin || initialRequest.origin,
+        destination: destination || initialRequest.destination,
+        seat_type: seatType || initialRequest.seat_type,
+        service_date: date || initialRequest.service_date,
+      });
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
