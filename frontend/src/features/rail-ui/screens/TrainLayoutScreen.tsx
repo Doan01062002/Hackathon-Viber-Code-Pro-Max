@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { SectionCard } from "@/features/rail-ui/components/Primitives";
 import { seatApi } from "@/features/rail-ui/api/seatApi";
