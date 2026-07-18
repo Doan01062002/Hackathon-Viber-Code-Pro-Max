@@ -63,7 +63,7 @@ def bootstrap_postgres_test_database():
     database_url = os.getenv("DATABASE_URL", "")
     url = make_url(database_url)
     database_name = url.database or ""
-    allowed_hosts = {"127.0.0.1", "localhost", "::1", "db"}
+    allowed_hosts = {"127.0.0.1", "localhost", "::1"}
     if (
         not url.drivername.startswith("postgresql")
         or url.host not in allowed_hosts
