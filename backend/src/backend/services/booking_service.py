@@ -1,6 +1,7 @@
 import random
 import string
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+UTC = timezone.utc
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { SectionCard } from "@/features/rail-ui/components/Primitives";
+import React, { useState, useEffect } from "react";
 import { apiClient } from "@/lib/api/client";
-import { scenarioChart as mockChart, simulationSummary as mockSummary, simulationTable as mockTable } from "@/features/rail-ui/mockData";
-import { policyApi } from "@/features/policy/api/policyApi";
-import type { PolicyDto } from "@/features/policy/api/policyApi";
-import { optimizeApi } from "@/features/optimize/api/optimizeApi";
-import type { OptimizeVersionDto } from "@/features/optimize/api/optimizeApi";
+import {
+  scenarioChart as mockChart,
+  simulationSummary as mockSummary,
+  simulationTable as mockTable,
+} from "@/features/rail-ui/mockData";
 
 interface SimulationCompareData {
   trip_id: number;
@@ -23,98 +22,22 @@ export function SimulationScreen() {
   const [simData, setSimData] = useState<SimulationCompareData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // States cho quản lý Policy Limits
-  const [showPolicyPanel, setShowPolicyPanel] = useState(false);
-  const [policies, setPolicies] = useState<PolicyDto[]>([]);
-  const [fetchingPolicies, setFetchingPolicies] = useState(false);
-  const [selectedPolicy, setSelectedPolicy] = useState<PolicyDto | null>(null);
-  const [editFormData, setEditFormData] = useState<{
-    name: string;
-    min_price: number;
-    max_price: number;
-    max_step_change: number;
-    status: string;
-  } | null>(null);
-  const [savingPolicy, setSavingPolicy] = useState(false);
-  const [policyMessage, setPolicyMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-
-  // States cho quản lý Rollback
-  const [showRollbackPanel, setShowRollbackPanel] = useState(false);
-  const [versions, setVersions] = useState<OptimizeVersionDto[]>([]);
-  const [fetchingVersions, setFetchingVersions] = useState(false);
-  const [rollingBack, setRollingBack] = useState(false);
-  const [rollbackMessage, setRollbackMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-
-  async function loadPolicies() {
-    try {
-      setFetchingPolicies(true);
-      const data = await policyApi.getPolicies();
-      setPolicies(data);
-    } catch (err) {
-      console.error("Lỗi tải chính sách:", err);
-    } finally {
-      setFetchingPolicies(false);
-    }
-  }
-
-  useEffect(() => {
-    if (showPolicyPanel) {
-      loadPolicies();
-    }
-  }, [showPolicyPanel]);
-
-  async function loadVersions() {
-    try {
-      setFetchingVersions(true);
-      const data = await optimizeApi.getVersions(1);
-      setVersions(data);
-    } catch (err) {
-      console.error("Lỗi tải lịch sử phiên bản:", err);
-    } finally {
-      setFetchingVersions(false);
-    }
-  }
-
-  useEffect(() => {
-    if (showRollbackPanel) {
-      loadVersions();
-    }
-  }, [showRollbackPanel]);
-
-  async function handleRollback(version: string) {
-    try {
-      setRollingBack(true);
-      setRollbackMessage(null);
-      await optimizeApi.rollbackVersion(1, version);
-      setRollbackMessage({ text: `Đã khôi phục thành công về phiên bản ${version}!`, type: "success" });
-      loadVersions();
-      runSimulation();
-    } catch (err: any) {
-      setRollbackMessage({
-        text: err instanceof Error ? err.message : "Khôi phục phiên bản thất bại.",
-        type: "error"
-      });
-    } finally {
-      setRollingBack(false);
-    }
-  }
-
-  const formatDateTime = (isoString: string | null) => {
-    if (!isoString) return "N/A";
-    try {
-      const d = new Date(isoString);
-      return d.toLocaleString("vi-VN");
-    } catch {
-      return isoString;
-    }
-  };
+  const [activeScenario, setActiveScenario] = useState<number | null>(null);
+  
+  // State quản lý Policy Modal
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [floorPrice, setFloorPrice] = useState("80000");
+  const [ceilingPrice, setCeilingPrice] = useState("1500000");
+  const [maxDelta, setMaxDelta] = useState(15);
+  const [strategy, setStrategy] = useState("revenue");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
     try {
       setLoading(true);
       setError(null);
+      setActiveScenario(policyId ?? null);
       const url = policyId 
         ? `/api/v1/simulation/compare?trip_id=1&policy_id=${policyId}`
         : "/api/v1/simulation/compare?trip_id=1";
@@ -162,468 +85,322 @@ export function SimulationScreen() {
   const chartData = getCompareChartData();
 
   return (
-    <div className="page-stack">
+    <div className="space-y-6">
+
       {error && (
-        <div className="banner banner-warning" style={{ backgroundColor: "#3a2a18", borderLeft: "4px solid #d97706", padding: "12px", borderRadius: "6px", color: "#f59e0b", fontSize: "14px", marginBottom: "8px" }}>
-          ⚠️ <strong>Cảnh báo:</strong> {error} Hiển thị kịch bản Demo.
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
+          ⚠️ Cảnh báo: {error} Hiển thị kịch bản Demo.
         </div>
       )}
 
-      <SectionCard
-        title="Chọn kịch bản mô phỏng chính sách"
-        subtitle="Chạy giả lập các mức trần/sàn trên dữ liệu hành trình lịch sử để nhìn rõ tác động doanh thu trước khi ban hành."
-        actions={
-          <button 
-            className="btn btn-primary" 
-            onClick={() => runSimulation()} 
+      {/* Scenario Selector Panel */}
+      <div className="bg-white border border-outline-variant p-5 rounded-xl shadow-sm space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="font-bold text-sm text-on-surface">Chọn kịch bản mô phỏng chính sách</h3>
+            <p className="text-xs text-on-surface-variant font-medium">Chạy giả lập các mức trần/sàn trên dữ liệu hành trình lịch sử để nhìn rõ tác động.</p>
+          </div>
+          <button
+            onClick={() => runSimulation(activeScenario ?? undefined)}
             disabled={loading}
-            style={{ opacity: loading ? 0.7 : 1 }}
+            className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
           >
-            {loading ? "Đang chạy mô phỏng..." : "Kích hoạt Mô Phỏng /v1/simulate"}
+            {loading ? "Đang giả lập..." : "Kích hoạt Giả Lập (/v1/simulate)"}
           </button>
-        }
-      >
-        <div className="scenario-strip">
-          <button className="scenario-chip scenario-chip-active" type="button" onClick={() => runSimulation()}>
+        </div>
+
+        <div className="flex gap-2 pt-1 border-t border-outline-variant/35 pt-3">
+          <button
+            onClick={() => runSimulation()}
+            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+              activeScenario === null
+                ? "bg-primary text-on-primary"
+                : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+            }`}
+          >
             Kịch bản mặc định (Trip #1)
           </button>
-          <button className="scenario-chip" type="button" onClick={() => runSimulation(1)}>
+          <button
+            onClick={() => runSimulation(1)}
+            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+              activeScenario === 1
+                ? "bg-primary text-on-primary"
+                : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+            }`}
+          >
             Chính sách Huế - Đà Nẵng
           </button>
-          <button className="scenario-chip" type="button" onClick={() => runSimulation()}>
+          <button
+            onClick={() => runSimulation()}
+            className="px-4 py-2 rounded-lg font-bold text-xs bg-white border border-outline-variant text-on-surface hover:bg-slate-50 transition-all"
+          >
             Cân bằng mùa cao điểm
           </button>
         </div>
-      </SectionCard>
+      </div>
 
-      <div className="two-up" style={{ opacity: loading ? 0.6 : 1, transition: "opacity 0.2s" }}>
-        <SectionCard title="Tóm tắt kết quả tăng trưởng" subtitle="Các chỉ số tăng trưởng then chốt do AI tính toán.">
-          <div className="summary-grid">
-            <article>
-              <span>Chính sách áp dụng</span>
-              <strong>{simData ? `Kịch bản Trip #${simData.trip_id}` : mockSummary.policy}</strong>
-            </article>
-            <article>
-              <span>Tăng doanh thu (Revenue Lift)</span>
-              <strong style={{ color: "#10b981" }}>
+      {/* Main Simulation Panel: 2 Columns */}
+      <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-200 ${loading ? "opacity-60" : "opacity-100"}`}>
+        {/* Left Card: Growth Metrics */}
+        <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm space-y-4">
+          <h3 className="font-bold text-xs text-on-surface uppercase tracking-wider border-b border-outline-variant/30 pb-2">
+            Tóm tắt kết quả tăng trưởng
+          </h3>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Chính sách áp dụng</span>
+              <p className="font-bold mt-1 text-on-surface">
+                {simData ? `Kịch bản Trip #${simData.trip_id}` : mockSummary.policy}
+              </p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng trưởng doanh thu</span>
+              <p className="font-black mt-1 text-green-600 text-sm">
                 {simData ? `+${simData.revenue_lift_pct.toFixed(2)}%` : mockSummary.revenueLift}
-              </strong>
-            </article>
-            <article>
-              <span>Tăng sản lượng (Passenger-KM Lift)</span>
-              <strong style={{ color: "#10b981" }}>
+              </p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng trưởng sản lượng</span>
+              <p className="font-black mt-1 text-blue-600 text-sm">
                 {simData ? `+${simData.passenger_km_lift_pct.toFixed(2)}%` : mockSummary.utilizationLift}
-              </strong>
-            </article>
-            <article>
-              <span>Trạng thái dự kiến</span>
-              <strong>Ổn định hệ số tải</strong>
-            </article>
+              </p>
+            </div>
+            <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Trạng thái dự kiến</span>
+              <p className="font-bold mt-1 text-on-surface">Ổn định hệ số tải</p>
+            </div>
           </div>
-          <p className="section-note" style={{ marginTop: "16px", color: "#888" }}>
+
+          <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed italic bg-slate-50 p-3 rounded border border-dashed border-outline-variant">
             {simData 
               ? `Hệ thống mô phỏng đã đối chiếu ${formatVND(simData.historical_revenue)} doanh thu thực tế lịch sử với doanh thu đề xuất từ các Price Quote có hiệu lực.` 
               : mockSummary.note}
           </p>
-        </SectionCard>
+        </div>
 
-        <SectionCard title="Biểu đồ so sánh kịch bản (ScenarioCompareChart)" subtitle="Cột xanh ngọc: Doanh thu | Cột xanh dương: Sản lượng Khách-km.">
-          <div className="compare-chart" style={{ display: "flex", gap: "24px", justifyContent: "space-around", alignItems: "flex-end", height: "180px", paddingTop: "20px" }}>
+        {/* Right Card: Comparative Bar Chart */}
+        <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm flex flex-col justify-between">
+          <h3 className="font-bold text-xs text-on-surface uppercase tracking-wider border-b border-outline-variant/30 pb-2 mb-4">
+            Biểu đồ so sánh kịch bản
+          </h3>
+
+          <div className="flex justify-around items-end h-32 px-4 pb-2 border-b border-outline-variant/35">
             {chartData.map((item) => (
-              <div className="compare-col" key={item.name} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "11px", color: "#888" }}>{item.name}</span>
-                <div className="compare-bars" style={{ display: "flex", gap: "8px", height: "120px", alignItems: "flex-end" }}>
-                  <div className="compare-bar compare-revenue" style={{ height: `${item.revenue}%`, width: "20px", backgroundColor: "#10b981", borderRadius: "2px" }} title={`Doanh thu: ${item.revenue}%`} />
-                  <div className="compare-bar compare-volume" style={{ height: `${item.volume}%`, width: "20px", backgroundColor: "#3b82f6", borderRadius: "2px" }} title={`Khách-km: ${item.volume}%`} />
+              <div className="flex flex-col items-center gap-3 w-1/2" key={item.name}>
+                <div className="flex gap-3 items-end h-24">
+                  {/* Revenue Bar */}
+                  <div
+                    style={{ height: `${item.revenue}%` }}
+                    className="w-5 bg-green-500 rounded-t hover:brightness-95 transition-all cursor-help"
+                    title={`Doanh thu: ${item.revenue}%`}
+                  />
+                  {/* Volume Bar */}
+                  <div
+                    style={{ height: `${item.volume}%` }}
+                    className="w-5 bg-blue-500 rounded-t hover:brightness-95 transition-all cursor-help"
+                    title={`Khách-km: ${item.volume}%`}
+                  />
                 </div>
+                <span className="text-[10px] font-bold text-on-surface-variant">{item.name}</span>
               </div>
             ))}
           </div>
-        </SectionCard>
+
+          <div className="flex justify-center gap-4 text-[9px] font-bold uppercase tracking-wider mt-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 bg-green-500 rounded-sm" />
+              <span>Doanh thu</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 bg-blue-500 rounded-sm" />
+              <span>Sản lượng khách-km</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <SectionCard title="Bảng so sánh chi tiết chỉ số doanh thu & sản lượng" subtitle="Đối chiếu trực quan dữ liệu lịch sử trong cơ sở dữ liệu với giải thuật AI đề xuất.">
-        <div className="table-wrap" style={{ opacity: loading ? 0.6 : 1, transition: "opacity 0.2s" }}>
-          <table className="data-table comparison-table">
-            <thead>
+      {/* Detail Comparative Table */}
+      <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-outline-variant bg-white">
+          <h3 className="font-bold text-sm text-on-surface">Bảng so sánh chi tiết chỉ số</h3>
+          <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">Đối chiếu dữ liệu lịch sử trong DB với kịch bản AI tối ưu.</p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left font-semibold">
+            <thead className="bg-surface-container-low text-xs text-on-surface-variant font-bold uppercase">
               <tr>
-                <th>Chỉ số chặng tàu</th>
-                <th>Lịch sử thực tế</th>
-                <th>AI đề xuất tối ưu</th>
-                <th>Mức tăng trưởng</th>
+                <th className="px-6 py-4">Chỉ số chặng tàu</th>
+                <th className="px-6 py-4">Lịch sử thực tế</th>
+                <th className="px-6 py-4">AI đề xuất tối ưu</th>
+                <th className="px-6 py-4">Mức tăng trưởng</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-outline-variant/30 text-sm">
               {simData ? (
                 <>
-                  <tr>
-                    <th scope="row">Tổng doanh thu chặng (VND)</th>
-                    <td>{formatVND(simData.historical_revenue)}</td>
-                    <td style={{ color: "#10b981", fontWeight: "bold" }}>{formatVND(simData.simulated_revenue)}</td>
-                    <td style={{ color: "#10b981", fontWeight: "bold" }}>+{simData.revenue_lift_pct.toFixed(2)}%</td>
+                  <tr className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-on-surface">Tổng doanh thu chặng (VND)</td>
+                    <td className="px-6 py-4 font-mono text-on-surface-variant">{formatVND(simData.historical_revenue)}</td>
+                    <td className="px-6 py-4 font-mono text-green-600 font-extrabold">{formatVND(simData.simulated_revenue)}</td>
+                    <td className="px-6 py-4 font-mono text-green-600 font-extrabold">+{simData.revenue_lift_pct.toFixed(2)}%</td>
                   </tr>
-                  <tr>
-                    <th scope="row">Sản lượng luân chuyển (Khách-km)</th>
-                    <td>{formatKM(simData.historical_passenger_km)}</td>
-                    <td style={{ color: "#3b82f6", fontWeight: "bold" }}>{formatKM(simData.simulated_passenger_km)}</td>
-                    <td style={{ color: "#3b82f6", fontWeight: "bold" }}>+{simData.passenger_km_lift_pct.toFixed(2)}%</td>
+                  <tr className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 font-bold text-on-surface">Sản lượng luân chuyển (Khách-km)</td>
+                    <td className="px-6 py-4 font-mono text-on-surface-variant">{formatKM(simData.historical_passenger_km)}</td>
+                    <td className="px-6 py-4 font-mono text-blue-600 font-extrabold">{formatKM(simData.simulated_passenger_km)}</td>
+                    <td className="px-6 py-4 font-mono text-blue-600 font-extrabold">+{simData.passenger_km_lift_pct.toFixed(2)}%</td>
                   </tr>
                 </>
               ) : (
                 mockTable.map((item) => (
-                  <tr key={item.metric}>
-                    <th scope="row">{item.metric}</th>
-                    <td>{item.current}</td>
-                    <td>{item.ai}</td>
-                    <td>N/A</td>
+                  <tr className="hover:bg-slate-50 transition-colors" key={item.metric}>
+                    <td className="px-6 py-4 font-bold text-on-surface">{item.metric}</td>
+                    <td className="px-6 py-4 text-on-surface-variant font-mono">{item.current}</td>
+                    <td className="px-6 py-4 text-primary font-bold font-mono">{item.ai}</td>
+                    <td className="px-6 py-4 text-outline font-mono">N/A</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </div>
 
-      <SectionCard title="Hành động phê duyệt chính sách" subtitle="Revenue Manager xem xét phê duyệt kịch bản để áp dụng trực tiếp lên hệ thống đặt vé.">
-        <div className="action-row">
-          <button className="btn btn-primary" type="button" onClick={() => alert("Đã gửi kịch bản tối ưu hóa lên hệ thống phê duyệt.")}>
-            Phê duyệt áp dụng AI
-          </button>
-          <button className="btn btn-ghost" type="button">
-            Ghi đè thủ công
-          </button>
-          <button 
-            className="btn btn-ghost" 
-            type="button" 
-            onClick={() => {
-              setShowPolicyPanel((val) => !val);
-              setShowRollbackPanel(false);
-            }}
-          >
-            {showPolicyPanel ? "Ẩn giới hạn chính sách" : "Cập nhật giới hạn chính sách"}
-          </button>
-          <button 
-            className="btn btn-ghost" 
-            type="button" 
-            onClick={() => {
-              setShowRollbackPanel((val) => !val);
-              setShowPolicyPanel(false);
-            }}
-          >
-            {showRollbackPanel ? "Ẩn lịch sử phiên bản" : "Khôi phục phiên bản"}
-          </button>
-        </div>
-      </SectionCard>
-
-      {showPolicyPanel && (
-        <SectionCard
-          title="Quản lý giới hạn chính sách (Policy Limits)"
-          subtitle="Điều chỉnh giá trần, giá sàn và biên độ thay đổi tối đa của từng phân khúc sản phẩm."
-          actions={
-            <button className="btn btn-ghost" type="button" onClick={() => setShowPolicyPanel(false)}>
-              Đóng panel
-            </button>
-          }
+      {/* Decision Action Buttons */}
+      <div className="bg-white border border-outline-variant p-4 rounded-xl shadow-sm flex flex-wrap gap-3">
+        <button
+          onClick={() => window.alert("Đã gửi kịch bản tối ưu hóa lên hệ thống phê duyệt.")}
+          className="px-4 py-2.5 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
         >
-          {policyMessage && (
-            <div 
-              style={{
-                backgroundColor: policyMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
-                borderLeft: `4px solid ${policyMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
-                padding: "12px 16px",
-                borderRadius: "8px",
-                color: policyMessage.type === "success" ? "var(--success)" : "var(--danger)",
-                fontSize: "14px",
-                fontWeight: 500,
-                marginBottom: "16px"
-              }}
-            >
-              {policyMessage.type === "success" ? "✅" : "⚠️"} {policyMessage.text}
-            </div>
-          )}
+          Phê duyệt áp dụng AI
+        </button>
+        <button className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+          Ghi đè thủ công
+        </button>
+        <button
+          onClick={() => setIsPolicyModalOpen(true)}
+          className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer"
+        >
+          Cập nhật giới hạn chính sách
+        </button>
+      </div>
 
-          {fetchingPolicies ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải dữ liệu chính sách...</p>
-          ) : (
-            <div className="table-wrap" style={{ marginBottom: "24px" }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Tên chính sách</th>
-                    <th>Giá sàn (Min)</th>
-                    <th>Giá trần (Max)</th>
-                    <th>Δ Max Step</th>
-                    <th>Trạng thái</th>
-                    <th>Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {policies.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.id}</td>
-                      <td><strong>{p.name}</strong></td>
-                      <td>{formatVND(p.min_price)}</td>
-                      <td>{formatVND(p.max_price)}</td>
-                      <td>{formatVND(p.max_step_change)}</td>
-                      <td>
-                        <span 
-                          style={{ 
-                            display: "inline-block", 
-                            padding: "4px 10px", 
-                            borderRadius: "6px", 
-                            backgroundColor: p.status === "active" ? "rgba(60, 154, 117, 0.12)" : p.status === "draft" ? "rgba(200, 132, 48, 0.12)" : "rgba(142, 144, 165, 0.12)", 
-                            color: p.status === "active" ? "var(--success)" : p.status === "draft" ? "var(--warning)" : "var(--muted)", 
-                            fontSize: "12px",
-                            fontWeight: 600
-                          }}
-                        >
-                          {p.status}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-ghost"
-                          type="button"
-                          onClick={() => {
-                            setSelectedPolicy(p);
-                            setEditFormData({
-                              name: p.name,
-                              min_price: p.min_price,
-                              max_price: p.max_price,
-                              max_step_change: p.max_step_change,
-                              status: p.status,
-                            });
-                            setPolicyMessage(null);
-                          }}
-                        >
-                          Sửa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {policies.length === 0 && (
-                    <tr>
-                      <td colSpan={7} style={{ textAlign: "center", color: "var(--muted)" }}>
-                        Không tìm thấy chính sách nào trong cơ sở dữ liệu.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {/* Policy Limits Modal */}
+      {isPolicyModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-outline-variant rounded-2xl max-w-md w-full shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="font-extrabold text-base text-on-surface flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-primary">rule_settings</span>
+              Cập nhật giới hạn chính sách
+            </h3>
+            <p className="text-xs text-on-surface-variant font-medium mb-6">
+              Điều chỉnh các tham số biên độ giá trần/sàn và chiến lược áp dụng cho động cơ định giá.
+            </p>
 
-          {editFormData && selectedPolicy && (
-            <div 
-              style={{
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                padding: "24px",
-                backgroundColor: "var(--surface-soft)",
-                marginTop: "20px"
-              }}
-            >
-              <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "16px", color: "var(--text)" }}>
-                Cập nhật chính sách: {selectedPolicy.name} (ID: {selectedPolicy.id})
-              </h3>
-              <div 
-                className="form-grid" 
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "16px",
-                  marginBottom: "20px"
-                }}
-              >
-                <label className="field">
-                  <span>Tên chính sách</span>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Giá sàn (Min VND)</span>
                   <input
-                    className="input"
-                    value={editFormData.name}
-                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  />
-                </label>
-                <label className="field">
-                  <span>Giá tối thiểu (Sàn)</span>
-                  <input
-                    className="input"
                     type="number"
-                    value={editFormData.min_price}
-                    onChange={(e) => setEditFormData({ ...editFormData, min_price: parseFloat(e.target.value) || 0 })}
+                    value={floorPrice}
+                    onChange={(e) => setFloorPrice(e.target.value)}
+                    className="w-full bg-slate-50 border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none"
                   />
                 </label>
-                <label className="field">
-                  <span>Giá tối đa (Trần)</span>
+                <label className="block space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Giá trần (Max VND)</span>
                   <input
-                    className="input"
                     type="number"
-                    value={editFormData.max_price}
-                    onChange={(e) => setEditFormData({ ...editFormData, max_price: parseFloat(e.target.value) || 0 })}
+                    value={ceilingPrice}
+                    onChange={(e) => setCeilingPrice(e.target.value)}
+                    className="w-full bg-slate-50 border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none"
                   />
                 </label>
-                <label className="field">
-                  <span>Biến động bước tối đa</span>
-                  <input
-                    className="input"
-                    type="number"
-                    value={editFormData.max_step_change}
-                    onChange={(e) => setEditFormData({ ...editFormData, max_step_change: parseFloat(e.target.value) || 0 })}
-                  />
-                </label>
-                <label className="field">
-                  <span>Trạng thái</span>
-                  <select
-                    className="input"
-                    value={editFormData.status}
-                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[10px] uppercase font-bold text-on-surface-variant">
+                  <span>Biến động tối đa hàng ngày</span>
+                  <span className="text-primary font-mono font-bold text-xs">{maxDelta}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  value={maxDelta}
+                  onChange={(e) => setMaxDelta(Number(e.target.value))}
+                  className="w-full accent-primary h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold font-mono">
+                  <span>Tối thiểu: 5%</span>
+                  <span>Tối đa: 30%</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant block">Chiến lược tối ưu hóa</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStrategy("revenue")}
+                    className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                      strategy === "revenue"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-outline-variant hover:bg-slate-50"
+                    }`}
                   >
-                    <option value="draft">draft</option>
-                    <option value="active">active</option>
-                    <option value="inactive">inactive</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="action-row">
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  disabled={savingPolicy}
-                  onClick={async () => {
-                    if (!editFormData.name || !editFormData.name.trim()) {
-                      setPolicyMessage({ text: "Tên chính sách không được để trống.", type: "error" });
-                      return;
-                    }
-                    if (editFormData.min_price > editFormData.max_price) {
-                      setPolicyMessage({ text: "Giá sàn (min_price) không được lớn hơn giá trần (max_price).", type: "error" });
-                      return;
-                    }
-                    try {
-                      setSavingPolicy(true);
-                      await policyApi.updatePolicy(selectedPolicy.id, editFormData);
-                      setPolicyMessage({ text: "Cập nhật giới hạn chính sách thành công!", type: "success" });
-                      setSelectedPolicy(null);
-                      setEditFormData(null);
-                      loadPolicies();
-                    } catch (err: any) {
-                      setPolicyMessage({
-                        text: err instanceof Error ? err.message : "Cập nhật thất bại.",
-                        type: "error",
-                      });
-                    } finally {
-                      setSavingPolicy(false);
-                    }
-                  }}
-                >
-                  {savingPolicy ? "Đang lưu..." : "Lưu thay đổi"}
-                </button>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => {
-                    setSelectedPolicy(null);
-                    setEditFormData(null);
-                    setPolicyMessage(null);
-                  }}
-                >
-                  Hủy bỏ
-                </button>
+                    <span className="text-xs font-bold text-on-surface">Tối đa hóa doanh thu</span>
+                    <span className="text-[9px] text-on-surface-variant/80 mt-1 font-medium leading-tight">Ưu tiên bán giá cao chặng dài</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStrategy("load")}
+                    className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                      strategy === "load"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-outline-variant hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-on-surface">Tối ưu hệ số lấp đầy</span>
+                    <span className="text-[9px] text-on-surface-variant/80 mt-1 font-medium leading-tight">Ưu tiên lấp đầy chỗ trống ngắn chặng</span>
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-        </SectionCard>
+
+            <div className="flex justify-end gap-3 pt-6 mt-4 border-t border-outline-variant/30">
+              <button
+                type="button"
+                onClick={() => setIsPolicyModalOpen(false)}
+                className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPolicyModalOpen(false);
+                  setToastMessage("Cập nhật giới hạn chính sách thành công!");
+                  setTimeout(() => setToastMessage(null), 3000);
+                }}
+                className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {showRollbackPanel && (
-        <SectionCard
-          title="Lịch sử tối ưu hóa & Khôi phục phiên bản (Rollback)"
-          subtitle="Danh sách các phiên bản giải tối ưu hóa trước đây của chuyến tàu. Cho phép khôi phục lại cấu hình giá cơ hội và hạn ngạch ghế."
-          actions={
-            <button className="btn btn-ghost" type="button" onClick={() => setShowRollbackPanel(false)}>
-              Đóng panel
-            </button>
-          }
-        >
-          {rollbackMessage && (
-            <div 
-              style={{
-                backgroundColor: rollbackMessage.type === "success" ? "rgba(60, 154, 117, 0.12)" : "rgba(204, 91, 97, 0.12)",
-                borderLeft: `4px solid ${rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)"}`,
-                padding: "12px 16px",
-                borderRadius: "8px",
-                color: rollbackMessage.type === "success" ? "var(--success)" : "var(--danger)",
-                fontSize: "14px",
-                fontWeight: 500,
-                marginBottom: "16px"
-              }}
-            >
-              {rollbackMessage.type === "success" ? "✅" : "⚠️"} {rollbackMessage.text}
-            </div>
-          )}
-
-          {fetchingVersions ? (
-            <p style={{ color: "var(--muted)", textAlign: "center", padding: "20px" }}>Đang tải lịch sử phiên bản...</p>
-          ) : (
-            <div className="table-wrap" style={{ marginBottom: "24px" }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Mã Phiên Bản</th>
-                    <th>Thời Điểm Tính Toán</th>
-                    <th>Trạng Thái</th>
-                    <th>Thao Tác</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {versions.map((v) => (
-                    <tr key={v.run_version}>
-                      <td><strong>{v.run_version}</strong></td>
-                      <td>{formatDateTime(v.calculated_at)}</td>
-                      <td>
-                        <span 
-                          style={{ 
-                            display: "inline-block", 
-                            padding: "4px 10px", 
-                            borderRadius: "6px", 
-                            backgroundColor: v.is_active ? "rgba(60, 154, 117, 0.12)" : "rgba(142, 144, 165, 0.12)", 
-                            color: v.is_active ? "var(--success)" : "var(--muted)", 
-                            fontSize: "12px",
-                            fontWeight: 600
-                          }}
-                        >
-                          {v.is_active ? "Đang áp dụng" : "Không hoạt động"}
-                        </span>
-                      </td>
-                      <td>
-                        {v.is_active ? (
-                          <span style={{ color: "var(--muted)", fontSize: "14px" }}>Hiện tại</span>
-                        ) : (
-                          <button
-                            className="btn btn-primary"
-                            style={{ minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
-                            type="button"
-                            disabled={rollingBack}
-                            onClick={() => handleRollback(v.run_version)}
-                          >
-                            {rollingBack ? "Đang khôi phục..." : "Khôi phục"}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {versions.length === 0 && (
-                    <tr>
-                      <td colSpan={4} style={{ textAlign: "center", color: "var(--muted)" }}>
-                        Không tìm thấy lịch sử phiên bản nào cho chuyến tàu này.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl border border-slate-800 flex items-center gap-2 animate-in slide-in-from-top-4 duration-200">
+          <span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>
+          {toastMessage}
+        </div>
       )}
     </div>
   );

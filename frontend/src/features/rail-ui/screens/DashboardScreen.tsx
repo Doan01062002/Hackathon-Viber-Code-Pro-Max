@@ -1,31 +1,154 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MetricGrid, SectionCard } from "@/features/rail-ui/components/Primitives";
-import { buildCurveChart, useForecast } from "@/features/forecast";
-import { buildSegmentHeatmap, useSegmentsLoad } from "@/features/segments";
+import { seatApi } from "@/features/rail-ui/api/seatApi";
+import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
+import { useForecast, buildCurveChart } from "@/features/forecast";
+import { useSegmentsLoad, buildSegmentHeatmap } from "@/features/segments";
 import {
-  gapSuggestions,
+  gapSuggestions as mockGapSuggestions,
   odMatrix,
   rightRailCards,
 } from "@/features/rail-ui/mockData";
-import { seatApi } from "@/features/rail-ui/api/seatApi";
-import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
 
 const DEFAULT_TRIP_ID = 1;
 
 function heatClass(value: number) {
-  if (value >= 95) return "heat-critical";
-  if (value >= 80) return "heat-hot";
-  if (value >= 60) return "heat-warm";
-  return "heat-cool";
+  if (value >= 90) return "text-red-600 font-bold";
+  if (value >= 75) return "text-orange-600 font-bold";
+  return "text-primary font-bold";
 }
 
-function severityClass(value: string) {
-  if (value === "Cao") return "severity-cao";
-  if (value === "Trung bình") return "severity-trung-binh";
-  return "severity-thap";
+// Reusable Interactive Sparkline Component
+interface SparklineProps {
+  data: number[];
+  labels: string[];
+  prefix?: string;
+  suffix?: string;
+  strokeColor: string;
+}
+
+function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeColor }: SparklineProps) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const width = 240;
+  const height = 40;
+  const padding = 6;
+
+  // Calculate points
+  const points = data.map((val, idx) => {
+    const x = padding + (idx / (data.length - 1)) * (width - padding * 2);
+    const y = height - padding - ((val - min) / range) * (height - padding * 2);
+    return { x, y, value: val, label: labels[idx] };
+  });
+
+  const pathD = points.map((p, idx) => `${idx === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+
+  return (
+    <div className="relative w-full mt-2">
+      {/* Min / Max indicators */}
+      <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold mb-1 font-mono">
+        <span>Thấp nhất: {prefix}{min.toLocaleString()}{suffix}</span>
+        <span>Cao nhất: {prefix}{max.toLocaleString()}{suffix}</span>
+      </div>
+
+      <div className="h-10 relative">
+        <svg
+          className="w-full h-full overflow-visible"
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+        >
+          {/* Background gridlines */}
+          <line x1="0" y1={padding} x2={width} y2={padding} stroke="#f1f5f9" strokeDasharray="2 2" strokeWidth="1" />
+          <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke="#f1f5f9" strokeDasharray="2 2" strokeWidth="1" />
+
+          {/* Line Path */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke={strokeColor}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2.5"
+          />
+
+          {/* Interaction Zones */}
+          {points.map((p, idx) => (
+            <g key={idx}>
+              {hoverIndex === idx && (
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r="4"
+                  fill={strokeColor}
+                  stroke="#opacity"
+                  strokeWidth="1.5"
+                />
+              )}
+              <rect
+                x={idx === 0 ? 0 : points[idx - 1].x + (p.x - points[idx - 1].x) / 2}
+                y="0"
+                width={
+                  idx === 0
+                    ? points[1].x / 2
+                    : idx === data.length - 1
+                    ? width - (points[idx - 1].x + (p.x - points[idx - 1].x) / 2)
+                    : (points[idx + 1].x - points[idx - 1].x) / 2
+                }
+                height={height}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={(e) => {
+                  setHoverIndex(idx);
+                  const svgEl = e.currentTarget.ownerSVGElement;
+                  if (svgEl) {
+                    const rect = svgEl.getBoundingClientRect();
+                    const pctX = p.x / width;
+                    setTooltipPos({
+                      x: pctX * rect.width,
+                      y: (p.y / height) * rect.height - 28,
+                    });
+                  }
+                }}
+                onMouseMove={(e) => {
+                  const svgEl = e.currentTarget.ownerSVGElement;
+                  if (svgEl) {
+                    const rect = svgEl.getBoundingClientRect();
+                    const pctX = p.x / width;
+                    setTooltipPos({
+                      x: pctX * rect.width,
+                      y: (p.y / height) * rect.height - 28,
+                    });
+                  }
+                }}
+                onMouseLeave={() => setHoverIndex(null)}
+              />
+            </g>
+          ))}
+        </svg>
+
+        {/* Dynamic Tooltip */}
+        {hoverIndex !== null && (
+          <div
+            style={{
+              left: `${tooltipPos.x}px`,
+              top: `${tooltipPos.y}px`,
+              transform: "translateX(-50%)",
+            }}
+            className="absolute z-50 pointer-events-none bg-slate-950 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow border border-slate-800 font-mono whitespace-nowrap"
+          >
+            {points[hoverIndex].label}: {prefix}{points[hoverIndex].value.toLocaleString()}{suffix}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Fallback Mock Heatmap Rows (khi không có API)
@@ -38,32 +161,13 @@ const mockHeatmapRows = [
   { segment: "Nha Trang → Sài Gòn", slots: [59, 63, 68, 70, 74, 72] },
 ];
 
-const defaultCurvePoints = [
-  { day: "D-30", actual: 14, forecast: 18 },
-  { day: "D-20", actual: 28, forecast: 31 },
-  { day: "D-10", actual: 48, forecast: 52 },
-  { day: "D-7", actual: 58, forecast: 61 },
-  { day: "D-3", actual: 74, forecast: 76 },
-  { day: "D-1", actual: 88, forecast: 91 },
-];
-
-function buildMockPolyline(values: number[], max: number) {
-  const width = 360;
-  const height = 180;
-  return values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * width;
-      const y = height - (value / max) * 140 - 12;
-      return `${x},${y}`;
-    })
-    .join(" ");
-}
-
 export function DashboardScreen() {
   const router = useRouter();
+
+  // Custom Hooks từ develop branch
   const forecast = useForecast(DEFAULT_TRIP_ID);
   const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
-  const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(gapSuggestions);
+  const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(mockGapSuggestions);
 
   useEffect(() => {
     async function loadGaps() {
@@ -80,18 +184,11 @@ export function DashboardScreen() {
   }, []);
 
   const legs = useMemo(() => segments.data?.legs ?? [], [segments.data?.legs]);
-  const heatmap = useMemo(
-    () => buildSegmentHeatmap(legs),
-    [legs],
-  );
+  const heatmap = useMemo(() => buildSegmentHeatmap(legs), [legs]);
+  const curveChart = useMemo(() => buildCurveChart(forecast.data?.booking_curve ?? []), [forecast.data]);
 
-  const curveChart = useMemo(
-    () => buildCurveChart(forecast.data?.booking_curve ?? []),
-    [forecast.data],
-  );
-
-  // Tính toán Top Metrics động dựa trên dữ liệu chặng thực tế từ backend (nếu có)
-  let avgLoad = 78;
+  // Tính toán metrics động dựa trên dữ liệu chặng thực tế từ backend
+  let avgLoad = 84.2;
   let bottleneckCount = 1;
   if (legs.length > 0) {
     const totalCapacity = legs.reduce((acc, leg) => acc + leg.capacity, 0);
@@ -100,460 +197,488 @@ export function DashboardScreen() {
     bottleneckCount = legs.filter((leg) => leg.is_bottleneck).length;
   }
 
-  const topMetrics = [
-    {
-      label: legs.length > 0 ? "Tải TB Thực tế" : "Tải trung bình",
-      value: `${avgLoad}%`,
-      detail: legs.length > 0 ? "Tính trên tất cả chặng" : "Tăng 4 điểm so với hôm qua",
-      tone: "good",
-    },
-    { label: "Doanh thu dự kiến", value: "2,84 tỷ", detail: "Đạt 103% kế hoạch ngày", tone: "neutral" },
-    {
-      label: legs.length > 0 ? "Chặng Bottleneck" : "Chặng rủi ro",
-      value: bottleneckCount.toString().padStart(2, "0"),
-      detail: legs.length > 0 ? "Cần điều phối bid price" : "Huế → Đà Nẵng đang gần đầy",
-      tone: bottleneckCount > 0 ? "danger" : "good",
-    },
-    { label: "Cảnh báo mở", value: "12", detail: "03 cảnh báo cần xử lý ngay", tone: "danger" },
-  ];
-
-  // Gom lỗi (nếu có) hiển thị dưới dạng banner thông báo
+  // Gom lỗi hiển thị banner
   const apiError = segments.error || forecast.error;
 
+  // Sparkline data
+  const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Hôm nay"];
+  const revenueTrend = [1.10, 1.12, 1.08, 1.15, 1.13, 1.18, 1.16, 1.22, 1.20, 1.24];
+  const loadTrend = [86.5, 87.2, 86.0, 85.3, 85.5, 84.8, 85.0, 84.2, 84.5, avgLoad];
+  const seatUseTrend = [0.85, 0.88, 0.86, 0.89, 0.87, 0.90, 0.88, 0.91, 0.90, 0.92];
+
+  // Mapping legs to SegmentHeatmap slots format
+  const mappedHeatmapRows = legs.length > 0
+    ? legs.map(leg => {
+        const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
+        return {
+          segment: `${leg.origin_station_code} → ${leg.destination_station_code} (${leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"})`,
+          slots: [
+            load,
+            Math.max(10, Math.min(100, load - 12)),
+            Math.max(10, Math.min(100, load + 8)),
+            Math.max(10, Math.min(100, load - 5)),
+            Math.max(10, Math.min(100, load + 15)),
+            Math.max(10, Math.min(100, load - 8)),
+          ]
+        };
+      })
+    : mockHeatmapRows;
+
   return (
-    <div className="page-stack">
+    <div className="space-y-6">
+      {/* Header / Controls */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-lg font-black text-on-surface">Bảng Điều Khiển Tổng Quan</h2>
+          <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+            Giám sát thời gian thực hệ số tải, xu hướng đặt vé, doanh thu và cảnh báo thắt nút cổ chai.
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <div className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2">
+            <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
+            <span className="text-xs font-semibold">Hôm nay, 17 Tháng 7 2026</span>
+          </div>
+          <select
+            className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-primary focus:border-primary outline-none"
+            defaultValue="Mã tàu: SE1, SE2, SE3"
+          >
+            <option>Mã tàu: SE1, SE2, SE3</option>
+            <option>Mã tàu: SE4, SE5, SE6</option>
+          </select>
+        </div>
+      </div>
+
       {apiError && (
-        <div
-          className="banner banner-warning"
-          style={{
-            backgroundColor: "#3a2a18",
-            borderLeft: "4px solid #d97706",
-            padding: "12px",
-            borderRadius: "6px",
-            color: "#f59e0b",
-            fontSize: "14px",
-            marginBottom: "8px",
-          }}
-        >
-          ⚠️ <strong>Cập nhật thất bại:</strong> Không kết nối được API backend. Hệ thống đang chuyển sang chế độ hiển thị dữ liệu mô phỏng Demo.
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
+          ⚠️ Cảnh báo kết nối: Không thể đồng bộ từ Backend API. Đang hiển thị kịch bản Demo.
         </div>
       )}
 
-      <section className="dashboard-toolbar">
-        <div className="command-bar">
-          <span className="command-icon" aria-hidden="true">
-            ⌕
-          </span>
-          <input
-            aria-label="Tìm tàu, ga hoặc chính sách"
-            className="input command-input"
-            defaultValue="Tìm tàu, ga, chính sách hoặc mã chạy cần theo dõi..."
-          />
-        </div>
+      {/* Decision and Alert Stack Row */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Huế -> Đà Nẵng Decision Card (Left 8 cols) */}
+        <div className="col-span-12 lg:col-span-8 bg-white border-l-4 border-primary border-y border-r border-outline-variant p-6 rounded-xl shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">
+                Ưu tiên xử lý ngay
+              </span>
+              <span className="material-symbols-outlined text-primary scale-75">auto_awesome</span>
+            </div>
+            <h3 className="font-extrabold text-base text-on-surface mb-2">
+              Huế → Đà Nẵng đang là chặng cần can thiệp trước khi mở thêm quota ngắn.
+            </h3>
+            <p className="text-xs text-on-surface-variant leading-relaxed mb-6 font-semibold">
+              Năng lực còn rất thấp trong 18 giờ tới, trong khi nhu cầu ngắn hạn tăng nhanh hơn
+              dự báo. Nếu không điều chỉnh sớm, hệ thống có nguy cơ sold-out giả và bỏ lỡ doanh
+              thu cho ga trung gian.
+            </p>
 
-        <div className="filters-row">
-          <button className="filter-chip filter-chip-active" type="button">
-            Toàn tuyến SE3
-          </button>
-          <button className="filter-chip" type="button">
-            Khởi hành hôm nay
-          </button>
-          <button className="filter-chip" type="button">
-            Chỉ xem chặng rủi ro cao
-          </button>
-        </div>
-      </section>
-
-      <section className="dashboard-lead">
-        <article className="decision-card">
-          <div className="decision-main">
-            <div className="decision-heading">
-              <span className="priority-badge">Ưu tiên xử lý ngay</span>
-              <h2>Huế → Đà Nẵng đang là chặng cần can thiệp trước khi mở thêm quota ngắn.</h2>
-              <p>
-                Năng lực còn rất thấp trong 18 giờ tới, trong khi nhu cầu ngắn hạn tăng nhanh hơn
-                dự báo. Nếu không điều chỉnh sớm, hệ thống có nguy cơ sold-out giả và bỏ lỡ doanh
-                thu cho ga trung gian.
-              </p>
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Mức tải hiện tại</p>
+                <p className="text-lg font-black text-on-surface mt-1">{avgLoad}%</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">Tăng 6% trong 2h gần nhất</p>
+              </div>
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Dự báo tăng thêm</p>
+                <p className="text-lg font-black text-primary mt-1">+8.2%</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">So với giữ nguyên quota</p>
+              </div>
+              <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
+                <p className="text-[10px] text-on-surface-variant font-bold uppercase">Tác động doanh thu</p>
+                <p className="text-lg font-black text-green-600 mt-1">+190 triệu</p>
+                <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">Nếu mở bán đúng nhóm ghế</p>
+              </div>
             </div>
 
-            <div className="decision-stat-grid">
-              <article className="decision-stat">
-                <span>Mức tải hiện tại</span>
-                <strong>{legs.length > 0 ? `${avgLoad}%` : "97%"}</strong>
-                <small>Tăng 6% trong 2 giờ gần nhất</small>
-              </article>
-              <article className="decision-stat">
-                <span>Dự báo tăng thêm</span>
-                <strong>+8,2%</strong>
-                <small>So với kịch bản giữ quota hiện tại</small>
-              </article>
-              <article className="decision-stat">
-                <span>Tác động doanh thu</span>
-                <strong>+190 triệu</strong>
-                <small>Nếu mở bán lại đúng nhóm ghế</small>
-              </article>
-            </div>
-
-            <ul className="recommendation-list">
+            <ul className="text-xs text-on-surface-variant space-y-1.5 list-disc list-inside font-semibold mb-6">
               <li>Mở lại quota ngắn cho Vinh → Huế ở toa B2 và B3 trong 90 phút tới.</li>
               <li>Giữ bid price cao cho luồng dài đi Đà Nẵng để tránh mất doanh thu cơ hội.</li>
               <li>Chạy mô phỏng nhanh trước khi duyệt để kiểm tra ảnh hưởng lên ga trung gian.</li>
             </ul>
-
-            <div className="hero-actions">
-              <button className="btn btn-primary" type="button">
-                Chạy mô phỏng khuyến nghị
-              </button>
-              <button className="btn btn-ghost" type="button">
-                Mở màn hình báo giá
-              </button>
-            </div>
           </div>
-        </article>
 
-        <aside className="side-stack">
-          <section className="side-mini-card">
-            <div className="side-mini-head">
-              <h3>Cảnh báo cần xử lý</h3>
-              <span className="status-chip">03 nóng</span>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push("/simulation")}
+              className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs cursor-pointer"
+            >
+              Chạy mô phỏng khuyến nghị
+            </button>
+            <button
+              onClick={() => router.push("/quote")}
+              className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg transition-all text-xs cursor-pointer"
+            >
+              Mở màn hình báo giá
+            </button>
+          </div>
+        </div>
+
+        {/* Side Stack (Right 4 cols) */}
+        <aside className="col-span-12 lg:col-span-4 space-y-6">
+          {/* Cảnh báo cần xử lý */}
+          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+            <div className="flex justify-between items-center mb-4 border-b border-outline-variant/30 pb-2">
+              <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider">Cảnh báo cần xử lý</h4>
+              <button
+                onClick={() => router.push("/alerts")}
+                className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded hover:bg-red-200 transition-colors cursor-pointer"
+              >
+                Xem tất cả
+              </button>
             </div>
-            <div className="stack-list">
+            <div className="space-y-3">
               {rightRailCards.quickAlerts.map((item) => (
-                <article className="mini-alert" key={item.title}>
-                  <span className={`severity-dot ${severityClass(item.severity)}`} aria-hidden="true" />
+                <div
+                  onClick={() => router.push("/alerts")}
+                  className="flex items-start gap-2 text-xs cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
+                  key={item.title}
+                >
+                  <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${item.severity === "Cao" ? "bg-red-500" : "bg-orange-500"}`} />
                   <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.body}</p>
+                    <p className="font-bold text-on-surface">{item.title}</p>
+                    <p className="text-[10px] text-on-surface-variant font-medium mt-0.5 leading-tight">{item.body}</p>
                   </div>
-                </article>
+                </div>
               ))}
             </div>
-          </section>
-
-          <section className="side-mini-card">
-            <div className="side-mini-head">
-              <h3>Chế độ xem đã lưu</h3>
-            </div>
-            <div className="stack-list">
-              {rightRailCards.savedViews.map((item) => (
-                <article className="saved-view" key={item.title}>
-                  <strong>{item.title}</strong>
-                  <p>{item.meta}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-
-          <section className="side-mini-card">
-            <div className="side-mini-head">
-              <h3>Trạng thái mô phỏng</h3>
-            </div>
-            <div className="status-row">
-              <strong>{rightRailCards.simulationStatus.value}</strong>
-              <span>{rightRailCards.simulationStatus.body}</span>
-            </div>
-            <div className="progress-track">
-              <span className="progress-fill" style={{ width: "68%" }} />
-            </div>
-          </section>
-        </aside>
-      </section>
-
-      <MetricGrid items={topMetrics} />
-
-      <div className="dashboard-grid">
-        <SectionCard
-          title="Heatmap tải chặng"
-          subtitle="Tỉ lệ lấp đầy từng chặng theo loại chỗ; chặng nút cổ chai được đánh dấu để ưu tiên xử lý."
-          actions={
-            segments.status === "error" ? (
-              <button className="btn btn-ghost" type="button" onClick={segments.refetch}>
-                Thử lại
-              </button>
-            ) : (
-              <button className="btn btn-ghost">Bộ lọc tàu và ngày</button>
-            )
-          }
-        >
-          <div className="heatmap-legend">
-            <span>
-              <i className="legend-box heat-cool" />
-              Dưới 60%
-            </span>
-            <span>
-              <i className="legend-box heat-warm" />
-              60 - 80%
-            </span>
-            <span>
-              <i className="legend-box heat-hot" />
-              80 - 95%
-            </span>
-            <span>
-              <i className="legend-box heat-critical" />
-              Trên 95%
-            </span>
           </div>
 
-          {segments.isLoading && <p className="curve-state">Đang tải dữ liệu tải chặng…</p>}
+          {/* Chế độ xem đã lưu */}
+          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+            <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-3 border-b border-outline-variant/30 pb-2">
+              Chế độ xem đã lưu
+            </h4>
+            <div className="space-y-2">
+              {rightRailCards.savedViews.map((item) => (
+                <div className="text-xs" key={item.title}>
+                  <p className="font-bold text-on-surface hover:underline cursor-pointer">{item.title}</p>
+                  <p className="text-[10px] text-on-surface-variant font-medium">{item.meta}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-          {heatmap ? (
-            <div className="table-wrap">
-              <table className="data-table heatmap-table">
-                <thead>
-                  <tr>
-                    <th>Chặng</th>
-                    {heatmap.columns.map((col) => (
-                      <th key={col.key}>{col.label}</th>
-                    ))}
-                    <th>Nút cổ chai</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {heatmap.rows.map((row) => (
-                    <tr key={row.seq}>
-                      <th scope="row">{row.label}</th>
-                      {heatmap.columns.map((col) => {
-                        const load = row.loads[col.key];
-                        return (
-                          <td
-                            key={`${row.seq}-${col.key}`}
-                            className={load === null ? undefined : heatClass(load)}
-                          >
-                            {load === null ? "—" : `${Math.round(load)}%`}
-                          </td>
-                        );
-                      })}
-                      <td>
-                        {row.isBottleneck ? (
-                          <span className="priority-badge severity-cao">Nút cổ chai</span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
+          {/* Trạng thái mô phỏng */}
+          <div
+            onClick={() => router.push("/simulation")}
+            className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors"
+          >
+            <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-2 border-b border-outline-variant/30 pb-2">
+              Trạng thái mô phỏng
+            </h4>
+            <div className="flex justify-between items-center text-xs mb-2">
+              <span className="font-bold text-on-surface">{rightRailCards.simulationStatus.value}</span>
+              <span className="text-[10px] text-on-surface-variant font-semibold">{rightRailCards.simulationStatus.body}</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-primary" style={{ width: "68%" }} />
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* 4 Key Bento Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Metric Card 1 */}
+        <div
+          onClick={() => router.push("/quote")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
+              Tổng doanh thu
+            </span>
+            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
+              +12.4%
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-on-surface">29.8 tỷ</span>
+            <span className="text-on-surface-variant text-xs font-semibold">VNĐ</span>
+          </div>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={revenueTrend}
+              labels={sparkLabels}
+              suffix=" tỷ"
+              strokeColor="#3525cd"
+            />
+          </div>
+        </div>
+
+        {/* Metric Card 2 */}
+        <div
+          onClick={() => router.push("/train-layout")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
+              Hệ số lấp đầy trung bình
+            </span>
+            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-bold">
+              -2.1%
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-on-surface">{avgLoad}%</span>
+          </div>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={loadTrend}
+              labels={sparkLabels}
+              suffix="%"
+              strokeColor="#ba1a1a"
+            />
+          </div>
+        </div>
+
+        {/* Metric Card 3 */}
+        <div
+          onClick={() => router.push("/simulation")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
+              Hiệu suất Ghế-Km (ASK)
+            </span>
+            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
+              +5.8%
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-on-surface">0.92</span>
+            <span className="text-on-surface-variant text-xs font-semibold">Ghế-km</span>
+          </div>
+          <div className="mt-4">
+            <InteractiveSparkline
+              data={seatUseTrend}
+              labels={sparkLabels}
+              suffix=" Ghế-km"
+              strokeColor="#3525cd"
+            />
+          </div>
+        </div>
+
+        {/* Metric Card 4 */}
+        <div
+          onClick={() => router.push("/simulation")}
+          className="bg-surface-container border border-primary/20 p-5 rounded-xl ai-accent-border hover:bg-surface-container-high transition-colors duration-200 cursor-pointer"
+        >
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-[10px] tracking-wider uppercase text-primary font-bold">
+              Nhu cầu chưa được đáp ứng
+            </span>
+            <span className="material-symbols-outlined text-primary scale-75">
+              auto_awesome
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2">
+            <span className="text-2xl font-black text-primary">4,122</span>
+            <span className="text-primary/70 text-xs font-semibold">Ghế</span>
+          </div>
+          <p className="mt-2 text-[11px] text-on-surface-variant leading-tight font-medium">
+            AI đề xuất tăng năng lực chở khách cho tàu SE3 trên chặng HN-Vinh vào cuối tuần.
+          </p>
+        </div>
+      </div>
+
+      {/* Charts & Heatmap Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Dynamic Booking Curve */}
+        <div className="lg:col-span-2 bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="text-base font-bold text-on-surface">
+                Đường cong đặt vé
+              </h3>
+              <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+                Theo dõi thực tế so với dự báo trên cùng một biểu đồ để nhìn ra điểm lệch sớm.
+              </p>
+            </div>
+            <div className="flex items-center space-x-4 text-xs font-semibold">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-0.5 bg-primary" />
+                <span className="text-on-surface-variant">Thực tế bán vé</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-0.5 bg-primary/45 border-t border-dashed" />
+                <span className="text-on-surface-variant">Dự báo nhu cầu</span>
+              </div>
+            </div>
+          </div>
+
+          {forecast.isLoading ? (
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Đang tải dữ liệu dự báo...</p>
+          ) : curveChart ? (
+            <div className="flex gap-4 items-stretch h-64">
+              {/* Y axis labels */}
+              <div className="flex flex-col justify-between py-2 text-[9px] text-on-surface-variant font-bold font-mono">
+                <span>100%</span>
+                <span>50%</span>
+                <span>0%</span>
+              </div>
+
+              {/* SVG wrapper */}
+              <div className="flex-grow border-l border-b border-outline-variant/60 relative">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 360 180" preserveAspectRatio="none">
+                  <path className="curve-grid-line" d="M0 28 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <path className="curve-grid-line" d="M0 88 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <path className="curve-grid-line" d="M0 148 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <polyline fill="none" stroke="#ba1a1a" strokeWidth="2" strokeDasharray="4 3" opacity="0.75" points={curveChart.forecastPoints} />
+                  <polyline fill="none" stroke="#3525cd" strokeWidth="3" points={curveChart.actualPoints} />
+                </svg>
+
+                {/* X axis labels */}
+                <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[9px] text-on-surface-variant font-mono font-bold">
+                  {curveChart.labels.map((label) => (
+                    <span key={label}>{label}</span>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
           ) : (
-            !segments.isLoading && (
-              <div className="table-wrap">
-                <table className="data-table heatmap-table">
-                  <thead>
-                    <tr>
-                      <th>Chặng</th>
-                      <th>06h</th>
-                      <th>09h</th>
-                      <th>12h</th>
-                      <th>15h</th>
-                      <th>18h</th>
-                      <th>21h</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockHeatmapRows.map((row) => (
-                      <tr key={row.segment}>
-                        <th scope="row">{row.segment}</th>
-                        {row.slots.map((slot, index) => (
-                          <td key={`${row.segment}-${index}`} className={heatClass(slot)}>
-                            {slot}%
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Không có dữ liệu biểu đồ.</p>
           )}
-        </SectionCard>
+        </div>
 
-        <SectionCard
-          title="Đường cong đặt vé"
-          subtitle="Theo dõi thực tế so với dự báo trên cùng một biểu đồ để nhìn ra điểm lệch sớm."
-          actions={
-            forecast.status === "error" ? (
-              <button className="btn btn-ghost" type="button" onClick={forecast.refetch}>
-                Thử lại
-              </button>
-            ) : undefined
-          }
-        >
-          {forecast.isLoading && <p className="curve-state">Đang tải dữ liệu dự báo…</p>}
-
-          {curveChart ? (
-            <>
-              <div className="curve-chart">
-                <div className="curve-axis-labels">
-                  <span>100%</span>
-                  <span>50%</span>
-                  <span>0%</span>
+        {/* Dynamic Gap Combining / AI Recommendation */}
+        <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-base font-bold text-on-surface mb-2">
+              Hệ số tải chặng Thống Nhất
+            </h3>
+            <p className="text-xs text-on-surface-variant mb-6 font-medium">Theo dõi hệ số lấp đầy ba phân đoạn trọng điểm.</p>
+            <div className="space-y-6">
+              {/* Segment */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-on-surface-variant font-semibold">HN → Vinh</span>
+                  <span className="font-bold text-primary">92% Hệ số tải</span>
                 </div>
-
-                <div className="curve-svg-wrap">
-                  <svg aria-hidden="true" className="curve-svg" viewBox="0 0 360 180">
-                    <path className="curve-grid-line" d="M0 28 H360" />
-                    <path className="curve-grid-line" d="M0 88 H360" />
-                    <path className="curve-grid-line" d="M0 148 H360" />
-                    <polyline
-                      className="curve-line curve-line-forecast"
-                      fill="none"
-                      points={curveChart.forecastPoints}
-                    />
-                    <polyline
-                      className="curve-line curve-line-actual"
-                      fill="none"
-                      points={curveChart.actualPoints}
-                    />
-                  </svg>
-
-                  <div className="curve-x-axis">
-                    {curveChart.labels.map((label) => (
-                      <span key={label}>{label}</span>
-                    ))}
-                  </div>
+                <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+                  <div className="h-full bg-primary" style={{ width: "92%" }} />
                 </div>
               </div>
-
-              <div className="curve-summary">
-                <span>
-                  <i className="curve-dot curve-dot-actual" />
-                  Thực tế bán vé (Chuẩn hóa)
-                </span>
-                <span>
-                  <i className="curve-dot curve-dot-forecast" />
-                  Dự báo nhu cầu (Chuẩn hóa)
-                </span>
+              {/* Segment */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-on-surface-variant font-semibold">Vinh → Huế</span>
+                  <span className="font-bold text-primary">{avgLoad}% Hệ số tải</span>
+                </div>
+                <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+                  <div className="h-full bg-primary" style={{ width: `${avgLoad}%` }} />
+                </div>
               </div>
-            </>
-          ) : (
-            !forecast.isLoading && (
-              <>
-                <div className="curve-chart">
-                  <div className="curve-axis-labels">
-                    <span>100%</span>
-                    <span>50%</span>
-                    <span>0%</span>
-                  </div>
-
-                  <div className="curve-svg-wrap">
-                    <svg aria-hidden="true" className="curve-svg" viewBox="0 0 360 180">
-                      <path className="curve-grid-line" d="M0 28 H360" />
-                      <path className="curve-grid-line" d="M0 88 H360" />
-                      <path className="curve-grid-line" d="M0 148 H360" />
-                      <polyline
-                        className="curve-line curve-line-forecast"
-                        fill="none"
-                        points={buildMockPolyline(defaultCurvePoints.map(p => p.forecast), 100)}
-                      />
-                      <polyline
-                        className="curve-line curve-line-actual"
-                        fill="none"
-                        points={buildMockPolyline(defaultCurvePoints.map(p => p.actual), 100)}
-                      />
-                    </svg>
-
-                    <div className="curve-x-axis">
-                      {defaultCurvePoints.map((point) => (
-                        <span key={point.day}>{point.day}</span>
-                      ))}
-                    </div>
-                  </div>
+              {/* Segment */}
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-on-surface-variant font-semibold">Huế → Đà Nẵng</span>
+                  <span className="font-bold text-red-600">98% Hệ số tải</span>
                 </div>
-
-                <div className="curve-summary">
-                  <span>
-                    <i className="curve-dot curve-dot-actual" />
-                    Thực tế bán vé
-                  </span>
-                  <span>
-                    <i className="curve-dot curve-dot-forecast" />
-                    Dự báo nhu cầu
-                  </span>
+                <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
+                  <div className="h-full bg-red-500" style={{ width: "98%" }} />
                 </div>
-              </>
-            )
-          )}
-        </SectionCard>
+              </div>
+            </div>
+          </div>
 
-        <SectionCard
-          title="Ma trận OD"
-          subtitle="Theo dõi số vé theo cặp ga để điều chỉnh bán vé, quota và giá theo đúng luồng nhu cầu."
-        >
-          <div className="table-wrap">
-            <table className="data-table matrix-table">
+          <div className="mt-8 p-4 bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
+            <p className="text-[11px] text-on-surface-variant italic leading-relaxed font-semibold">
+              Phát hiện nút cổ chai nghiêm trọng tại <span className="font-bold text-red-600">Huế - Đà Nẵng</span>. Cần tối ưu phân bổ quota chặng để mở rộng ghế.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Heatmap chặng chi tiết (SegmentHeatmap Grid) */}
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-base font-bold text-on-surface">Bản đồ nhiệt tải chặng</h3>
+            <p className="text-xs text-on-surface-variant font-medium mt-0.5">Tỉ lệ lấp đầy chặng theo loại chỗ và thời điểm chạy.</p>
+          </div>
+        </div>
+
+        {segments.isLoading ? (
+          <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Đang tải bản đồ nhiệt...</p>
+        ) : heatmap ? (
+          <div className="overflow-x-auto">
+            <table className="data-table heatmap-table w-full text-left border-collapse">
               <thead>
-                <tr>
-                  {odMatrix[0].map((cell, index) => (
-                    <th key={`od-head-${index}`}>{cell || "Ga đi / Ga đến"}</th>
+                <tr className="bg-slate-50 text-[11px] font-bold text-on-surface-variant uppercase border-b border-slate-200">
+                  <th className="py-3 px-4">Chặng tàu</th>
+                  {heatmap.columns.map((col) => (
+                    <th key={col.key} className="py-3 px-4 text-center">{col.label}</th>
                   ))}
+                  <th className="py-3 px-4 text-right">Nút cổ chai</th>
                 </tr>
               </thead>
-              <tbody>
-                {odMatrix.slice(1).map((row) => (
-                  <tr key={row[0]}>
-                    <th scope="row">{row[0]}</th>
-                    {row.slice(1).map((cell, index) => (
-                      <td key={`${row[0]}-${index}`}>{cell}</td>
-                    ))}
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold">
+                {heatmap.rows.map((row) => (
+                  <tr key={row.seq} className="hover:bg-slate-50/55 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-on-surface">{row.label}</td>
+                    {heatmap.columns.map((col) => {
+                      const load = row.loads[col.key];
+                      return (
+                        <td
+                          key={`${row.seq}-${col.key}`}
+                          className={`py-3.5 px-4 text-center ${load === null ? "text-slate-400 font-normal" : heatClass(load)}`}
+                        >
+                          {load === null ? "—" : `${Math.round(load)}%`}
+                        </td>
+                      );
+                    })}
+                    <td className="py-3.5 px-4 text-right">
+                      {row.isBottleneck ? (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">
+                          Cảnh báo
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Gợi ý lấp khoảng trống"
-          subtitle="Các hành động có thể triển khai ngay để tận dụng tồn kho đang bị bỏ phí."
-        >
-          <div className="action-list">
-            {suggestions.map((item) => (
-              <article className="action-item" key={`${item.route}-${item.seatType}`}>
-                <div>
-                  <strong>{item.route}</strong>
-                  <p>{item.reason}</p>
-                </div>
-                <div className="action-meta">
-                  <span>{item.seatType}</span>
-                  <span>{item.benefit}</span>
-                  <span className={`priority-text ${severityClass(item.priority)}`}>{item.priority}</span>
-                </div>
-                <button 
-                  className="btn btn-ghost" 
-                  type="button"
-                  onClick={() => {
-                    const match = item.reason.match(/toa\s+([A-Za-z0-9]+)/i);
-                    const coachNo = match ? match[1].trim() : "01";
-                    router.push(`/train-layout?coach=${coachNo}`);
-                  }}
-                >
-                  Xem chi tiết
-                </button>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
+        ) : (
+          <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Không có dữ liệu chặng.</p>
+        )}
       </div>
 
-      <SectionCard
-        title="Trạng thái dữ liệu và điều phối"
-        subtitle="Giữ phần cuối trang có điểm kết thúc rõ ràng thay vì dừng đột ngột giữa viewport."
-      >
-        <div className="summary-footer-grid">
-          <article className="summary-footer-card">
-            <span className="mini-label">Đồng bộ dữ liệu</span>
-            <strong>{rightRailCards.updateStatus.title}</strong>
-            <p>{rightRailCards.updateStatus.body}</p>
-          </article>
-          <article className="summary-footer-card">
-            <span className="mini-label">Tín hiệu cuối ngày</span>
-            <strong>Ưu tiên theo dõi sold-out giả và ga trung gian</strong>
-            <p>Từ 18h đến 21h là khung thời gian cần nhìn lại quota ngắn và giá vé luồng dài.</p>
-          </article>
+      {/* Gợi ý ghép chặng lấp chỗ trống */}
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <h3 className="text-base font-bold text-on-surface mb-2">Hành động lấp chỗ trống tối ưu (Gap Combining)</h3>
+        <p className="text-xs text-on-surface-variant mb-6 font-medium">Ghép nối hành trình chặng ngắn liên kết trống để bán vé đi suốt.</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {suggestions.slice(0, 3).map((item, index) => (
+            <article key={index} className="p-4 bg-slate-50 rounded-xl border border-outline-variant flex flex-col justify-between h-44">
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <strong className="text-xs text-on-surface font-extrabold">{item.route}</strong>
+                  <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded font-bold">{item.benefit}</span>
+                </div>
+                <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">{item.reason}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const match = item.reason.match(/toa\s+([A-Za-z0-9]+)/i);
+                  const coachNo = match ? match[1].trim() : "01";
+                  router.push(`/train-layout?coach=${coachNo}`);
+                }}
+                className="w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all cursor-pointer text-center"
+              >
+                Xem chi tiết sơ đồ
+              </button>
+            </article>
+          ))}
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }

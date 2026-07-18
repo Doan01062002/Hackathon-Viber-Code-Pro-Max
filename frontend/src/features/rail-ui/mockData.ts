@@ -1,16 +1,18 @@
 export type NavItem = {
   href: string;
   label: string;
-  icon: "dashboard" | "price" | "simulation" | "alert" | "audit" | "train";
+  icon: string;
+  group: "passenger" | "admin";
 };
 
 export const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Tổng quan", icon: "dashboard" },
-  { href: "/quote", label: "Báo giá", icon: "price" },
-  { href: "/simulation", label: "Mô phỏng", icon: "simulation" },
-  { href: "/alerts", label: "Cảnh báo", icon: "alert" },
-  { href: "/audit", label: "Kiểm toán", icon: "audit" },
-  { href: "/train-layout", label: "Toa tàu", icon: "train" },
+  { href: "/booking", label: "Đặt vé tàu", icon: "confirmation_number", group: "passenger" },
+  { href: "/dashboard", label: "Tổng quan", icon: "dashboard", group: "admin" },
+  { href: "/quote", label: "Báo giá", icon: "price", group: "admin" },
+  { href: "/simulation", label: "Mô phỏng", icon: "simulation", group: "admin" },
+  { href: "/alerts", label: "Cảnh báo", icon: "alert", group: "admin" },
+  { href: "/audit", label: "Kiểm toán", icon: "audit", group: "admin" },
+  { href: "/train-layout", label: "Toa tàu", icon: "train", group: "admin" },
 ];
 
 export const topMetrics = [

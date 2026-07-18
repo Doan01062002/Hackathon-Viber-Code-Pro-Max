@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import type { ReactNode } from "react";
-
+import { type ReactNode, useState } from "react";
 import { navItems } from "@/features/rail-ui/mockData";
 
 type AppShellProps = {
@@ -13,164 +11,195 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-function NavIcon({ icon }: { icon: (typeof navItems)[number]["icon"] }) {
+function getIconName(icon: string) {
   switch (icon) {
-    case "dashboard":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M4 4h7v7H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 13h7v7H4z" />
-        </svg>
-      );
-    case "price":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M5 6h9l5 5-8 8-5-5zM8.5 9.5h.01" />
-        </svg>
-      );
-    case "simulation":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M5 7h8M5 12h14M5 17h10M15 5v4M11 10v4M17 15v4" />
-        </svg>
-      );
-    case "alert":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M12 4 3 20h18zM12 9v4M12 17h.01" />
-        </svg>
-      );
-    case "audit":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M8 4h8v3h3v13H5V7h3zM8 12h8M8 16h6" />
-        </svg>
-      );
-    case "train":
-      return (
-        <svg aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M7 4h10a3 3 0 0 1 3 3v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V7a3 3 0 0 1 3-3zM8 8h3M13 8h3M9 18l-2 2M15 18l2 2" />
-        </svg>
-      );
-    default:
-      return null;
+    case "confirmation_number": return "confirmation_number";
+    case "dashboard": return "dashboard";
+    case "price": return "payments";
+    case "simulation": return "analytics";
+    case "alert": return "notifications";
+    case "audit": return "history";
+    case "train": return "train";
+    default: return "menu";
   }
 }
 
 export function AppShell({ title, eyebrow, children }: AppShellProps) {
   const pathname = usePathname();
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <div className="rail-shell">
-      <a className="skip-link" href="#main-content">
-        Bỏ qua điều hướng
-      </a>
-
-      <aside className="rail-sidebar" aria-label="Thanh điều hướng chính">
-        <div className="rail-sidebar-top">
-          <div className="rail-brand">
-            <div className="rail-brand-mark" aria-hidden="true">
-              SR
-            </div>
-            <div className="rail-brand-copy">
-              <strong>SRRM Console</strong>
-              <span>Revenue Control Tower</span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-background text-on-surface">
+      {/* SideNavBar Shell */}
+      <aside
+        className="h-screen w-56 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-4 z-50 select-none"
+      >
+        <div className="px-6 mb-4">
+          <h1 className="text-xl font-extrabold text-primary leading-tight">SRRM AI</h1>
+          <p className="text-[9px] uppercase font-bold tracking-widest text-on-surface-variant opacity-70 mt-0.5">
+            Rail Revenue Management
+          </p>
         </div>
 
-        <nav className="rail-nav">
-          {navItems.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`rail-nav-link${active ? " rail-nav-link-active" : ""}`}
-                href={item.href}
-              >
-                <span className="rail-nav-icon">
-                  <NavIcon icon={item.icon} />
-                </span>
-                <span className="rail-nav-copy">{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav className="flex-grow space-y-4 overflow-y-auto custom-scrollbar pr-1">
+          {/* Passenger Section */}
+          <div className="px-3">
+            <p className="px-4 text-[9px] font-bold text-on-surface-variant/50 uppercase tracking-widest mb-1.5">
+              Cổng Hành Khách (Portal)
+            </p>
+            {navItems
+              .filter((item) => item.group === "passenger")
+              .map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 ease-in-out cursor-pointer ${
+                      active
+                        ? "text-primary font-extrabold border-r-4 border-primary bg-surface-container-high"
+                        : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                    }`}
+                    href={item.href}
+                  >
+                    <span className="material-symbols-outlined text-base">{getIconName(item.icon)}</span>
+                    <span className="text-xs font-semibold">{item.label}</span>
+                  </Link>
+                );
+              })}
+          </div>
+
+          {/* Admin Section */}
+          <div className="px-3">
+            <p className="px-4 text-[9px] font-bold text-on-surface-variant/50 uppercase tracking-widest mb-1.5">
+              Điều Hành Doanh Thu (Control Tower)
+            </p>
+            {navItems
+              .filter((item) => item.group === "admin")
+              .map((item) => {
+                const active = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 ease-in-out cursor-pointer ${
+                      active
+                        ? "text-primary font-extrabold border-r-4 border-primary bg-surface-container-high"
+                        : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                    }`}
+                    href={item.href}
+                  >
+                    <span className="material-symbols-outlined text-base">{getIconName(item.icon)}</span>
+                    <span className="text-xs font-semibold">{item.label}</span>
+                  </Link>
+                );
+              })}
+          </div>
         </nav>
 
-        <div className="sidebar-actions">
-          <button className="rail-nav-link rail-nav-link-utility" type="button">
-            <span className="rail-nav-icon">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5A3.5 3.5 0 1 0 12 8.5Z" />
-                <path d="M19 12a7.46 7.46 0 0 0-.08-1l2.08-1.62-2-3.46-2.48 1a7.9 7.9 0 0 0-1.72-1l-.4-2.62H10.4L10 5.92a7.9 7.9 0 0 0-1.72 1l-2.48-1-2 3.46L5.88 11a7.92 7.92 0 0 0 0 2l-2.08 1.62 2 3.46 2.48-1a7.9 7.9 0 0 0 1.72 1l.4 2.62h4l.4-2.62a7.9 7.9 0 0 0 1.72-1l2.48 1 2-3.46L18.92 13c.05-.33.08-.66.08-1Z" />
-              </svg>
-            </span>
-            <span className="rail-nav-copy">Cài đặt</span>
+        <div className="px-3 mt-auto space-y-1.5 pt-2 border-t border-outline-variant">
+          <button
+            className="w-full py-2 bg-primary text-on-primary rounded-xl font-bold text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+          >
+            Generate Report
           </button>
+          <div>
+            <a
+              className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
+              href="#"
+            >
+              <span className="material-symbols-outlined text-base">settings</span>
+              <span className="text-xs">Settings</span>
+            </a>
+            <a
+              className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
+              href="#"
+            >
+              <span className="material-symbols-outlined text-base">help_outline</span>
+              <span className="text-xs">Support</span>
+            </a>
+          </div>
         </div>
       </aside>
 
-      <main className="rail-main" id="main-content">
-        <div className="rail-main-inner">
-          <header className="topbar">
-            <div className="topbar-main">
-              <div className="topbar-title-block">
-                <div className="topbar-crumbs">
-                  <p className="breadcrumb">Revenue Manager / {title}</p>
-                  <p className="eyebrow">{eyebrow}</p>
-                </div>
-                <h1>{title}</h1>
-                <p className="topbar-subtitle">Bảng điều hành dành cho đội vận hành doanh thu và điều phối chặng.</p>
-                <div className="topbar-status">
-                  <span className="topbar-status-item">Tuyến Bắc - Nam</span>
-                  <span className="topbar-status-item">Tàu SE3</span>
-                  <span className="topbar-status-item">Cập nhật 5 phút trước</span>
-                </div>
-              </div>
-
-              <div className="topbar-actions">
-                <button className="btn btn-ghost" type="button">
-                  Hôm nay, 17/07/2026
+      {/* TopNavBar Shell */}
+      <header
+        className="flex justify-between items-center h-16 px-8 w-[calc(100%-14rem)] ml-56 bg-surface border-b border-outline-variant fixed top-0 z-40"
+      >
+        <div className="flex items-center gap-8">
+          <span className="text-lg font-black text-on-surface">{title}</span>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-sm">search</span>
+            <input
+              className="pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-full text-xs w-[400px] focus:w-[480px] focus:border-primary transition-all focus:outline-none"
+              placeholder="Search routes or inventory..."
+              type="text"
+            />
+          </div>
+          <div className="h-6 w-px bg-outline-variant"></div>
+          <div className="flex items-center gap-4">
+            <button
+              className="flex items-center gap-2 px-4 py-1.5 bg-primary-container text-on-primary-container rounded-lg font-bold text-xs hover:brightness-110 transition-all scale-95 active:scale-90"
+            >
+              <span className="material-symbols-outlined text-sm">filter_alt</span>
+              Apply Filters
+            </button>
+            <div className="flex gap-2 items-center">
+              <span className="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant text-base leading-none">notifications</span>
+              <span className="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant text-base leading-none">history</span>
+              
+              {/* Interactive Profile Avatar & Popup */}
+              <div className="relative ml-2">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 px-2.5 py-1 hover:bg-surface-container-high rounded-lg cursor-pointer transition-colors text-on-surface-variant focus:outline-none select-none border border-outline-variant/35"
+                >
+                  <img
+                    className="w-6 h-6 rounded-full object-cover bg-surface-container-highest"
+                    alt="User Avatar"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcaWGkMGSlfdSbZpcl7uvv_GMlm-69Dc8roJ9Mu4gxrm3kekOE1Fuod-yisy0jt6nLjqGMLkC6qEPmtyWJdu8YP4c-ogy74ljysoAYRJmM1uzMpj0kyxTLH4i7RpHix3mI25ilCn1lV82r3WykYOsUt8o7MPvk72_GQBc0PZ4_C3vocTpESy54l0fLLxuj1Rv-pNkOxlHNAgxvrLiu0A-dZT4ycszZ7mWP2pPSUc9QidKUJwYJ86MOtPKGRCI-sMq4SKPNwhVbqXaw"
+                  />
+                  <span className="text-xs font-bold text-on-surface truncate max-w-[80px]">Admin User</span>
+                  <span className="material-symbols-outlined text-xs leading-none">arrow_drop_down</span>
                 </button>
-                <button className="btn btn-primary" type="button">
-                  Xuất báo cáo
-                </button>
 
-                <div className={`account-menu${accountOpen ? " account-menu-open" : ""}`}>
-                  <button
-                    aria-expanded={accountOpen}
-                    className="topbar-user-chip"
-                    onClick={() => setAccountOpen((value) => !value)}
-                    type="button"
-                  >
-                    <span className="topbar-user-avatar" aria-hidden="true">
-                      TN
-                    </span>
-                    <span className="topbar-user-copy">
-                      <strong>Thu Nga</strong>
-                      <small>Revenue Manager</small>
-                    </span>
-                  </button>
-
-                  {accountOpen ? (
-                    <div className="account-dropdown">
-                      <button className="account-dropdown-item" type="button">
-                        Cài đặt tài khoản
-                      </button>
-                      <button className="account-dropdown-item" type="button">
-                        Tùy chọn giao diện
-                      </button>
-                      <button className="account-dropdown-item account-dropdown-item-danger" type="button">
-                        Đăng xuất
-                      </button>
+                {showProfileMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white border border-outline-variant rounded-xl shadow-lg py-2 z-50">
+                    <div className="px-4 py-2 border-b border-outline-variant/30">
+                      <p className="font-bold text-xs text-on-surface">Admin User</p>
+                      <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">administrator@srrm.vn</p>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="py-1">
+                      <a href="#" className="flex items-center gap-3 px-4 py-2 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors">
+                        <span className="material-symbols-outlined text-sm leading-none">person</span>
+                        Thông tin cá nhân
+                      </a>
+                      <a href="#" className="flex items-center gap-3 px-4 py-2 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors">
+                        <span className="material-symbols-outlined text-sm leading-none">settings</span>
+                        Cài đặt hệ thống
+                      </a>
+                      <a href="#" className="flex items-center gap-3 px-4 py-2 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors">
+                        <span className="material-symbols-outlined text-sm leading-none">security</span>
+                        Bảo mật & Token
+                      </a>
+                    </div>
+                    <div className="border-t border-outline-variant/30 mt-1 pt-1">
+                      <a href="#" className="flex items-center gap-3 px-4 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors font-bold">
+                        <span className="material-symbols-outlined text-sm leading-none">logout</span>
+                        Đăng xuất
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          </header>
 
+            </div>
+          </div>
+        </div>
+      </header>
+      {/* Main Content Area */}
+      <main className="ml-56 mt-16 p-8">
+        <div>
           <div className="rail-content">{children}</div>
         </div>
       </main>

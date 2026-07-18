@@ -1,7 +1,8 @@
 import os
 import pickle
 import sys
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
+UTC = timezone.utc
 from typing import Any
 
 from sqlalchemy import text

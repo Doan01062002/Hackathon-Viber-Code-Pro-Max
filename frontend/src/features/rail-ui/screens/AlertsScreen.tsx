@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SectionCard } from "@/features/rail-ui/components/Primitives";
 import { apiClient } from "@/lib/api/client";
 import { alerts as mockAlerts } from "@/features/rail-ui/mockData";
 
@@ -21,10 +20,6 @@ interface LegHeatmapItem {
 interface LegHeatmapResponse {
   trip_id: number;
   legs: LegHeatmapItem[];
-}
-
-function severityClass(value: string) {
-  return value === "Trung bình" ? "severity-trung-binh" : "severity-cao";
 }
 
 export function AlertsScreen() {
@@ -72,7 +67,7 @@ export function AlertsScreen() {
 
   const alertsToRender = generatedAlerts.length > 0 ? generatedAlerts : mockAlerts.map(a => ({
     ...a,
-    type: a.title.includes("cháy vé") ? "bottleneck" : "empty"
+    type: a.title.includes("cháy vé") || a.severity === "Cao" ? "bottleneck" : "empty"
   }));
 
   const filteredAlerts = alertsToRender.filter((alert) => {
@@ -81,77 +76,113 @@ export function AlertsScreen() {
   });
 
   return (
-    <div className="page-stack">
-      <SectionCard
-        title="Bộ lọc cảnh báo"
-        subtitle="Lọc theo mức độ, loại vấn đề và nhóm chặng để xử lý theo ưu tiên."
-      >
-        <div className="scenario-strip">
-          <button 
-            className={`scenario-chip ${filterType === "all" ? "scenario-chip-active" : ""}`} 
-            type="button"
-            onClick={() => setFilterType("all")}
-          >
-            Tất cả ({alertsToRender.length})
-          </button>
-          <button 
-            className={`scenario-chip ${filterType === "bottleneck" ? "scenario-chip-active" : ""}`} 
-            type="button"
-            onClick={() => setFilterType("bottleneck")}
-          >
-            Sắp cháy vé ({alertsToRender.filter(a => a.type === "bottleneck").length})
-          </button>
-          <button 
-            className={`scenario-chip ${filterType === "empty" ? "scenario-chip-active" : ""}`} 
-            type="button"
-            onClick={() => setFilterType("empty")}
-          >
-            Trống cao ({alertsToRender.filter(a => a.type === "empty").length})
-          </button>
-        </div>
-      </SectionCard>
+    <div className="space-y-6">
 
-      <SectionCard
-        title="Danh sách cảnh báo điều hành"
-        subtitle="Tập trung vào cảnh báo đáng xử lý ngay trong ca trực hiện tại."
-      >
-        <div className="stack-list">
-          {filteredAlerts.map((item, idx) => (
-            <article className={`alert-card ${severityClass(item.severity)}`} key={idx}>
-              <div>
-                <span className="alert-pill">{item.severity}</span>
-                <strong>{item.title}</strong>
-                <p>{item.detail}</p>
+      {/* Filter Buttons */}
+      <div className="flex gap-2 border-b border-outline-variant/30 pb-4">
+        <button
+          onClick={() => setFilterType("all")}
+          className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+            filterType === "all"
+              ? "bg-primary text-on-primary"
+              : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+          }`}
+        >
+          Tất cả ({alertsToRender.length})
+        </button>
+        <button
+          onClick={() => setFilterType("bottleneck")}
+          className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+            filterType === "bottleneck"
+              ? "bg-primary text-on-primary"
+              : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+          }`}
+        >
+          Sắp cháy vé ({alertsToRender.filter(a => a.type === "bottleneck").length})
+        </button>
+        <button
+          onClick={() => setFilterType("empty")}
+          className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+            filterType === "empty"
+              ? "bg-primary text-on-primary"
+              : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+          }`}
+        >
+          Trống cao ({alertsToRender.filter(a => a.type === "empty").length})
+        </button>
+      </div>
+
+      {/* Alerts List */}
+      <div className="space-y-4">
+        {filteredAlerts.map((alert, idx) => {
+          const isHigh = alert.severity === "Cao";
+          return (
+            <div
+              key={idx}
+              className={`p-5 rounded-xl border flex justify-between items-start gap-4 transition-colors duration-200 ${
+                isHigh
+                  ? "bg-error-container/10 border-error/20 hover:bg-error-container/20"
+                  : "bg-surface border-outline-variant hover:bg-surface-container-low"
+              }`}
+            >
+              <div className="flex gap-4">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    isHigh ? "bg-error text-white" : "bg-secondary text-white"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-base">
+                    {isHigh ? "warning" : "info"}
+                  </span>
+                </div>
+                <div>
+                  <p className={`font-bold text-sm ${isHigh ? "text-error" : "text-on-surface"}`}>
+                    {alert.title}
+                  </p>
+                  <p className="text-xs text-on-surface-variant font-semibold mt-1 leading-relaxed">
+                    {alert.detail}
+                  </p>
+                </div>
               </div>
-              <button 
-                className="btn btn-ghost" 
-                type="button" 
-                onClick={() => {
-                  const routeMatch = item.title.match(/(?:Chặng|Đoạn)\s+([A-Z0-9]+)\s*→\s*([A-Z0-9]+)/i);
-                  const seatMatch = item.title.match(/\(([^)]+)\)/);
-                  
-                  const origin = routeMatch ? routeMatch[1].trim() : "HAN";
-                  const destination = routeMatch ? routeMatch[2].trim() : "DAN";
-                  
-                  let seatType = "giuong_nam_k6";
-                  if (seatMatch && seatMatch[1].includes("Ngồi mềm")) {
-                    seatType = "ngoi_mem";
-                  }
-                  
-                  router.push(`/quote?origin=${origin}&destination=${destination}&seatType=${seatType}&date=2024-01-01`);
-                }}
-              >
-                Xem chi tiết
-              </button>
-            </article>
-          ))}
-          {filteredAlerts.length === 0 && (
-            <p style={{ textAlign: "center", color: "#888", padding: "20px" }}>
-              Không có cảnh báo nào thuộc bộ lọc này.
-            </p>
-          )}
-        </div>
-      </SectionCard>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                    isHigh ? "bg-error/15 text-error" : "bg-secondary-container text-on-secondary-container"
+                  }`}
+                >
+                  {alert.severity}
+                </span>
+                <button
+                  onClick={() => {
+                    const routeMatch = alert.title.match(/(?:Chặng|Đoạn)\s+([A-Za-z0-9]+)\s*→\s*([A-Za-z0-9]+)/i);
+                    const seatMatch = alert.title.match(/\(([^)]+)\)/);
+                    
+                    const origin = routeMatch ? routeMatch[1].trim() : "HN";
+                    const destination = routeMatch ? routeMatch[2].trim() : "DAN";
+                    
+                    let seatType = "giuong_nam_k6";
+                    if (seatMatch && seatMatch[1].includes("Ngồi mềm")) {
+                      seatType = "ngoi_mem";
+                    }
+                    
+                    router.push(`/quote?origin=${origin}&destination=${destination}&seatType=${seatType}&date=2026-07-19`);
+                  }}
+                  className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface cursor-pointer"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {filteredAlerts.length === 0 && (
+          <p className="text-center text-xs text-on-surface-variant font-semibold py-8">
+            Không có cảnh báo nào thuộc bộ lọc này.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

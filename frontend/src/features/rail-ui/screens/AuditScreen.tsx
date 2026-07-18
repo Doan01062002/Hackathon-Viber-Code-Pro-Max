@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { SectionCard } from "@/features/rail-ui/components/Primitives";
+import React, { useState, useEffect } from "react";
 import { apiClient } from "@/lib/api/client";
 import { auditLogs as mockLogs } from "@/features/rail-ui/mockData";
 
@@ -75,73 +74,85 @@ export function AuditScreen() {
     : (mockLogs[selectedIndex]?.after ?? "{}");
 
   return (
-    <div className="page-stack">
+    <div className="space-y-6">
+
       {error && (
-        <div className="banner banner-warning" style={{ backgroundColor: "#3a2a18", borderLeft: "4px solid #d97706", padding: "12px", borderRadius: "6px", color: "#f59e0b", fontSize: "14px", marginBottom: "8px" }}>
-          ⚠️ <strong>Cảnh báo:</strong> {error} Đang hiển thị nhật ký Demo cục bộ.
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
+          ⚠️ Cảnh báo: {error} Đang hiển thị nhật ký Demo cục bộ.
         </div>
       )}
 
-      <SectionCard title="Bộ lọc kiểm toán" subtitle="Tìm kiếm nhanh nhật ký can thiệp theo người thao tác (actor) và hành động.">
-        <div className="form-grid">
-          <label className="field">
-            <span>Người thao tác (Actor)</span>
-            <input 
-              className="input" 
-              placeholder="Nhập tên người dùng..." 
-              value={actorFilter}
-              onChange={(e) => setActorFilter(e.target.value)}
-              style={{ backgroundColor: "#1e1e24", color: "#fff", border: "1px solid #333", borderRadius: "4px", padding: "8px" }}
-            />
-          </label>
-          <label className="field">
-            <span>Hành động</span>
-            <input 
-              className="input" 
-              placeholder="Nhập hành động (vd: Cập nhật)..." 
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-              style={{ backgroundColor: "#1e1e24", color: "#fff", border: "1px solid #333", borderRadius: "4px", padding: "8px" }}
-            />
-          </label>
-          <label className="field">
-            <span>Vai trò xác thực</span>
-            <input className="input" value="Revenue Manager" readOnly style={{ backgroundColor: "#151518", color: "#888" }} />
-          </label>
+      {/* Filter Bar */}
+      <div className="bg-white border border-outline-variant p-4 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Người thao tác (Actor)</label>
+          <input
+            className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-1.5 px-3 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Nhập tên người dùng..."
+            value={actorFilter}
+            onChange={(e) => setActorFilter(e.target.value)}
+          />
         </div>
-      </SectionCard>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Hành động</label>
+          <input
+            className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-1.5 px-3 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Nhập hành động (vd: Cập nhật)..."
+            value={actionFilter}
+            onChange={(e) => setActionFilter(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Vai trò xác thực</label>
+          <input
+            className="w-full bg-slate-100 border border-outline-variant rounded-lg py-1.5 px-3 text-xs font-semibold outline-none text-on-surface-variant"
+            value="Revenue Manager"
+            readOnly
+          />
+        </div>
+      </div>
 
-      <SectionCard
-        title="Bảng nhật ký kiểm toán hệ thống"
-        subtitle="Danh sách các lần điều chỉnh hạn ngạch, thay đổi giá trần/sàn được tự động ghi nhận."
-      >
-        <div className="table-wrap">
-          <table className="data-table audit-table">
-            <thead>
+      {/* Main Table */}
+      <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+        <div className="p-4 border-b border-outline-variant flex justify-between items-center bg-white">
+          <h3 className="font-bold text-sm text-on-surface">Audit Logs</h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-surface-container-low text-xs text-on-surface-variant font-bold uppercase">
               <tr>
-                <th>Người dùng (Actor)</th>
-                <th>Hành động thực hiện</th>
-                <th>Thực thể bị tác động (Entity)</th>
-                <th>Thời gian ghi nhận</th>
+                <th className="px-6 py-4">Người dùng (Actor)</th>
+                <th className="px-6 py-4">Hành động thực hiện</th>
+                <th className="px-6 py-4">Thực thể bị tác động (Entity)</th>
+                <th className="px-6 py-4 text-right">Thời gian ghi nhận</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-outline-variant/30 text-sm">
               {filteredLogs.map((item, idx) => {
                 const isSelected = idx === selectedIndex;
                 return (
-                  <tr 
-                    key={idx} 
+                  <tr
+                    key={idx}
                     onClick={() => setSelectedIndex(idx)}
-                    style={{ cursor: "pointer", backgroundColor: isSelected ? "#2d2d3a" : "transparent", transition: "background-color 0.2s" }}
+                    className={`cursor-pointer transition-colors duration-150 ${
+                      isSelected
+                        ? "bg-primary/5 font-bold border-l-4 border-l-primary"
+                        : "hover:bg-surface-container-low"
+                    }`}
                   >
-                    <th scope="row" style={{ color: isSelected ? "#10b981" : "#fff" }}>
+                    <td className="px-6 py-4 text-primary font-bold">
                       {logsToRender ? (item as any).actor : (item as any).actor}
-                    </th>
-                    <td>{logsToRender ? (item as any).action : (item as any).action}</td>
-                    <td>{logsToRender ? `${(item as any).entity_type} ID: ${(item as any).entity_id}` : (item as any).entity}</td>
-                    <td>
-                      {logsToRender 
-                        ? new Date((item as any).created_at).toLocaleString() 
+                    </td>
+                    <td className="px-6 py-4 text-on-surface font-semibold">
+                      {logsToRender ? (item as any).action : (item as any).action}
+                    </td>
+                    <td className="px-6 py-4 text-on-surface-variant font-medium">
+                      {logsToRender ? `${(item as any).entity_type} ID: ${(item as any).entity_id}` : (item as any).entity}
+                    </td>
+                    <td className="px-6 py-4 text-right text-on-surface-variant font-mono font-medium">
+                      {logsToRender
+                        ? new Date((item as any).created_at).toLocaleString("vi-VN")
                         : (item as any).time}
                     </td>
                   </tr>
@@ -149,7 +160,7 @@ export function AuditScreen() {
               })}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", color: "#888", padding: "20px" }}>
+                  <td colSpan={4} className="text-center text-xs text-on-surface-variant font-semibold py-8">
                     Không tìm thấy nhật ký kiểm toán nào khớp bộ lọc.
                   </td>
                 </tr>
@@ -157,19 +168,22 @@ export function AuditScreen() {
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </div>
 
-      <div className="two-up">
-        <SectionCard title="Dữ liệu trước thay đổi (Before Data)" subtitle="Trạng thái cấu hình ban đầu trước khi tác vụ diễn ra.">
-          <pre className="code-block" style={{ backgroundColor: "#111", color: "#f87171", padding: "16px", borderRadius: "6px", fontFamily: "monospace", fontSize: "13px", overflowX: "auto" }}>
+      {/* JSON Comparison panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm">
+          <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-2">Dữ liệu trước thay đổi (Before Data)</h4>
+          <pre className="bg-slate-900 text-red-400 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed max-h-64">
             {beforeJson}
           </pre>
-        </SectionCard>
-        <SectionCard title="Dữ liệu sau thay đổi (After Data)" subtitle="Giá trị cấu hình mới được áp dụng thành công.">
-          <pre className="code-block" style={{ backgroundColor: "#111", color: "#34d399", padding: "16px", borderRadius: "6px", fontFamily: "monospace", fontSize: "13px", overflowX: "auto" }}>
+        </div>
+        <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm">
+          <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-2">Dữ liệu sau thay đổi (After Data)</h4>
+          <pre className="bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-x-auto leading-relaxed max-h-64">
             {afterJson}
           </pre>
-        </SectionCard>
+        </div>
       </div>
     </div>
   );
