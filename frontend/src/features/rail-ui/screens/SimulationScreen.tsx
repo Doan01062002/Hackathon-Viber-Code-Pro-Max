@@ -23,6 +23,14 @@ export function SimulationScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeScenario, setActiveScenario] = useState<number | null>(null);
+  
+  // State quản lý Policy Modal
+  const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [floorPrice, setFloorPrice] = useState("80000");
+  const [ceilingPrice, setCeilingPrice] = useState("1500000");
+  const [maxDelta, setMaxDelta] = useState(15);
+  const [strategy, setStrategy] = useState("revenue");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
@@ -147,13 +155,13 @@ export function SimulationScreen() {
               </p>
             </div>
             <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
-              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng doanh thu (Revenue Lift)</span>
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng trưởng doanh thu</span>
               <p className="font-black mt-1 text-green-600 text-sm">
                 {simData ? `+${simData.revenue_lift_pct.toFixed(2)}%` : mockSummary.revenueLift}
               </p>
             </div>
             <div className="bg-slate-50 p-3 rounded-lg border border-outline-variant/30 text-xs">
-              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng sản lượng (Pax-KM Lift)</span>
+              <span className="text-[9px] text-on-surface-variant font-bold uppercase">Tăng trưởng sản lượng</span>
               <p className="font-black mt-1 text-blue-600 text-sm">
                 {simData ? `+${simData.passenger_km_lift_pct.toFixed(2)}%` : mockSummary.utilizationLift}
               </p>
@@ -174,7 +182,7 @@ export function SimulationScreen() {
         {/* Right Card: Comparative Bar Chart */}
         <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm flex flex-col justify-between">
           <h3 className="font-bold text-xs text-on-surface uppercase tracking-wider border-b border-outline-variant/30 pb-2 mb-4">
-            Biểu đồ so sánh kịch bản (ScenarioCompareChart)
+            Biểu đồ so sánh kịch bản
           </h3>
 
           <div className="flex justify-around items-end h-32 px-4 pb-2 border-b border-outline-variant/35">
@@ -271,10 +279,129 @@ export function SimulationScreen() {
         <button className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
           Ghi đè thủ công
         </button>
-        <button className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+        <button
+          onClick={() => setIsPolicyModalOpen(true)}
+          className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer"
+        >
           Cập nhật giới hạn chính sách
         </button>
       </div>
+
+      {/* Policy Limits Modal */}
+      {isPolicyModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-outline-variant rounded-2xl max-w-md w-full shadow-2xl p-6 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="font-extrabold text-base text-on-surface flex items-center gap-2 mb-2">
+              <span className="material-symbols-outlined text-primary">rule_settings</span>
+              Cập nhật giới hạn chính sách
+            </h3>
+            <p className="text-xs text-on-surface-variant font-medium mb-6">
+              Điều chỉnh các tham số biên độ giá trần/sàn và chiến lược áp dụng cho động cơ định giá.
+            </p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <label className="block space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Giá sàn (Min VND)</span>
+                  <input
+                    type="number"
+                    value={floorPrice}
+                    onChange={(e) => setFloorPrice(e.target.value)}
+                    className="w-full bg-slate-50 border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">Giá trần (Max VND)</span>
+                  <input
+                    type="number"
+                    value={ceilingPrice}
+                    onChange={(e) => setCeilingPrice(e.target.value)}
+                    className="w-full bg-slate-50 border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[10px] uppercase font-bold text-on-surface-variant">
+                  <span>Biến động tối đa hàng ngày</span>
+                  <span className="text-primary font-mono font-bold text-xs">{maxDelta}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="30"
+                  value={maxDelta}
+                  onChange={(e) => setMaxDelta(Number(e.target.value))}
+                  className="w-full accent-primary h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold font-mono">
+                  <span>Min: 5%</span>
+                  <span>Max: 30%</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant block">Chiến lược tối ưu hóa</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStrategy("revenue")}
+                    className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                      strategy === "revenue"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-outline-variant hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-on-surface">Tối đa hóa doanh thu</span>
+                    <span className="text-[9px] text-on-surface-variant/80 mt-1 font-medium leading-tight">Ưu tiên bán giá cao chặng dài</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStrategy("load")}
+                    className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all ${
+                      strategy === "load"
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-outline-variant hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-xs font-bold text-on-surface">Tối ưu hệ số lấp đầy</span>
+                    <span className="text-[9px] text-on-surface-variant/80 mt-1 font-medium leading-tight">Ưu tiên lấp đầy chỗ trống ngắn chặng</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 mt-4 border-t border-outline-variant/30">
+              <button
+                type="button"
+                onClick={() => setIsPolicyModalOpen(false)}
+                className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPolicyModalOpen(false);
+                  setToastMessage("Cập nhật giới hạn chính sách thành công!");
+                  setTimeout(() => setToastMessage(null), 3000);
+                }}
+                className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              >
+                Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xl border border-slate-800 flex items-center gap-2 animate-in slide-in-from-top-4 duration-200">
+          <span className="material-symbols-outlined text-green-400 text-sm">check_circle</span>
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }

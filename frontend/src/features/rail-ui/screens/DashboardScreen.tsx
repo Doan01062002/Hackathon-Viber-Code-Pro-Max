@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
+import { useQuery } from "@/lib/api/useQuery";
+import { SegmentHeatmap } from "@/features/rail-ui/components/SegmentHeatmap";
 import {
   bookingCurve as mockBookingCurve,
   gapSuggestions,
@@ -181,33 +183,26 @@ function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeCo
 }
 
 export function DashboardScreen() {
-  const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
-  const [curve, setCurve] = useState<BookingCurvePoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
-        setError(null);
-        const [heatmapRes, forecastRes] = await Promise.all([
-          apiClient.get<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1"),
-          apiClient.get<ForecastResponse>("/api/v1/forecast?trip_id=1")
-        ]);
-        
-        setLegs(heatmapRes.legs);
-        setCurve(forecastRes.booking_curve);
-      } catch (err: any) {
-        console.warn("Lỗi khi kết nối API backend, fallback sang dữ liệu mô phỏng:", err);
-        setError("Không thể đồng bộ dữ liệu thời gian thực từ Backend server.");
-      } finally {
-        setLoading(false);
-      }
-    }
+  // Sử dụng custom hook useQuery theo yêu cầu FE-02.1
+  const {
+    data: heatmapData,
+    loading: loadingHeatmap,
+    error: errorHeatmap,
+  } = useQuery<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1");
 
-    fetchData();
-  }, []);
+  const {
+    data: forecastData,
+    loading: loadingForecast,
+    error: errorForecast,
+  } = useQuery<ForecastResponse>("/api/v1/forecast?trip_id=1");
+
+  const legs = heatmapData?.legs ?? [];
+  const curve = forecastData?.booking_curve ?? [];
+
+  const loading = loadingHeatmap || loadingForecast;
+  const error = errorHeatmap || errorForecast;
 
   const legsToRender = legs.length > 0 ? legs : null;
   const curveToRender = curve.length > 0 ? curve : mockBookingCurve;
@@ -254,6 +249,24 @@ export function DashboardScreen() {
   const revenueTrend = [1.10, 1.12, 1.08, 1.15, 1.13, 1.18, 1.16, 1.22, 1.20, 1.24];
   const loadTrend = [86.5, 87.2, 86.0, 85.3, 85.5, 84.8, 85.0, 84.2, 84.5, avgLoad];
   const seatUseTrend = [0.85, 0.88, 0.86, 0.89, 0.87, 0.90, 0.88, 0.91, 0.90, 0.92];
+
+  // Mapping legs to SegmentHeatmap slots format
+  const mappedHeatmapRows = legs.length > 0
+    ? legs.map(leg => {
+        const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
+        return {
+          segment: `${leg.origin_station_code} → ${leg.destination_station_code} (${leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"})`,
+          slots: [
+            load,
+            Math.max(10, Math.min(100, load - 12)),
+            Math.max(10, Math.min(100, load + 8)),
+            Math.max(10, Math.min(100, load - 5)),
+            Math.max(10, Math.min(100, load + 15)),
+            Math.max(10, Math.min(100, load - 8)),
+          ]
+        };
+      })
+    : mockHeatmapRows;
 
   return (
     <div className="space-y-6">
@@ -326,10 +339,16 @@ export function DashboardScreen() {
           </div>
 
           <div className="flex gap-3">
-            <button className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs">
+            <button
+              onClick={() => router.push("/simulation")}
+              className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs cursor-pointer"
+            >
               Chạy mô phỏng khuyến nghị
             </button>
-            <button className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg transition-all text-xs">
+            <button
+              onClick={() => router.push("/pricing")}
+              className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg transition-all text-xs cursor-pointer"
+            >
               Mở màn hình báo giá
             </button>
           </div>
@@ -341,13 +360,20 @@ export function DashboardScreen() {
           <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4 border-b border-outline-variant/30 pb-2">
               <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider">Cảnh báo cần xử lý</h4>
-              <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded">
-                03 Nóng
-              </span>
+              <button
+                onClick={() => router.push("/alerts")}
+                className="px-2 py-0.5 bg-red-100 text-red-700 text-[9px] font-bold rounded hover:bg-red-200 transition-colors cursor-pointer"
+              >
+                Xem tất cả
+              </button>
             </div>
             <div className="space-y-3">
               {rightRailCards.quickAlerts.map((item) => (
-                <div className="flex items-start gap-2 text-xs" key={item.title}>
+                <div
+                  onClick={() => router.push("/alerts")}
+                  className="flex items-start gap-2 text-xs cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
+                  key={item.title}
+                >
                   <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${item.severity === "Cao" ? "bg-red-500" : "bg-orange-500"}`} />
                   <div>
                     <p className="font-bold text-on-surface">{item.title}</p>
@@ -374,7 +400,10 @@ export function DashboardScreen() {
           </div>
 
           {/* Trạng thái mô phỏng */}
-          <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
+          <div
+            onClick={() => router.push("/simulation")}
+            className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors"
+          >
             <h4 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-2 border-b border-outline-variant/30 pb-2">
               Trạng thái mô phỏng
             </h4>
@@ -392,35 +421,40 @@ export function DashboardScreen() {
       {/* 4 Key Bento Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Metric Card 1 */}
-        <div className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200">
+        <div
+          onClick={() => router.push("/pricing")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
           <div className="flex justify-between items-start mb-4">
             <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
-              Total Revenue
+              Tổng doanh thu
             </span>
             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
               +12.4%
             </span>
           </div>
           <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-black text-on-surface">$1.24M</span>
-            <span className="text-on-surface-variant text-xs font-semibold">USD</span>
+            <span className="text-2xl font-black text-on-surface">29.8 tỷ</span>
+            <span className="text-on-surface-variant text-xs font-semibold">VNĐ</span>
           </div>
           <div className="mt-4">
             <InteractiveSparkline
               data={revenueTrend}
               labels={sparkLabels}
-              prefix="$"
-              suffix="M"
+              suffix=" tỷ"
               strokeColor="#3525cd"
             />
           </div>
         </div>
 
         {/* Metric Card 2 */}
-        <div className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200">
+        <div
+          onClick={() => router.push("/train")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
           <div className="flex justify-between items-start mb-4">
             <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
-              Avg Load Factor
+              Hệ số lấp đầy trung bình
             </span>
             <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-bold">
               -2.1%
@@ -440,10 +474,13 @@ export function DashboardScreen() {
         </div>
 
         {/* Metric Card 3 */}
-        <div className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200">
+        <div
+          onClick={() => router.push("/simulation")}
+          className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
+        >
           <div className="flex justify-between items-start mb-4">
             <span className="text-[10px] tracking-wider uppercase font-bold text-on-surface-variant">
-              Seat-km Utilization
+              Hiệu suất Ghế-Km (ASK)
             </span>
             <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-bold">
               +5.8%
@@ -451,23 +488,26 @@ export function DashboardScreen() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-on-surface">0.92</span>
-            <span className="text-on-surface-variant text-xs font-semibold">ASK</span>
+            <span className="text-on-surface-variant text-xs font-semibold">Ghế-km</span>
           </div>
           <div className="mt-4">
             <InteractiveSparkline
               data={seatUseTrend}
               labels={sparkLabels}
-              suffix=" ASK"
+              suffix=" Ghế-km"
               strokeColor="#3525cd"
             />
           </div>
         </div>
 
         {/* Metric Card 4 */}
-        <div className="bg-surface-container border border-primary/20 p-5 rounded-xl ai-accent-border hover:bg-surface-container-high transition-colors duration-200">
+        <div
+          onClick={() => router.push("/simulation")}
+          className="bg-surface-container border border-primary/20 p-5 rounded-xl ai-accent-border hover:bg-surface-container-high transition-colors duration-200 cursor-pointer"
+        >
           <div className="flex justify-between items-start mb-4">
             <span className="text-[10px] tracking-wider uppercase text-primary font-bold">
-              Unfulfilled Demand
+              Nhu cầu chưa được đáp ứng
             </span>
             <span className="material-symbols-outlined text-primary scale-75">
               auto_awesome
@@ -475,10 +515,10 @@ export function DashboardScreen() {
           </div>
           <div className="flex items-baseline space-x-2">
             <span className="text-2xl font-black text-primary">4,122</span>
-            <span className="text-primary/70 text-xs font-semibold">Seats</span>
+            <span className="text-primary/70 text-xs font-semibold">Ghế</span>
           </div>
           <p className="mt-2 text-[11px] text-on-surface-variant leading-tight font-medium">
-            AI recommends adding capacity to SE3 for HN-Vinh segment on weekend.
+            AI đề xuất tăng năng lực chở khách cho tàu SE3 trên chặng HN-Vinh vào cuối tuần.
           </p>
         </div>
       </div>
@@ -552,7 +592,7 @@ export function DashboardScreen() {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-on-surface-variant font-medium">HN → Vinh</span>
-                  <span className="font-bold text-primary">92% LF</span>
+                  <span className="font-bold text-primary">92% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: "92%" }} />
@@ -562,7 +602,7 @@ export function DashboardScreen() {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-on-surface-variant font-medium">Vinh → Hue</span>
-                  <span className="font-bold text-primary">78% LF</span>
+                  <span className="font-bold text-primary">78% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
                   <div className="h-full bg-primary" style={{ width: "78%" }} />
@@ -572,7 +612,7 @@ export function DashboardScreen() {
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-on-surface-variant font-medium">Hue → DN</span>
-                  <span className="font-bold text-red-600">98% LF</span>
+                  <span className="font-bold text-red-600">98% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
                   <div className="h-full bg-red-500" style={{ width: "98%" }} />
@@ -583,81 +623,14 @@ export function DashboardScreen() {
 
           <div className="mt-8 p-4 bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
             <p className="text-[11px] text-on-surface-variant italic leading-relaxed">
-              Critical bottleneck detected at <span className="font-bold">Hue-DN</span>. Higher yield available through segment re-allocation.
+              Phát hiện nút cổ chai nghiêm trọng tại <span className="font-bold">Huế - Đà Nẵng</span>. Doanh thu cao hơn khả dụng thông qua việc phân bổ lại quota chặng.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Heatmap chặng chi tiết (Legs database Table) */}
-      <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-outline-variant flex justify-between items-center">
-          <div>
-            <h3 className="text-base font-bold text-on-surface">Heatmap tải chặng (Chi tiết)</h3>
-            <p className="text-xs text-on-surface-variant font-medium mt-0.5">Nhìn nhanh chặng nào đang nóng lên để mở quota ngắn.</p>
-          </div>
-          <button className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface">
-            Bộ lọc tàu và ngày
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-surface-container-low text-[11px] text-on-surface-variant uppercase font-bold">
-              <tr>
-                <th className="px-6 py-4">Chặng hành trình</th>
-                <th className="px-6 py-4">Loại chỗ</th>
-                <th className="px-6 py-4">Tồn kho ghế</th>
-                <th className="px-6 py-4">Hệ số lấp đầy</th>
-                <th className="px-6 py-4">Giá cơ hội (Bid)</th>
-                <th className="px-6 py-4">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant text-sm font-semibold">
-              {legsToRender ? (
-                legsToRender.map((leg) => {
-                  const load = Math.round(((leg.capacity - leg.remaining) / leg.capacity) * 100);
-                  return (
-                    <tr key={leg.segment_id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 text-on-surface">
-                        {leg.origin_station_code} → {leg.destination_station_code}
-                      </td>
-                      <td className="px-6 py-4 text-on-surface-variant">
-                        {leg.seat_type === "soft_seat" ? "Ngồi mềm" : "Giường nằm"}
-                      </td>
-                      <td className="px-6 py-4 font-mono">{leg.remaining} / {leg.capacity}</td>
-                      <td className={`px-6 py-4 font-mono ${heatClass(load)}`}>{load}%</td>
-                      <td className="px-6 py-4 text-green-600 font-mono">
-                        {leg.bid_price.toLocaleString("vi-VN")} VND
-                      </td>
-                      <td className="px-6 py-4">
-                        {leg.is_bottleneck ? (
-                          <span className="px-2.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] uppercase font-bold">Nút cổ chai</span>
-                        ) : (
-                          <span className="px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] uppercase font-bold">Thường</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                mockHeatmapRows.map((row) => (
-                  <tr key={row.segment} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 text-on-surface">{row.segment}</td>
-                    <td className="px-6 py-4 text-on-surface-variant">Ngồi mềm</td>
-                    <td className="px-6 py-4 font-mono">152 / 200</td>
-                    <td className={`px-6 py-4 font-mono ${heatClass(row.slots[0])}`}>{row.slots[0]}%</td>
-                    <td className="px-6 py-4 text-green-600 font-mono">350.000 VND</td>
-                    <td className="px-6 py-4">
-                      <span className="px-2.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] uppercase font-bold">Thường</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Heatmap chặng chi tiết (SegmentHeatmap Grid) */}
+      <SegmentHeatmap data={mappedHeatmapRows} />
     </div>
   );
 }
