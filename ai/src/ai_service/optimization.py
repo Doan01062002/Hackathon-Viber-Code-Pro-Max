@@ -158,7 +158,7 @@ def solve_bid_prices(
     od_products, lambda_hat: dict[int, float], nseg: int, capacity: dict[str, int] = C.CAPACITY
 ) -> dict:
     """Pipeline đầy đủ Lớp A: ma trận -> LP -> giải HiGHS -> kiểm định -> bid price +
-    quota + quy tắc chấp nhận. Đây là API công khai mà ai_service/app.py gọi.
+    quota + quy tắc chấp nhận. Đây là API công khai mà ai_service.engine.AIEngine gọi.
 
     Trả về: bid_prices[(seg,seat_type)] -> π_ℓ, quotas[od_id] -> x_j (số thực),
     accept[od_id] -> {opportunity_cost, accept}, segment_load[(seg,seat_type)] -> tải

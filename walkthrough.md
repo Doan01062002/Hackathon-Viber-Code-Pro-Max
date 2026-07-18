@@ -35,6 +35,7 @@ Tài liệu này tổng hợp toàn bộ các kết quả phát triển nghiệp
 * **[ai_client.py](file:///c:/Users/vando/OneDrive/Desktop/Hackathon-Viber-Code-Pro-Max/backend/src/backend/services/ai_client.py)**: Phát triển `AIClient` sử dụng `httpx.AsyncClient` để giao tiếp với `ai-service`:
   * **Exponential Backoff Retry:** Tự động thử lại cuộc gọi khi gặp lỗi kết nối hoặc HTTP 5xx tối đa 3 lần.
   * **In-Memory Cache:** Tự động lưu trữ (cache) kết quả bid prices tối ưu của từng ngày chạy (`service_date`).
+  * > **Đã thay đổi sau sprint này:** `ai_service` chuyển thành thư viện import thẳng, không còn HTTP. `AIClient` giờ gọi `ai_service.engine.AIEngine` qua `asyncio.to_thread`; **retry/timeout bị bỏ** (không còn lỗi mạng để retry) và **cache chuyển vào `AIEngine`**, đánh khóa theo fingerprint của λ̂ thay vì theo `service_date` — nhờ vậy tự invalidate khi model đổi dự báo.
 
 ### 5. Đặc tả OpenAPI Contracts (BE-19)
 * **[openapi.yaml](file:///c:/Users/vando/OneDrive/Desktop/Hackathon-Viber-Code-Pro-Max/contracts/openapi.yaml)**: Soạn thảo cấu trúc tài liệu OpenAPI 3.0.3 thống nhất lưu trong `contracts/` định nghĩa chi tiết URL, HTTP verb, query params, request body payload và response schema cho cả 3 dịch vụ.

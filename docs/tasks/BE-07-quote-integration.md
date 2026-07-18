@@ -1,5 +1,13 @@
 # BE-07 — Tích hợp API báo giá từ Frontend đến AI Service
 
+> **⚠️ Bản ghi lịch sử — kiến trúc đã thay đổi.** Tài liệu này mô tả BE-07 tại thời điểm
+> AI còn là microservice riêng gọi qua HTTP. Sau đó `ai_service` đã được chuyển thành
+> **thư viện Python import thẳng vào backend**: `ai/ai_service/app.py`, `ai/Dockerfile`,
+> `backend/services/ai_pricing_client.py` và các biến `AI_SERVICE_URL`/
+> `AI_SERVICE_TIMEOUT_SECONDS` đều **không còn tồn tại**. Phần *nghiệp vụ* dưới đây
+> (ánh xạ OD, snapshot bid price, policy guard, mã lỗi) vẫn đúng; chỉ phần *vận chuyển*
+> là lỗi thời. Xem `ai/README.md` và `backend/services/ai_client.py` cho trạng thái hiện tại.
+
 ## 1. Mục tiêu
 
 Tài liệu này ghi lại quá trình thay thế mock data trên màn hình báo giá bằng luồng dữ liệu thật:
@@ -9,7 +17,8 @@ Frontend Quote
     -> POST /api/v1/quote
     -> Backend ánh xạ sản phẩm OD và các chặng
     -> Tổng hợp bid price và kiểm tra tồn chỗ
-    -> POST ai-service /internal/price
+    -> Gọi AI định giá (khi đó: POST ai-service /internal/price;
+       nay: AIClient.price -> AIEngine.price, in-process)
     -> Backend áp dụng chính sách giá và quyết định chấp nhận
     -> Lưu price_quotes và trả kết quả cho Frontend
 ```
@@ -20,7 +29,7 @@ Phạm vi triển khai gồm bốn task:
 |---|---|
 | BE-07.1 | Nhận yêu cầu OD và ánh xạ các chặng |
 | BE-07.2 | Kiểm tra chấp nhận theo bid price |
-| BE-07.3 | Gọi AI service `/internal/price` |
+| BE-07.3 | Gọi AI để định giá theo snapshot |
 | BE-07.4 | Trả kết quả và bổ sung test |
 
 ## 2. Trạng thái trước khi tích hợp
@@ -121,10 +130,10 @@ Sau khi nhận giá đề xuất từ AI, backend tiếp tục áp dụng chính
 
 Quyết định cuối cùng sử dụng `final_price` sau policy guard.
 
-## 5. BE-07.3 — Gọi AI service `/internal/price`
+## 5. BE-07.3 — Gọi AI để định giá theo snapshot
 
 Backend bổ sung `AIPriceClient` trong
-`backend/src/backend/services/ai_pricing_client.py`.
+`backend/src/backend/services/ai_pricing_client.py` (nay đã gộp vào `ai_client.py`).
 
 Client gửi snapshot dữ liệu đã lấy từ PostgreSQL sang AI:
 
@@ -152,25 +161,17 @@ AI tính:
 - chặng có bid price lớn nhất làm nút cổ chai;
 - dữ liệu giải trình gồm elasticity và bid price từng chặng.
 
-Endpoint AI được mở rộng tại `ai/ai_service/app.py`. Nếu model forecast chưa có,
-pricing theo snapshot vẫn hoạt động; các endpoint forecast/optimize sẽ trả `503`
-cho đến khi model sẵn sàng.
+Nếu model forecast chưa có, pricing theo snapshot vẫn hoạt động; forecast/optimize sẽ
+trả `503` cho đến khi model sẵn sàng.
 
-Các biến cấu hình backend:
+Lỗi từ AI được chuyển thành `AIServiceError`, và public API trả HTTP `502`.
 
-```dotenv
-AI_SERVICE_URL=http://localhost:8001
-AI_SERVICE_TIMEOUT_SECONDS=10
-```
-
-Trong Docker Compose, backend sử dụng URL nội bộ:
-
-```dotenv
-AI_SERVICE_URL=http://ai-service:8001
-```
-
-Lỗi kết nối, timeout, HTTP lỗi hoặc response AI sai cấu trúc được chuyển thành
-`AIServiceError`, và public API trả HTTP `502`.
+> **Hiện tại:** `AIPriceClient` đã được gộp vào `AIClient.price` trong
+> `backend/services/ai_client.py`, gọi thẳng `ai_service.engine.AIEngine`. Không còn
+> biến `AI_SERVICE_URL`/`AI_SERVICE_TIMEOUT_SECONDS`, không còn retry/timeout mạng —
+> chỉ còn `AIEngineError` được bọc lại thành `AIServiceError`. Snapshot request giữ
+> nguyên cấu trúc như JSON ở trên, nhưng truyền bằng object `PriceRequest` thay vì JSON
+> qua mạng. Mã `502` giữ nguyên cho tương thích client.
 
 ## 6. BE-07.4 — Trả kết quả và test
 
@@ -244,7 +245,7 @@ Coverage chính:
 - accepted khi giá đủ bù chi phí cơ hội và còn chỗ;
 - rejected khi giá thấp hơn bid price hoặc hết chỗ;
 - backend gửi đúng snapshot bid price sang AI;
-- AI `/internal/price` nhận snapshot và trả giá;
+- AI nhận snapshot và trả giá;
 - response `200` đầy đủ đúng contract;
 - error response `404`, `422`, `502`;
 - frontend request khớp request contract của backend.
@@ -280,15 +281,15 @@ thị kết quả sau khi backend trả response thành công.
 
 - `backend/src/backend/controllers/pricing_controller.py`
 - `backend/src/backend/services/pricing_service.py`
-- `backend/src/backend/services/ai_pricing_client.py`
+- `backend/src/backend/services/ai_pricing_client.py` *(đã xóa — gộp vào `ai_client.py`)*
 - `backend/src/backend/views/pricing_view.py`
 - `backend/src/backend/config.py`
 
 ### AI và triển khai
 
-- `ai/ai_service/app.py`
-- `ai/ai_service/schemas.py`
-- `ai/Dockerfile`
+- `ai/ai_service/app.py` *(đã xóa — thay bằng `ai/src/ai_service/engine.py`)*
+- `ai/src/ai_service/schemas.py`
+- `ai/Dockerfile` *(đã xóa — `ai` cài kèm trong `backend/Dockerfile`)*
 - `docker-compose.yml`
 - `.env.example`
 
@@ -315,7 +316,9 @@ Các địa chỉ mặc định:
 | Frontend | `http://localhost:3000/quote` |
 | Backend | `http://localhost:8000` |
 | Backend OpenAPI | `http://localhost:8000/docs` |
-| AI service | `http://localhost:8001` |
+
+AI không còn cổng riêng — chạy in-process trong backend, xem `POST /api/v1/ai/forecast`
+và `/api/v1/ai/optimize`.
 
 Chạy kiểm tra chuẩn của dự án:
 
