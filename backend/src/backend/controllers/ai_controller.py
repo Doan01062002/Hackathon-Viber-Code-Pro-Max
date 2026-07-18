@@ -4,11 +4,10 @@ Khác với optimize_controller (chạy batch, ghi DB), controller này chỉ pr
 kết quả Khối 1 (forecast) và Khối 2 (optimize) mà không đụng tới database.
 """
 
-from ai_service.engine import InvalidRequestError, ModelNotReadyError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from backend.services.ai_client import AIClient
+from backend.services.ai_client import AIClient, AIInvalidRequestError, AIModelNotReadyError
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -33,9 +32,9 @@ async def forecast(request: ForecastRequest) -> dict:
     """Khối 1 — dự báo nhu cầu (λ̂, p10/p50/p90) cho ngày chạy tàu."""
     try:
         return await get_ai_client().get_forecast(request.service_date)
-    except InvalidRequestError as exc:
+    except AIInvalidRequestError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    except ModelNotReadyError as exc:
+    except AIModelNotReadyError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
 
 
@@ -44,7 +43,7 @@ async def optimize(request: OptimizeRequest) -> dict:
     """Khối 2 — giải DLP bid price (engine cache theo fingerprint của λ̂)."""
     try:
         return await get_ai_client().get_optimization(request.service_date)
-    except InvalidRequestError as exc:
+    except AIInvalidRequestError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    except ModelNotReadyError as exc:
+    except AIModelNotReadyError as exc:
         raise HTTPException(status_code=503, detail=str(exc))

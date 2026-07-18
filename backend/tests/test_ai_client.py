@@ -178,14 +178,16 @@ async def test_price_wraps_engine_error():
 
 
 def test_ai_client_defaults_to_shared_engine_singleton():
-    """Không truyền engine -> dùng chung singleton để model.pkl chỉ nạp một lần/process."""
+    """Không truyền engine -> chỉ nạp singleton khi request AI đầu tiên."""
     from ai_service import engine as engine_module
 
     sentinel = FakeEngine()
     original = engine_module._engine
     try:
         engine_module._engine = sentinel
-        assert AIClient()._engine is sentinel
+        client = AIClient()
+        assert client._engine is None
+        assert client._get_engine() is sentinel
     finally:
         engine_module._engine = original
 

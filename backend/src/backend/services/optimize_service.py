@@ -1,15 +1,17 @@
 from datetime import UTC, date, datetime
 from typing import Any
 
-from ai_service import datagen
-from ai_service import optimization as opt
-from ai_service.engine import MODEL_PATH, feature_rows, get_engine
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
 class OptimizeService:
     def run_optimization_batch(self, trip_id: int, db: Session) -> dict[str, Any]:
+        # Import AI theo nhu cầu để các endpoint dashboard thuần DB khởi động nhanh.
+        from ai_service import datagen
+        from ai_service import optimization as opt
+        from ai_service.engine import MODEL_PATH, feature_rows, get_engine
+
         # 1. Job đọc dữ liệu đầu vào (BE-10.1)
         trip_row = db.execute(
             text("SELECT id, service_date FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}
@@ -332,6 +334,7 @@ class OptimizeService:
         telescoping về `curve[0] = 1`.
         """
         import numpy as np
+        from ai_service.engine import get_engine
 
         curve = getattr(get_engine(), "booking_curve", None)
         if curve is not None:
@@ -377,6 +380,8 @@ class OptimizeService:
         """
         if not segments_rows:
             return 0
+
+        from ai_service import optimization as opt
 
         # Chuỗi ga của chuyến: idx 0 = ga đi của chặng đầu, idx i+1 = ga đến của chặng thứ i.
         station_ids = [segments_rows[0][2]] + [row[3] for row in segments_rows]

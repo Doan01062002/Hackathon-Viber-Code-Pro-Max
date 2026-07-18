@@ -12,8 +12,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="vi" className="light">
       <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries" />
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500&display=swap"
           rel="stylesheet"
@@ -83,7 +81,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                       lg: "0.25rem",
                       xl: "0.5rem",
                       full: "0.75rem",
-                    },
+                     },
                     spacing: {
                       base: "4px",
                       "stack-md": "1rem",
