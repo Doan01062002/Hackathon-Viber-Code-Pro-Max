@@ -69,6 +69,9 @@ class MockRedis:
 
 def get_redis_client():
     settings = get_settings()
+    if settings.app_env == "test":
+        return MockRedis.get_mock_instance()
+
     try:
         # Thử kết nối đến Redis thực tế
         # XREAD blocks for 1 second in EventWorker, so the socket timeout must be

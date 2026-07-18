@@ -4,10 +4,10 @@ Khác với optimize_controller (chạy batch, ghi DB), controller này chỉ pr
 kết quả Khối 1 (forecast) và Khối 2 (optimize) mà không đụng tới database.
 """
 
+from ai_service.engine import InvalidRequestError, ModelNotReadyError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ai_service.engine import InvalidRequestError, ModelNotReadyError
 from backend.services.ai_client import AIClient
 
 router = APIRouter(prefix="/ai", tags=["ai"])

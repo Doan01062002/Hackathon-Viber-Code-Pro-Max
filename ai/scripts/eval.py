@@ -43,7 +43,8 @@ def main():
     args = ap.parse_args()
 
     if not os.path.exists(MODEL_PATH):
-        print("Chưa có model — chạy trước: python scripts/train.py"); return
+        print("Chưa có model — chạy trước: python scripts/train.py")
+        return
     bundle = pickle.load(open(MODEL_PATH, "rb"))
     fc = bundle["forecaster"]
 

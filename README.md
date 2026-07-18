@@ -148,11 +148,16 @@ không phải sửa backend; đổi giao diện không phải sửa agent.
 | Lệnh | Việc |
 |---|---|
 | `make run` / `make run-fe` | Chạy backend / frontend |
-| `make test` | Test cả `ai` và `backend` (12 test) |
+| `make test` | Test toàn bộ `ai` và `backend` |
 | `make lint` | ruff + ESLint |
 | `make boundaries` | Kiểm tra ranh giới module |
 | `make check` | Cả ba việc trên |
 | `docker compose up --build` | Chạy full stack, không cần cài gì |
+
+Backend integration tests dùng PostgreSQL thật về mặt tính năng SQL, nhưng luôn chạy
+trên database test cô lập. GitHub Actions tự dựng PostgreSQL tạm, nạp `schema.sql` và
+fixture xác định; không kết nối RDS. Khi chạy local, xem phần kiểm thử trong
+[`docs/AWS_RDS_POSTGRES_SETUP.md`](docs/AWS_RDS_POSTGRES_SETUP.md).
 
 ## 🛠 Tech Stack
 

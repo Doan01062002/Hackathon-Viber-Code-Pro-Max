@@ -79,7 +79,9 @@ def main():
     # --- mở writer CSV ---
     def w(name, header):
         f = open(os.path.join(OUT, name), "w", newline="", encoding="utf-8")
-        wr = csv.writer(f); wr.writerow(header); return f, wr
+        wr = csv.writer(f)
+        wr.writerow(header)
+        return f, wr
 
     f_trip, wr_trip = w("trips.csv", ["id", "train_id", "service_date", "origin_station_id",
         "destination_station_id", "departure_at", "arrival_at", "status", "created_at", "updated_at"])
@@ -132,7 +134,8 @@ def main():
             wr_cap.writerow([seg_id, "ngoi_mem", C.CAPACITY["ngoi_mem"], iso(dep0), iso(dep0)])
             wr_cap.writerow([seg_id, "giuong_nam_k6", C.CAPACITY["giuong_nam_k6"], iso(dep0), iso(dep0)])
             seg_global[i] = seg_id
-            seg_times.append((cur, arr)); cur = arr
+            seg_times.append((cur, arr))
+            cur = arr
         arr_final = cur
         wr_trip.writerow([trip_id, 1, d.isoformat(), 1, 20, iso(dep0), iso(arr_final),
                           "completed", iso(dep0), iso(dep0)])
@@ -165,25 +168,29 @@ def main():
         promo_lift = C.PROMO_LIFT if promo_day else 1.0
         promo_disc = C.PROMO_DISCOUNT if promo_day else 1.0
         for k in rng.permutation(len(ods_net)):
-            od = ods_net[k]; oid = od_global[k]
+            od = ods_net[k]
+            oid = od_global[k]
             lam, *_ = datagen.lam_for(od, d)          # đã gồm chiều đi/về Tết + mùa mưa
             lam *= promo_lift
             demand = int(datagen._nb(rng, lam))
-            month_demand[d.month][0] += demand; month_demand[d.month][1] += 1
+            month_demand[d.month][0] += demand
+            month_demand[d.month][1] += 1
             if demand == 0:
                 continue
             bp = round1k(20000 + C.PRICE_PER_KM[od["seat_type"]] * od["distance_km"])
             price = round1k(bp * promo_disc * (1 + 0.10 * weekend) * (1 + rng.uniform(-0.15, 0.20)))
             med = C.WTP_MEDIAN_MULT * bp
             w_ = rng.lognormal(np.log(med), C.WTP_SIGMA_LOG, size=demand)
-            segs = od["segments"]; stype = od["seat_type"]
+            segs = od["segments"]
+            stype = od["seat_type"]
             for wi in w_:
                 # searched_at: theo lead time
                 lead = min(int(rng.exponential(12)), 59)
                 sdt = datetime(d.year, d.month, d.day, 12, 0, tzinfo=TZ) - timedelta(days=lead)
                 cap_ok = remaining[stype][segs].min() > 0 if len(segs) else False
                 if not cap_ok:
-                    srch_id += 1; tot_sold += 1
+                    srch_id += 1
+                    tot_sold += 1
                     wr_srch.writerow([srch_id, iso(sdt), od["origin_idx"] + 1, od["dest_idx"] + 1,
                                       stype, d.isoformat(), "sold_out", oid, "web", iso(sdt)])
                     continue
@@ -207,11 +214,16 @@ def main():
                 placed = False
                 for si in range(len(seat_free)):
                     if seat_free[si] <= o:
-                        seat_free[si] = dd; seat_idx_of[idx] = si; placed = True; break
+                        seat_free[si] = dd
+                        seat_idx_of[idx] = si
+                        placed = True
+                        break
                 if not placed:
-                    seat_free.append(dd); seat_idx_of[idx] = len(seat_free) - 1
+                    seat_free.append(dd)
+                    seat_idx_of[idx] = len(seat_free) - 1
             for idx, (o, dd, oid, price, is_cancel, sdt) in enumerate(items):
-                bk_id += 1; tot_bk += 1
+                bk_id += 1
+                tot_bk += 1
                 sid = seat_base[stype] + seat_idx_of[idx]
                 status = "cancelled" if is_cancel else "confirmed"
                 canc = iso(min(sdt + timedelta(days=2), datetime(d.year, d.month, d.day, tzinfo=TZ))) if is_cancel else ""
@@ -241,7 +253,8 @@ def main():
     for m in range(1, 13):
         s, n = month_demand[m]
         if n:
-            v = s / n; print(f"  tháng {m:2d}: {v:5.2f} " + "█" * int(v * 8))
+            v = s / n
+            print(f"  tháng {m:2d}: {v:5.2f} " + "█" * int(v * 8))
 
 
 if __name__ == "__main__":
