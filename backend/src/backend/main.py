@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.config import get_settings
 from backend.controllers import api_router
+from backend.controllers.checkdata_controller import router as checkdata_router
 from backend.controllers.health_controller import router as health_router
 from backend.database import dispose_engine
 
@@ -40,9 +41,20 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title=settings.app_name,
-        description="AI Agent built with LangGraph",
+        title="SRRM Backend API",
+        description=(
+            "Swagger UI for Smart Rail Revenue Management backend APIs. "
+            "Use this page to inspect request bodies, response schemas, and call endpoints during development."
+        ),
         version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
+        swagger_ui_parameters={
+            "docExpansion": "none",
+            "defaultModelsExpandDepth": -1,
+            "displayRequestDuration": True,
+        },
         lifespan=lifespan,
     )
 
@@ -55,6 +67,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
+    app.include_router(checkdata_router)
     app.include_router(api_router, prefix="/api/v1")
 
     return app

@@ -58,8 +58,8 @@
   - [x] Lưu phiên bản bid_price/price_quote (BE-17.1)
   - [x] Cơ chế khôi phục điểm trước (Rollback) (BE-17.2)
   - [x] Viết test kiểm thử rollback (BE-17.3)
-- [x] Triển khai BE-18: Client gọi ai-service tích hợp
-  - [x] Client gọi ai-service + retry/cache (BE-18.1)
+- [x] Triển khai BE-18: Client gọi AI tích hợp *(ai-service sau đó đổi thành thư viện import thẳng — bỏ HTTP/retry, cache dời vào AIEngine)*
+  - [x] Client gọi AI + retry/cache (BE-18.1)
   - [x] Cache bid price (BE-18.2)
   - [x] Viết test (BE-18.3)
 - [x] Triển khai BE-19: Tài liệu hóa API

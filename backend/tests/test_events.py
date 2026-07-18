@@ -194,6 +194,7 @@ async def test_worker_debounce_re_solve(client):
             db.execute(text("DELETE FROM bid_prices WHERE run_version = :v"), {"v": ver})
             db.execute(text("DELETE FROM quotas WHERE run_version = :v"), {"v": ver})
             db.execute(text("DELETE FROM price_quotes WHERE run_version = :v"), {"v": ver})
+            db.execute(text("DELETE FROM gap_combinations WHERE run_version = :v"), {"v": ver})
 
         db.commit()
         db.close()

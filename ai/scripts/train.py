@@ -114,7 +114,7 @@ def main():
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(bundle, f)
     print(f"[train] ✅ Đã lưu model -> {MODEL_PATH}")
-    print("[train] Giờ chạy API:  uvicorn ai_service.app:app --port 8100")
+    print("[train] Backend sẽ tự nạp model này khi khởi động:  uvicorn backend.main:app --port 8000")
 
 
 if __name__ == "__main__":

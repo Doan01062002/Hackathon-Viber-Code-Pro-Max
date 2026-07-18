@@ -1,22 +1,11 @@
-import os
-import pickle
-import sys
 from datetime import UTC, date, datetime
-
-UTC = UTC
 from typing import Any
-
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
-# Thêm thư mục ai vào sys.path để import ai_service
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
-ai_path = os.path.join(root_dir, "ai")
-if ai_path not in sys.path:
-    sys.path.append(ai_path)
 
 from ai_service import datagen
 from ai_service import optimization as opt
+from ai_service.engine import MODEL_PATH, feature_rows, get_engine
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 class OptimizeService:
@@ -63,63 +52,76 @@ class OptimizeService:
         if not od_rows:
             raise ValueError(f"Không tìm thấy sản phẩm OD nào cho chuyến tàu {trip_id}")
 
-        od_product_map = {}
-        for r in od_rows:
-            key = (r["origin_code"].upper(), r["dest_code"].upper(), r["seat_type"])
-            od_product_map[key] = r["od_product_id"]
-
-        # Lấy danh sách segments của chuyến tàu
+        # Lấy danh sách segments của chuyến tàu (đọc trước OD vì chuỗi ga suy ra từ đây).
         segments_rows = db.execute(
-            text("SELECT id, sequence_no FROM segments WHERE trip_id = :trip_id ORDER BY sequence_no ASC"),
+            text("""
+                SELECT id, sequence_no, origin_station_id, destination_station_id
+                FROM segments
+                WHERE trip_id = :trip_id
+                ORDER BY sequence_no ASC
+            """),
             {"trip_id": trip_id},
         ).fetchall()
         segment_map = {i: row[0] for i, row in enumerate(segments_rows)}
         nseg = len(segments_rows)
 
+        if not segments_rows:
+            raise ValueError(f"Chuyến tàu {trip_id} không có chặng nào")
+
+        # Chuỗi ga 0-based của chuyến: idx 0 = ga đi chặng đầu, idx i+1 = ga đến chặng thứ i.
+        station_ids = [segments_rows[0][2]] + [row[3] for row in segments_rows]
+        idx_of_station = {station_id: i for i, station_id in enumerate(station_ids)}
+
+        # Ánh xạ OD theo VỊ TRÍ ga dọc tuyến, không theo mã ga.
+        #
+        # Trước đây chỗ này ghép bằng chuỗi (origin_code, dest_code, seat_type). Mã ga của
+        # ai_service/config.py và của bảng stations viết khác nhau ở 11/20 ga (HN vs HAN,
+        # DNA vs DAN, SGN vs SGO, ...) nên chỉ 16/198 OD khớp được. Hệ quả: DLP chỉ nạp 8%
+        # nhu cầu, không chặng nào chạm trần sức chứa, bid price = 0 toàn tuyến và Khối 3
+        # không bao giờ surge. Hai bên xếp ga cùng thứ tự Bắc–Nam nên ghép theo chỉ số là
+        # đúng và không phụ thuộc cách đặt mã.
+        od_product_map = {}
+        for r in od_rows:
+            origin_idx = idx_of_station.get(r["origin_station_id"])
+            dest_idx = idx_of_station.get(r["destination_station_id"])
+            if origin_idx is None or dest_idx is None:
+                continue
+            od_product_map[(origin_idx, dest_idx, r["seat_type"])] = r["od_product_id"]
+
         # Chuẩn bị run_version duy nhất
         run_version = "ver-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         solved_at = datetime.now(UTC).isoformat()
 
-        # Tải Forecaster model
-        model_path = os.path.join(ai_path, "models", "model.pkl")
-        if not os.path.exists(model_path):
-            raise RuntimeError(f"Không tìm thấy tệp model tại {model_path}. Hãy chạy train script trước.")
-
-        with open(model_path, "rb") as f:
-            bundle = pickle.load(f)
-        forecaster = bundle["forecaster"]
+        # Dùng chung forecaster của engine singleton — trước đây chỗ này tự pickle.load
+        # model.pkl lần nữa, khiến model nằm trong RAM hai bản trong cùng process.
+        forecaster = get_engine().forecaster
+        if forecaster is None:
+            raise RuntimeError(f"Không tìm thấy tệp model tại {MODEL_PATH}. Hãy chạy train script trước.")
 
         # 2. Gọi forecast & lưu (BE-10.2)
         st, segs, ods, bn = datagen.build_network()
 
+        # Mạng lưới AI và chuyến trong DB phải cùng số ga thì chỉ số mới có nghĩa như nhau.
+        if len(st.code) != len(station_ids):
+            raise ValueError(
+                f"Mạng lưới AI có {len(st.code)} ga nhưng chuyến {trip_id} có {len(station_ids)} ga "
+                "— không ánh xạ được OD theo vị trí."
+            )
+
         # Ánh xạ OD từ mạng lưới của AI với database
         valid_network_ods = []
         for od in ods:
-            db_key = (od["origin"].upper(), od["dest"].upper(), od["seat_type"])
-            if db_key in od_product_map:
+            if (od["origin_idx"], od["dest_idx"], od["seat_type"]) in od_product_map:
                 valid_network_ods.append(od)
 
         if not valid_network_ods:
             raise ValueError("Không tìm thấy sản phẩm OD khớp giữa cấu hình AI và database")
 
         # Dự báo nhu cầu GBDT
-        from ai_service.app import _feature_rows
-
-        feature_df = _feature_rows(valid_network_ods, service_date)
+        feature_df = feature_rows(valid_network_ods, service_date)
         pred_df = forecaster.predict(feature_df)
 
-        # Phân phối point forecast qua 61 lead days (60 về 0)
-        import numpy as np
-
-        t = np.arange(60, -1, -1, dtype=float)
-        w = np.exp(-t / 15.0)
-        # Tet features check
-        for yr, tet_date in {2024: date(2024, 2, 10), 2025: date(2025, 1, 29), 2026: date(2026, 2, 17)}.items():
-            delta_tet = (tet_date - service_date).days
-            if 0 < delta_tet <= 60:
-                w += 0.5 * np.exp(-((t - 45) ** 2) / (2 * 64.0))
-        w /= w.sum()
-        weights = w.tolist()
+        weights = self._lead_day_weights(service_date)
 
         # Xóa các dự báo cũ của chuyến tàu này
         db.execute(
@@ -138,8 +140,7 @@ class OptimizeService:
         for r in pred_df.itertuples():
             od_id_val = r.od_id
             od_meta = next(x for x in valid_network_ods if x["od_id"] == od_id_val)
-            db_key = (od_meta["origin"].upper(), od_meta["dest"].upper(), od_meta["seat_type"])
-            db_od_id = od_product_map[db_key]
+            db_od_id = od_product_map[(od_meta["origin_idx"], od_meta["dest_idx"], od_meta["seat_type"])]
 
             lambda_hat = float(r.lambda_hat)
             p10 = float(r.p10)
@@ -215,8 +216,7 @@ class OptimizeService:
         quotas_count = 0
         for od_id_val, q_val in sol["quotas"].items():
             od_meta = next(x for x in valid_network_ods if x["od_id"] == od_id_val)
-            db_key = (od_meta["origin"].upper(), od_meta["dest"].upper(), od_meta["seat_type"])
-            db_od_id = od_product_map[db_key]
+            db_od_id = od_product_map[(od_meta["origin_idx"], od_meta["dest_idx"], od_meta["seat_type"])]
             quota_params.append({"od_product_id": db_od_id, "quota": int(round(q_val)), "run_version": run_version})
             quotas_count += 1
 
@@ -229,6 +229,14 @@ class OptimizeService:
                 )
             """)
             db.execute(insert_quota_query, quota_params)
+
+        # 3b. Khối 2 Lớp B — gán ghế + ghép đoạn trống (FR2.5)
+        gap_count = self._persist_gap_combinations(
+            trip_id=trip_id,
+            segments_rows=segments_rows,
+            run_version=run_version,
+            db=db,
+        )
 
         # 4. HOÁN ĐỔI (SWAP) phiên bản active atomically (BE-10.5)
         # (demand_forecasts không cần update is_active do quản lý bằng cách delete-insert trực tiếp)
@@ -271,6 +279,25 @@ class OptimizeService:
             {"run_version": run_version},
         )
 
+        # gap_combinations swap
+        db.execute(
+            text("""
+            UPDATE gap_combinations
+            SET is_active = FALSE
+            WHERE seat_id IN (SELECT id FROM seats WHERE trip_id = :trip_id)
+        """),
+            {"trip_id": trip_id},
+        )
+
+        db.execute(
+            text("""
+            UPDATE gap_combinations
+            SET is_active = TRUE
+            WHERE run_version = :run_version
+        """),
+            {"run_version": run_version},
+        )
+
         # 5. Gọi price & lưu price_quote cho tất cả OD (BE-10.4)
         from backend.services.pricing_service import PricingService
 
@@ -287,8 +314,179 @@ class OptimizeService:
             "run_version": run_version,
             "quotas_updated_count": quotas_count,
             "bid_prices_updated_count": bid_prices_count,
+            "gap_combinations_count": gap_count,
             "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công.",
         }
+
+    def _lead_day_weights(self, service_date: date) -> list[float]:
+        """Tỉ lệ nhu cầu phát sinh ở từng lead day, chỉ số 0 ứng với lead 60 ... 60 ứng với lead 0.
+
+        Dùng đường cong đặt vé ĐÃ TRAIN (fit từ lead time thật, lưu trong model.pkl). Trước
+        đây chỗ này tự viết lại `exp(-lead/15)` — đúng bằng đường LÝ THUYẾT
+        `booking_curve.fit_theoretical(60, 15)`, thứ mà module đó ghi rõ là chỉ dùng khi
+        chưa có lead time thật. Đường học được lệch đáng kể: ở lead 14 mới đặt ~28.6% chứ
+        không phải ~39.3% như đường lý thuyết.
+
+        `curve[τ]` = tỉ lệ vé đã đặt xong khi còn τ ngày (giảm dần theo τ, curve[0] = 1),
+        nên phần phát sinh đúng vào ngày còn τ ngày là `curve[τ] - curve[τ+1]`. Tổng 61 mốc
+        telescoping về `curve[0] = 1`.
+        """
+        import numpy as np
+
+        curve = getattr(get_engine(), "booking_curve", None)
+        if curve is not None:
+            c = np.asarray(curve.curve, dtype=float)[: 60 + 2]
+            if len(c) < 62:
+                c = np.concatenate([c, np.zeros(62 - len(c))])
+            # increments[lead] = c[lead] - c[lead + 1]
+            increments = np.clip(c[:61] - c[1:62], 0.0, None)
+        else:
+            # Chưa có model: quay về đường lý thuyết như cũ.
+            increments = np.exp(-np.arange(61, dtype=float) / 15.0)
+
+        # Cao điểm Tết: khách đặt sớm hơn thường lệ. Đường cong trên là trung bình toàn cục
+        # nên không bắt được hiệu ứng này — giữ lại phần nhô quanh lead 45 như bản trước.
+        for tet_date in (date(2024, 2, 10), date(2025, 1, 29), date(2026, 2, 17)):
+            delta_tet = (tet_date - service_date).days
+            if 0 < delta_tet <= 60:
+                leads = np.arange(61, dtype=float)
+                increments = increments + 0.5 * increments.max() * np.exp(-((leads - 45) ** 2) / (2 * 64.0))
+                break
+
+        total = increments.sum()
+        if total <= 0:
+            increments = np.full(61, 1.0 / 61)
+        else:
+            increments = increments / total
+
+        # Đảo về thứ tự vị trí mà chỗ gọi dùng: index 0 = lead 60, index 60 = lead 0.
+        return increments[::-1].tolist()
+
+    def _persist_gap_combinations(
+        self, trip_id: int, segments_rows: list, run_version: str, db: Session
+    ) -> int:
+        """Khối 2 Lớp B — gán ghế (interval partitioning) rồi ghép đoạn trống, ghi gap_combinations.
+
+        Khác Lớp A (chạy trên mạng lưới mô phỏng của AI rồi ánh xạ ngược về DB), Lớp B chạy
+        thẳng trên dữ liệu DB: booking thật, ghế thật, OD thật. Nhờ vậy `od_id` truyền cho AI
+        chính là `od_products.id`, không cần bảng ánh xạ nào.
+
+        AI đánh số ga theo chỉ số 0-based dọc tuyến; ở đây chỉ số đó được suy ra từ chuỗi
+        segments của chuyến (sequence_no tăng dần), nên không phụ thuộc mạng 20 ga cố định
+        trong ai_service/config.py.
+        """
+        if not segments_rows:
+            return 0
+
+        # Chuỗi ga của chuyến: idx 0 = ga đi của chặng đầu, idx i+1 = ga đến của chặng thứ i.
+        station_ids = [segments_rows[0][2]] + [row[3] for row in segments_rows]
+        idx_of_station = {station_id: i for i, station_id in enumerate(station_ids)}
+        nstations = len(station_ids)
+
+        # Ghế thật của chuyến. Ghế khóa/bảo trì xếp TRƯỚC để khớp với assign_seats — hàm đó
+        # dựng sẵn các ghế locked ở đầu danh sách rồi mới gán booking vào phần còn lại.
+        seat_rows = db.execute(
+            text("""
+                SELECT id, seat_type, status
+                FROM seats
+                WHERE trip_id = :trip_id
+                ORDER BY seat_type, (status <> 'available') DESC, coach_no, seat_no
+            """),
+            {"trip_id": trip_id},
+        ).fetchall()
+
+        seat_ids_by_type: dict[str, list[int]] = {}
+        locked_seat_count: dict[str, int] = {}
+        for seat_id, seat_type, status in seat_rows:
+            seat_ids_by_type.setdefault(seat_type, []).append(seat_id)
+            if status != "available":
+                locked_seat_count[seat_type] = locked_seat_count.get(seat_type, 0) + 1
+
+        if not seat_ids_by_type:
+            return 0
+
+        # Booking đang giữ chỗ -> khoảng [origin_idx, dest_idx) mà AI cần.
+        booking_rows = db.execute(
+            text("""
+                SELECT o.origin_station_id, o.destination_station_id, o.seat_type
+                FROM bookings b
+                JOIN od_products o ON b.od_product_id = o.id
+                WHERE o.trip_id = :trip_id AND b.status IN ('confirmed', 'held')
+            """),
+            {"trip_id": trip_id},
+        ).fetchall()
+
+        bookings = [
+            {
+                "origin_idx": idx_of_station[origin_id],
+                "dest_idx": idx_of_station[dest_id],
+                "seat_type": seat_type,
+            }
+            for origin_id, dest_id, seat_type in booking_rows
+            if origin_id in idx_of_station and dest_id in idx_of_station
+        ]
+
+        # OD đang mở bán -> ứng viên lấp vào đoạn trống.
+        od_rows = db.execute(
+            text("""
+                SELECT id, origin_station_id, destination_station_id, seat_type
+                FROM od_products
+                WHERE trip_id = :trip_id AND is_active = TRUE
+            """),
+            {"trip_id": trip_id},
+        ).fetchall()
+
+        sellable_ods = [
+            {
+                "od_id": od_id,
+                "origin_idx": idx_of_station[origin_id],
+                "dest_idx": idx_of_station[dest_id],
+                "seat_type": seat_type,
+            }
+            for od_id, origin_id, dest_id, seat_type in od_rows
+            if origin_id in idx_of_station and dest_id in idx_of_station
+        ]
+
+        seat_plan = opt.assign_seats(bookings, locked_seat_count=locked_seat_count)
+        gaps = opt.find_gap_combinations(seat_plan, sellable_ods, nstations)
+
+        # Xóa gợi ý cũ để bảng không phình theo mỗi lần chạy (bid_prices/quotas giữ lịch sử
+        # phục vụ rollback, còn gap_combinations chỉ có ý nghĩa với thế trận ghế hiện tại).
+        db.execute(
+            text("DELETE FROM gap_combinations WHERE seat_id IN (SELECT id FROM seats WHERE trip_id = :trip_id)"),
+            {"trip_id": trip_id},
+        )
+
+        gap_params = []
+        for gap in gaps:
+            seat_ids = seat_ids_by_type.get(gap["seat_type"], [])
+            # assign_seats có thể cần nhiều ghế hơn số ghế thật khi booking chồng lấn vượt
+            # sức chứa; những ghế ảo đó không có hàng trong bảng seats nên bỏ qua.
+            if gap["seat_index"] >= len(seat_ids):
+                continue
+            gap_params.append(
+                {
+                    "seat_id": seat_ids[gap["seat_index"]],
+                    "from_station_id": station_ids[gap["from_idx"]],
+                    "to_station_id": station_ids[gap["to_idx"]],
+                    "suggested_od_product_id": gap["suggest_od_id"],
+                    "run_version": run_version,
+                }
+            )
+
+        if gap_params:
+            db.execute(
+                text("""
+                    INSERT INTO gap_combinations (
+                        seat_id, from_station_id, to_station_id, suggested_od_product_id, run_version, is_active
+                    ) VALUES (
+                        :seat_id, :from_station_id, :to_station_id, :suggested_od_product_id, :run_version, FALSE
+                    )
+                """),
+                gap_params,
+            )
+
+        return len(gap_params)
 
     def get_run_versions(self, trip_id: int, db: Session) -> list[dict[str, Any]]:
         """Lấy danh sách các phiên bản chạy (run_version) của chuyến tàu."""
