@@ -19,6 +19,8 @@ function getIconName(icon: string) {
     case "alert": return "notifications";
     case "audit": return "history";
     case "train": return "train";
+    case "simulation": return "trending_up";
+    case "ticket_details": return "receipt";
     default: return "menu";
   }
 }

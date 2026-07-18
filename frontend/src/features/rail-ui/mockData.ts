@@ -7,8 +7,10 @@ export type NavItem = {
 
 export const navItems: NavItem[] = [
   { href: "/booking", label: "Đặt vé tàu", icon: "confirmation_number", group: "passenger" },
+  { href: "/ticket-details", label: "Chi tiết vé tàu", icon: "ticket_details", group: "passenger" },
   { href: "/dashboard", label: "Tổng quan", icon: "dashboard", group: "admin" },
   { href: "/quote", label: "Báo giá", icon: "price", group: "admin" },
+  { href: "/simulation", label: "Mô phỏng", icon: "simulation", group: "admin" },
   { href: "/alerts", label: "Cảnh báo", icon: "alert", group: "admin" },
   { href: "/audit", label: "Kiểm toán", icon: "audit", group: "admin" },
   { href: "/train-layout", label: "Toa tàu", icon: "train", group: "admin" },
