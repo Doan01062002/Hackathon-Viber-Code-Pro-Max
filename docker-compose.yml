@@ -31,18 +31,8 @@ services:
       retries: 5
     restart: unless-stopped
 
-  ai-service:
-    build:
-      context: ./ai
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
+  # Không còn service ai-service riêng: package `ai` được cài thẳng vào image backend
+  # (xem backend/Dockerfile) và gọi in-process qua ai_service.engine.AIEngine.
 
   backend:
     build:
@@ -52,7 +42,6 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/srrm
-      - AI_SERVICE_URL=http://ai-service:8001
     env_file:
       - .env
     volumes:
@@ -61,8 +50,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      ai-service:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:

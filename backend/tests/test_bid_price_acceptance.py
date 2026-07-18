@@ -3,7 +3,7 @@ UTC = timezone.utc
 
 import pytest
 
-from backend.services.ai_pricing_client import AIPriceResult
+from backend.services.ai_client import AIPriceResult
 from backend.services.pricing_service import PricingService, evaluate_bid_price
 from backend.views.pricing_view import PricingQuoteRequest
 

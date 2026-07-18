@@ -1,12 +1,14 @@
 # SRRM `ai-service` — phần AI (Khối 1/2/3)
 
-Bản hiện thực chạy được của **phần AI** cho hệ thống Smart Rail Revenue Management (đường sắt Bắc–Nam, 20 ga). Bao gồm bộ sinh dữ liệu mô phỏng, ba khối AI, và FastAPI theo hợp đồng `/internal/*`.
+Bản hiện thực chạy được của **phần AI** cho hệ thống Smart Rail Revenue Management (đường sắt Bắc–Nam, 20 ga). Bao gồm bộ sinh dữ liệu mô phỏng và ba khối AI.
+
+> **Đây là thư viện Python, không phải service.** Trước đây `ai_service` chạy riêng thành một FastAPI microservice (`app.py`, cổng 8100/8001) và backend gọi sang qua HTTP. Giờ backend `pip install -e ./ai` rồi **import thẳng** `ai_service.engine.AIEngine` — không còn HTTP, không còn retry/timeout mạng, không còn container `ai-service` trong docker-compose. Điểm vào duy nhất cho backend là `engine.py`; xem `backend/services/ai_client.py`.
 
 ## Cấu trúc
 
 ```
-ai-service/
-  ai_service/
+ai/
+  src/ai_service/
     config.py         # 20 ga, cự ly, sức chứa, giá, hệ số (neo theo số liệu thật)
     datagen.py        # bộ sinh dữ liệu (+ thời tiết, khuyến mãi, chiều đi/về Tết)
     unconstraining.py # KHỐI 1 — EM giải kiểm duyệt cầu (censored Poisson)
@@ -15,8 +17,8 @@ ai-service/
     optimization.py   # KHỐI 2 — DLP bid price (HiGHS) + gán ghế + ghép đoạn
     pricing.py        # KHỐI 3 — markup trên bid price + co giãn + diễn giải
     adapter.py        # ETL 21 bảng CSV -> history (+ đặc trưng mới)
-    schemas.py        # hợp đồng JSON (pydantic)
-    app.py            # FastAPI /internal/forecast|optimize|price
+    schemas.py        # hợp đồng dữ liệu (pydantic) giữa backend và AI
+    engine.py         # AIEngine — điểm vào backend import: forecast/optimize/price
   scripts/
     eda.py            # khám phá dữ liệu + kiểm định feature set
     gen_data.py       # xuất 21 bảng seeds (CSV+JSON)
@@ -57,14 +59,25 @@ python scripts/eval_pricing.py                              # KHỐI 3: quét tr
 # 5) Unit test (EM unconstraining + booking curve)
 python tests/test_unconstraining.py && python tests/test_booking_curve.py
 
-# 6) Chạy API — app NẠP model đã train, KHÔNG train lúc khởi động
-uvicorn ai_service.app:app --port 8100
-#   POST /internal/forecast  {"service_date":"2024-02-11"}
-#   POST /internal/optimize  {"service_date":"2024-02-11"}
-#   POST /internal/price     {"od_id": 12, "service_date":"2024-02-11"}
+# 6) Phục vụ — không chạy service riêng nữa, backend nạp model đã train khi khởi động
+pip install -e ./ai -e ./backend
+uvicorn backend.main:app --port 8000
+#   POST /ai/forecast  {"service_date":"2024-02-11"}
+#   POST /ai/optimize  {"service_date":"2024-02-11"}
 ```
 
-> **Quy trình MVP:** train **một lần** bằng `scripts/train.py` (lưu `models/model.pkl`) → app chỉ nạp model để phục vụ. Khi dữ liệu thay đổi thì **chạy lại `train.py`** (thủ công). Chưa đưa train định kỳ/drift vào MVP — bước train đã tách riêng nên sau này chỉ cần bọc bằng scheduler là xong.
+Gọi trực tiếp trong Python (không qua backend):
+
+```python
+from ai_service.engine import get_engine
+from ai_service.schemas import ForecastRequest
+
+get_engine().forecast(ForecastRequest(service_date="2024-02-11"))
+```
+
+`get_engine()` là singleton: `models/model.pkl` chỉ nạp **một lần cho mỗi process**. Các method của `AIEngine` là **đồng bộ và nặng CPU** — backend bọc chúng bằng `asyncio.to_thread` để không chặn event loop; code async nào gọi thẳng engine cũng phải làm vậy.
+
+> **Quy trình MVP:** train **một lần** bằng `scripts/train.py` (lưu `models/model.pkl`) → backend chỉ nạp model để phục vụ. Khi dữ liệu thay đổi thì **chạy lại `train.py`** (thủ công). Chưa đưa train định kỳ/drift vào MVP — bước train đã tách riêng nên sau này chỉ cần bọc bằng scheduler là xong.
 
 ## Ba khối AI
 
@@ -96,7 +109,7 @@ KHỐI 3: HN→ĐN (giường, qua nút cổ chai) surge 1.55M; HN→Phủ Lý (
 
 ## Ghi chú thiết kế / triển khai thật
 
-- **ai-service stateless về nghiệp vụ.** Bản demo tự sinh data + train khi khởi động để chạy được ngay. Triển khai thật: **backend đẩy snapshot dữ liệu vào payload**, ai-service không đọc DB.
+- **ai_service stateless về nghiệp vụ.** Thư viện AI **không đọc DB** — backend đọc DB rồi đẩy snapshot vào request (rõ nhất ở `AIClient.price`: bid price lấy từ bảng `bid_prices` rồi truyền xuống). Ranh giới này giữ nguyên sau khi bỏ HTTP; nếu sau này cần tách lại thành service riêng thì chỉ việc bọc `AIEngine` bằng một lớp HTTP.
 - **Ground-truth** (λ thật) do `datagen` sinh ra — để ngoài DB vận hành, dùng chấm điểm Phase 1.
 - **Có thể thay** `HistGradientBoostingRegressor` bằng **LightGBM** (production); thay `scipy HiGHS` bằng **OR-Tools/Gurobi** nếu cần. Interface không đổi.
 - Ánh xạ đầu ra với 21 bảng schema: `demand_forecasts` (Khối 1), `bid_prices`/`quotas` (Khối 2A), `seat`/`gap_combinations` (Khối 2B), `price_quotes` (Khối 3).
