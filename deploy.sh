@@ -9,8 +9,10 @@ export PIP_BREAK_SYSTEM_PACKAGES=1
 echo "=== [1/4] Tạo file môi trường .env ==="
 cat << 'EOF' > .env
 DATABASE_URL="postgresql+psycopg://appadmin:dtkien2003@viber-coding-pro-max-db.czciyckimjww.ap-southeast-1.rds.amazonaws.com:5432/viber_coding_pro_max?sslmode=require"
+CORS_ORIGINS="*"
 EOF
-echo "Đã tạo xong file .env kết nối RDS PostgreSQL."
+echo "Đã tạo xong file .env kết nối RDS PostgreSQL và cấu hình CORS origins."
+
 
 echo "=== [2/4] Kiểm tra và tự động cài đặt pip cho User ==="
 # Kiểm tra nếu python3 -m pip hoạt động, nếu không thì tự cài pip cho user
