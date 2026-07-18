@@ -8,12 +8,19 @@ DATABASE_URL="postgresql+psycopg://appadmin:dtkien2003@viber-coding-pro-max-db.c
 EOF
 echo "Đã tạo xong file .env kết nối RDS PostgreSQL."
 
-echo "=== [2/4] Cài đặt dependencies (ai + backend) vào không gian User ==="
-# Nâng cấp pip cho user
-pip3 install --user --upgrade pip || echo "Bỏ qua nâng cấp pip"
+echo "=== [2/4] Kiểm tra và tự động cài đặt pip cho User ==="
+# Kiểm tra nếu python3 -m pip hoạt động, nếu không thì tự cài pip cho user
+if ! python3 -m pip --version >/dev/null 2>&1; then
+    echo "pip không tìm thấy. Đang tải và cài đặt pip cục bộ..."
+    curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    python3 get-pip.py --user
+    rm get-pip.py
+fi
 
-# Cài đặt toàn bộ gói thư viện trực tiếp vào user space (không cần venv)
-pip3 install --user -r requirements.txt
+# Cài đặt toàn bộ gói thư viện trực tiếp vào user space thông qua python3 -m pip
+python3 -m pip install --user --upgrade pip || echo "Bỏ qua nâng cấp pip"
+python3 -m pip install --user -r requirements.txt
+
 
 echo "=== [3/4] Khởi chạy Backend ngầm dưới cổng 8000 ==="
 # Tắt tiến trình cũ đang chạy trên cổng 8000 (nếu có)
