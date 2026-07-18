@@ -10,7 +10,7 @@ export const navItems: NavItem[] = [
   { href: "/dashboard", label: "Tổng quan", icon: "dashboard", group: "admin" },
   { href: "/quote", label: "Báo giá", icon: "price", group: "admin" },
   { href: "/simulation", label: "Mô phỏng", icon: "simulation", group: "admin" },
-  { href: "/alerts", label: "Cảnh báo", icon: "alert", group: "admin" },
+  { href: "/alerts", label: "Dự đoán & Cảnh báo", icon: "alert", group: "admin" },
   { href: "/audit", label: "Kiểm toán", icon: "audit", group: "admin" },
   { href: "/train-layout", label: "Toa tàu", icon: "train", group: "admin" },
 ];
