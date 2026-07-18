@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"style: scale global font size by +2px for better readability\"");
+  runCmd("git commit -m \"feat: add train logo to sidebar, scale sidebar headings size, and remove useless header filter button\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");
