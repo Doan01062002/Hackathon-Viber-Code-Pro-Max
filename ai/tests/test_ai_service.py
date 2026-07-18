@@ -50,10 +50,7 @@ def test_optimize(client):
 
 def test_price_without_policy(client):
     """Kiểm tra endpoint tính giá /internal/price không kèm chính sách."""
-    response = client.post("/internal/price", json={
-        "od_id": 1,
-        "service_date": "2026-07-20"
-    })
+    response = client.post("/internal/price", json={"od_id": 1, "service_date": "2026-07-20"})
     assert response.status_code == 200
     data = response.json()
     assert data["od_id"] == 1
@@ -63,12 +60,9 @@ def test_price_without_policy(client):
 
 def test_price_with_policy(client):
     """Kiểm tra endpoint tính giá /internal/price có trần/sàn."""
-    response = client.post("/internal/price", json={
-        "od_id": 1,
-        "service_date": "2026-07-20",
-        "min_price": 200000.0,
-        "max_price": 600000.0
-    })
+    response = client.post(
+        "/internal/price", json={"od_id": 1, "service_date": "2026-07-20", "min_price": 200000.0, "max_price": 600000.0}
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["od_id"] == 1

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api/client";
 import { alerts as mockAlerts } from "@/features/rail-ui/mockData";
 
@@ -22,6 +23,7 @@ interface LegHeatmapResponse {
 }
 
 export function AlertsScreen() {
+  const router = useRouter();
   const [legs, setLegs] = useState<LegHeatmapItem[]>([]);
   const [filterType, setFilterType] = useState<"all" | "bottleneck" | "empty">("all");
   const [loading, setLoading] = useState(true);
@@ -152,8 +154,21 @@ export function AlertsScreen() {
                   {alert.severity}
                 </span>
                 <button
-                  onClick={() => window.alert(`Chi tiết cảnh báo: ${alert.title}`)}
-                  className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface"
+                  onClick={() => {
+                    const routeMatch = alert.title.match(/(?:Chặng|Đoạn)\s+([A-Za-z0-9]+)\s*→\s*([A-Za-z0-9]+)/i);
+                    const seatMatch = alert.title.match(/\(([^)]+)\)/);
+                    
+                    const origin = routeMatch ? routeMatch[1].trim() : "HN";
+                    const destination = routeMatch ? routeMatch[2].trim() : "DAN";
+                    
+                    let seatType = "giuong_nam_k6";
+                    if (seatMatch && seatMatch[1].includes("Ngồi mềm")) {
+                      seatType = "ngoi_mem";
+                    }
+                    
+                    router.push(`/quote?origin=${origin}&destination=${destination}&seatType=${seatType}&date=2026-07-19`);
+                  }}
+                  className="px-3 py-1.5 border border-outline-variant rounded-md text-xs font-bold hover:bg-surface-container transition-colors text-on-surface cursor-pointer"
                 >
                   Xem chi tiết
                 </button>

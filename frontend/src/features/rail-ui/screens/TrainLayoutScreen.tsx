@@ -1,161 +1,268 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { seatApi } from "@/features/rail-ui/api/seatApi";
+import type { CoachDto, SeatPlanDto, GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
 
 export function TrainLayoutScreen() {
+  const router = useRouter();
+  const [coaches, setCoaches] = useState<CoachDto[]>([]);
+  const [selectedCoachNo, setSelectedCoachNo] = useState<string>("01");
+  const [seatPlan, setSeatPlan] = useState<SeatPlanDto | null>(null);
+  const [gapSuggestions, setGapSuggestions] = useState<GapSuggestionDto[]>([]);
+  
+  const [loadingCoaches, setLoadingCoaches] = useState(false);
+  const [loadingLayout, setLoadingLayout] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 1. Tải danh sách toa tàu và gợi ý ghép chặng
+  async function loadInitialData() {
+    try {
+      setLoadingCoaches(true);
+      setError(null);
+      
+      const [coachesData, suggestionsData] = await Promise.all([
+        seatApi.getCoaches(1),
+        seatApi.getGapSuggestions(1)
+      ]);
+      
+      setCoaches(coachesData);
+      setGapSuggestions(suggestionsData);
+      
+      const params = new URLSearchParams(window.location.search);
+      const urlCoach = params.get("coach");
+      if (urlCoach && coachesData.some(c => c.coach_no === urlCoach)) {
+        setSelectedCoachNo(urlCoach);
+      } else if (coachesData.length > 0) {
+        setSelectedCoachNo(coachesData[0].coach_no);
+      }
+    } catch (err) {
+      console.error("Lỗi tải dữ liệu tàu:", err);
+      setError("Không thể tải danh sách toa tàu.");
+    } finally {
+      setLoadingCoaches(false);
+    }
+  }
+
+  // 2. Tải sơ đồ ghế của toa tàu đang chọn
+  async function loadSeatLayout(coachNo: string) {
+    try {
+      setLoadingLayout(true);
+      const data = await seatApi.getSeatLayout(1, coachNo);
+      setSeatPlan(data);
+    } catch (err) {
+      console.error("Lỗi tải sơ đồ ghế:", err);
+    } finally {
+      setLoadingLayout(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCoachNo) {
+      loadSeatLayout(selectedCoachNo);
+    }
+  }, [selectedCoachNo]);
+
+  // CSS classes map for seats layout
+  const getSeatStyles = (status: string) => {
+    if (status === "selected") return "bg-primary text-white shadow-md shadow-primary/20 scale-105 border-primary";
+    if (status === "held") return "bg-yellow-100 border-yellow-300 text-yellow-800 font-bold";
+    if (status === "confirmed") return "bg-slate-300 text-slate-500 cursor-not-allowed border-transparent";
+    if (status === "blocked") return "bg-red-100 border-red-300 text-red-800 font-bold shadow-[0_0_8px_rgba(239,68,68,0.15)]";
+    return "bg-white border border-outline-variant hover:border-primary text-on-surface";
+  };
+
+  const translateSeatType = (type: string) => {
+    if (type === "ngoi_mem") return "Toa Ngồi mềm điều hòa";
+    if (type === "giuong_nam_k6") return "Toa Giường nằm K6";
+    return type;
+  };
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
+          ⚠️ Cảnh báo: {error}
+        </div>
+      )}
+
       {/* Header Section with Quick Stats */}
-      <section className="flex justify-end items-end mb-6">
+      <section className="flex justify-between items-center mb-6 border-b border-outline-variant/30 pb-4">
+        <div>
+          <h2 className="text-lg font-black text-on-surface">Giám sát và Phân bổ Chỗ ngồi</h2>
+          <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+            Quản lý tồn kho ghế vật lý, thiết lập giới hạn quota chặng và cấu hình bid price.
+          </p>
+        </div>
         <div className="flex gap-2">
-          <button className="px-6 py-2 border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-all text-xs">
-            Segmenting
+          <button className="px-4 py-2 border border-primary text-primary font-bold rounded-lg hover:bg-primary/5 transition-all text-xs cursor-pointer">
+            Phân đoạn Quota chặng
           </button>
-          <button className="px-6 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs shadow-md">
-            Reallocating Quotas
+          <button className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg hover:brightness-110 transition-all text-xs shadow-md cursor-pointer">
+            Tái phân bổ tự động
           </button>
         </div>
       </section>
 
-      {/* Bento Grid Layout */}
+      {/* Train Capacity Map (Full Width Visual) */}
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <h3 className="font-bold text-on-surface flex items-center gap-2 mb-6">
+          <span className="material-symbols-outlined text-primary">train</span>
+          Sơ đồ tải trọng đoàn tàu: Tàu Thống Nhất SE1
+        </h3>
+
+        {loadingCoaches ? (
+          <p className="text-center text-xs text-on-surface-variant py-6 font-semibold">Đang tải danh sách toa...</p>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar select-none">
+            {/* Locomotive Engine */}
+            <div className="min-w-[80px] h-20 bg-slate-200 text-slate-500 rounded-l-full flex flex-col items-center justify-center border-2 border-slate-300">
+              <span className="material-symbols-outlined text-2xl">speed</span>
+              <span className="text-[7px] font-black uppercase mt-0.5">Đầu Tàu</span>
+            </div>
+
+            {/* Coaches List */}
+            {coaches.map((coach) => {
+              const isActive = selectedCoachNo === coach.coach_no;
+              const occupancyVal = parseInt(coach.occupancy.replace("%", "")) || 0;
+
+              return (
+                <div
+                  key={coach.coach_no}
+                  onClick={() => setSelectedCoachNo(coach.coach_no)}
+                  className={`min-w-[145px] h-20 rounded-xl p-3 border flex flex-col justify-between cursor-pointer transition-all duration-150 ${
+                    isActive
+                      ? "border-2 border-primary bg-primary/5 ring-1 ring-primary"
+                      : "bg-white border-outline-variant hover:bg-slate-50 text-on-surface-variant"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-on-surface">TOA {coach.coach_no}</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-black ${
+                        occupancyVal >= 90
+                          ? "bg-red-100 text-red-700"
+                          : occupancyVal >= 70
+                          ? "bg-green-100 text-green-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {coach.occupancy}
+                    </span>
+                  </div>
+
+                  {/* Visual slots inside the car */}
+                  <div className="grid grid-cols-4 gap-1">
+                    <div className={`h-2 rounded-full ${occupancyVal > 20 ? "bg-primary" : "bg-slate-200"}`} />
+                    <div className={`h-2 rounded-full ${occupancyVal > 40 ? "bg-primary" : "bg-slate-200"}`} />
+                    <div className={`h-2 rounded-full ${occupancyVal > 60 ? "bg-primary" : "bg-slate-200"}`} />
+                    <div className={`h-2 rounded-full ${occupancyVal > 80 ? "bg-red-500" : "bg-slate-200"}`} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Two Column Seats Layout */}
       <div className="grid grid-cols-12 gap-6">
-        {/* Train Capacity Map (Full Width Visual) */}
-        <div className="col-span-12 bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-on-surface flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">train</span>
-              Train Capacity Map: High-Speed Unit #8421
-            </h3>
-            <div className="flex gap-4 text-xs font-semibold">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-primary rounded-sm" />
-                Reserved
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-secondary-container rounded-sm" />
-                Available
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-error-container rounded-sm" />
-                High Bid Lock
+        {/* Seat Map Panel */}
+        <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+          <h3 className="font-bold text-sm text-on-surface mb-1 flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-sm">airline_seat_recline_normal</span>
+            Sơ đồ chỗ ngồi chi tiết
+          </h3>
+          <p className="text-xs text-on-surface-variant font-medium mb-6">
+            {seatPlan ? `${seatPlan.route} • Toa ${selectedCoachNo} (${translateSeatType(seatPlan.seat_type)})` : "Chọn toa tàu để xem chi tiết"}
+          </p>
+
+          {loadingLayout ? (
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Đang tải sơ đồ ghế...</p>
+          ) : seatPlan ? (
+            <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50/50 max-w-xl mx-auto flex items-stretch">
+              <div className="w-full flex flex-col gap-3 py-1 overflow-x-auto custom-scrollbar">
+                {seatPlan.seats.map((row, rowIndex) => {
+                  const cols = seatPlan.seat_type === "ngoi_mem" ? 4 : 6;
+                  return (
+                    <div className="flex flex-row justify-center items-center gap-3" key={`row-${rowIndex}`}>
+                      {row.map((seat, seatIndex) => {
+                        const seatNum = rowIndex * cols + seatIndex + 1;
+                        return (
+                          <button
+                            key={`seat-${rowIndex}-${seatIndex}`}
+                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-default ${getSeatStyles(seat)}`}
+                            type="button"
+                          >
+                            {seatNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar">
-            {/* Engine */}
-            <div className="min-w-[80px] h-20 bg-slate-100 rounded-l-full flex items-center justify-center border-2 border-slate-200">
-              <span className="material-symbols-outlined text-slate-400 text-2xl">speed</span>
-            </div>
-
-            {/* Car 1 (First Class) */}
-            <div className="min-w-[140px] h-20 bg-surface-container-low border border-primary/20 rounded-lg p-2 train-car flex flex-col justify-between cursor-pointer">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-primary">CAR 01 (F)</span>
-                <span className="text-[10px] px-1 bg-primary-container text-white rounded font-bold">92%</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-secondary-container rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-              </div>
-            </div>
-
-            {/* Car 2 (First Class) */}
-            <div className="min-w-[140px] h-20 bg-surface-container-low border border-primary/20 rounded-lg p-2 train-car flex flex-col justify-between cursor-pointer">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-bold text-primary">CAR 02 (F)</span>
-                <span className="text-[10px] px-1 bg-primary-container text-white rounded font-bold">78%</span>
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-secondary-container rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-primary rounded-full" />
-                <div className="h-2 bg-secondary-container rounded-full" />
-                <div className="h-2 bg-secondary-container rounded-full" />
-              </div>
-            </div>
-
-            {/* Car 3 (Bar) */}
-            <div className="min-w-[100px] h-20 bg-tertiary-fixed rounded-lg p-2 flex flex-col items-center justify-center border border-outline-variant">
-              <span className="material-symbols-outlined text-on-tertiary-fixed-variant text-xl">local_cafe</span>
-              <span className="text-[8px] font-bold uppercase mt-1">Bistro</span>
-            </div>
-
-            {/* Cars 4-6 (Standard) */}
-            <div className="flex gap-2">
-              <div className="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between cursor-pointer">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-on-surface-variant">CAR 04</span>
-                  <span className="text-[10px] px-1 bg-error-container text-error rounded font-bold">98%</span>
-                </div>
-                <div className="grid grid-cols-4 gap-1">
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-error-container rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                </div>
-              </div>
-
-              <div className="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between cursor-pointer">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-on-surface-variant">CAR 05</span>
-                  <span className="text-[10px] px-1 bg-secondary-container text-on-secondary-container rounded font-bold">45%</span>
-                </div>
-                <div className="grid grid-cols-4 gap-1">
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                </div>
-              </div>
-
-              <div className="min-w-[140px] h-20 bg-white border border-outline-variant rounded-lg p-2 train-car flex flex-col justify-between cursor-pointer">
-                <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-on-surface-variant">CAR 06</span>
-                  <span className="text-[10px] px-1 bg-secondary-container text-on-secondary-container rounded font-bold">62%</span>
-                </div>
-                <div className="grid grid-cols-4 gap-1">
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-primary rounded-full" />
-                  <div className="h-2 bg-secondary-container rounded-full" />
-                </div>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Không có dữ liệu sơ đồ ghế.</p>
+          )}
         </div>
 
-        {/* Seat Inventory Table (Left Side) */}
+        {/* Legend and Operations Panel */}
+        <div className="col-span-12 lg:col-span-4 bg-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="font-bold text-sm text-on-surface mb-4 border-b border-outline-variant/30 pb-2">
+              Chú giải và Thao tác can thiệp
+            </h3>
+
+            {seatPlan ? (
+              <div className="space-y-3 mb-6">
+                {seatPlan.seatLegend.map((item) => (
+                  <div className="flex items-center gap-3 py-1" key={item.label}>
+                    <span 
+                      className={`w-6 h-6 rounded border ${getSeatStyles(item.tone)} flex items-center justify-center`}
+                    />
+                    <span className="text-xs font-bold text-on-surface-variant">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <button
+              onClick={() => window.alert("Đã gửi yêu cầu điều chỉnh trạng thái ghế lên hệ thống vận hành.")}
+              className="w-full py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm"
+            >
+              Giữ hoặc mở khóa ghế
+            </button>
+            <button className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+              Ưu tiên bán nhóm ghế
+            </button>
+            <button className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+              Chuyển sang Quota chặng ngắn
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Seat Inventory Table & AI Suggestions */}
+      <div className="grid grid-cols-12 gap-6">
+        {/* Seat Inventory Card */}
         <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-outline-variant flex justify-between items-center">
-            <h3 className="font-bold text-on-surface">Seat Inventory Allocation</h3>
+            <h3 className="font-bold text-on-surface text-sm">Phân bổ tồn kho chỗ ngồi chặng (Inventory Allocation)</h3>
             <div className="flex gap-2">
-              <span className="px-2 py-1 bg-surface-container-low text-primary rounded text-[10px] font-bold">
-                LONG LEG (80%)
+              <span className="px-2 py-0.5 bg-surface-container-low text-primary rounded text-[9px] font-bold">
+                CHẶNG DÀI (80%)
               </span>
-              <span className="px-2 py-1 bg-secondary-container text-on-secondary-container rounded text-[10px] font-bold">
-                SHORT LEG (20%)
+              <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[9px] font-bold">
+                CHẶNG NGẮN (20%)
               </span>
             </div>
           </div>
@@ -164,70 +271,70 @@ export function TrainLayoutScreen() {
             <table className="w-full text-left">
               <thead className="bg-surface-container-low text-on-surface-variant font-bold text-xs">
                 <tr>
-                  <th className="px-6 py-4">SEGMENT</th>
-                  <th class="px-6 py-4">CLASS</th>
-                  <th class="px-6 py-4">ALLOCATED</th>
-                  <th class="px-6 py-4">BOOKED</th>
-                  <th class="px-6 py-4">BID PRICE</th>
-                  <th class="px-6 py-4 text-right">OPTIMIZATION</th>
+                  <th className="px-6 py-4">PHÂN ĐOẠN CHẶNG</th>
+                  <th className="px-6 py-4">HẠNG GHẾ</th>
+                  <th className="px-6 py-4">ĐÃ PHÂN BỔ</th>
+                  <th className="px-6 py-4">ĐÃ BÁN</th>
+                  <th className="px-6 py-4">GIÁ CƠ HỘI</th>
+                  <th className="px-6 py-4 text-right">KHUYẾN NGHỊ AI</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant text-sm">
+              <tbody className="divide-y divide-outline-variant text-sm font-semibold">
                 <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-on-surface">Paris → Marseille (Long)</td>
+                  <td className="px-6 py-4 text-on-surface">Hà Nội → Sài Gòn (Chặng Dài)</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded font-bold uppercase">
-                      Business
+                      Giường nằm
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant font-medium">120 Seats</td>
+                  <td className="px-6 py-4 text-on-surface-variant font-medium">120 Ghế</td>
                   <td className="px-6 py-4">
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 max-w-[120px]">
                       <div className="bg-primary h-1.5 rounded-full" style={{ width: "85%" }} />
                     </div>
-                    <span className="text-[10px] text-on-surface-variant font-semibold">102 / 120 (85%)</span>
+                    <span className="text-[10px] text-on-surface-variant font-bold">102 / 120 (85%)</span>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold">€245.00</td>
+                  <td className="px-6 py-4 font-mono text-xs">850.000 VND</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-error font-bold text-[11px]">+12.4% Recommended</span>
+                    <span className="text-red-500 font-bold text-[11px]">+12.4% Tăng giá cơ hội</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-on-surface">Paris → Lyon (Short)</td>
+                  <td className="px-6 py-4 text-on-surface">Hà Nội → Vinh (Chặng Ngắn)</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded font-bold uppercase">
-                      Standard
+                      Ngồi mềm
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant font-medium">400 Seats</td>
+                  <td className="px-6 py-4 text-on-surface-variant font-medium">400 Ghế</td>
                   <td className="px-6 py-4">
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 max-w-[120px]">
                       <div className="bg-primary h-1.5 rounded-full" style={{ width: "42%" }} />
                     </div>
-                    <span className="text-[10px] text-on-surface-variant font-semibold">168 / 400 (42%)</span>
+                    <span className="text-[10px] text-on-surface-variant font-bold">168 / 400 (42%)</span>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold">€89.00</td>
+                  <td className="px-6 py-4 font-mono text-xs">220.000 VND</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-primary font-bold text-[11px]">-5.0% Flash Sale</span>
+                    <span className="text-primary font-bold text-[11px]">-5.0% Chạy ưu đãi</span>
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-on-surface">Lyon → Marseille (Short)</td>
+                  <td className="px-6 py-4 text-on-surface">Vinh → Sài Gòn (Chặng Dài)</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-0.5 border border-primary/30 text-primary text-[10px] rounded font-bold uppercase">
-                      Standard
+                      Ngồi mềm
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-on-surface-variant font-medium">400 Seats</td>
+                  <td className="px-6 py-4 text-on-surface-variant font-medium">400 Ghế</td>
                   <td className="px-6 py-4">
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1">
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full mt-1 max-w-[120px]">
                       <div className="bg-primary h-1.5 rounded-full" style={{ width: "95%" }} />
                     </div>
-                    <span className="text-[10px] text-on-surface-variant font-semibold">380 / 400 (95%)</span>
+                    <span className="text-[10px] text-on-surface-variant font-bold">380 / 400 (95%)</span>
                   </td>
-                  <td className="px-6 py-4 font-mono font-bold">€115.00</td>
+                  <td className="px-6 py-4 font-mono text-xs">680.000 VND</td>
                   <td className="px-6 py-4 text-right">
-                    <span className="text-error font-bold text-[11px]">Cap Reached</span>
+                    <span className="text-red-500 font-bold text-[11px]">Đã chạm giới hạn</span>
                   </td>
                 </tr>
               </tbody>
@@ -235,88 +342,39 @@ export function TrainLayoutScreen() {
           </div>
         </div>
 
-        {/* Gap Combining & Recommendations (Right Side) */}
+        {/* AI Recommendations Panel */}
         <div className="col-span-12 lg:col-span-4 space-y-6">
-          {/* AI Recommendation Card */}
           <div className="bg-white border-l-4 border-primary border-y border-r border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden">
             <div className="absolute top-0 right-0 p-2 opacity-5">
               <span className="material-symbols-outlined text-6xl">auto_awesome</span>
             </div>
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
-              <h3 className="font-bold text-on-surface">Gap Combining Opportunities</h3>
+              <h3 className="font-bold text-on-surface">Cơ hội ghép chặng (Gap Combining)</h3>
             </div>
             <p className="text-xs text-on-surface-variant mb-4 leading-relaxed font-semibold">
-              AI found 12 available "gaps" that can be merged into new end-to-end tickets.
+              AI phát hiện các cơ hội chặng ngắn trống liên tiếp ghép thành chặng dài để tăng doanh thu.
             </p>
+
             <div className="space-y-3">
-              <div className="p-3 bg-surface-container-low rounded-lg border border-primary/10">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xs text-on-surface">Paris-Lyon + Lyon-Marseille</span>
-                  <span className="text-primary font-bold text-xs">€1,240 Est. Gain</span>
-                </div>
-                <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">
-                  4 Seats free in Car 5 across both segments. Auto-merge recommended.
-                </p>
-                <button className="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all">
-                  Execute Merge
-                </button>
-              </div>
-
-              <div className="p-3 bg-surface-container-low rounded-lg border border-primary/10">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-xs text-on-surface">Lille-Paris + Paris-Nice</span>
-                  <span className="text-primary font-bold text-xs">€890 Est. Gain</span>
-                </div>
-                <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">
-                  2 Business class seats align perfectly at Gare de Lyon node.
-                </p>
-                <button className="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all">
-                  Execute Merge
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bid Price Trend Chart */}
-          <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold text-on-surface">Bid Price Trend</h3>
-              <span className="material-symbols-outlined text-on-surface-variant">show_chart</span>
-            </div>
-            <div className="h-40 w-full relative flex items-end gap-2 px-2">
-              <div className="flex-1 bg-primary/20 h-[40%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block whitespace-nowrap">
-                  €180
-                </div>
-              </div>
-              <div className="flex-1 bg-primary/20 h-[55%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block whitespace-nowrap">
-                  €195
-                </div>
-              </div>
-              <div className="flex-1 bg-primary/20 h-[75%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block whitespace-nowrap">
-                  €210
-                </div>
-              </div>
-              <div className="flex-1 bg-primary/20 h-[60%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold hidden group-hover:block whitespace-nowrap">
-                  €200
-                </div>
-              </div>
-              <div className="flex-1 bg-primary h-[90%] rounded-t-sm relative group cursor-pointer bid-price-indicator">
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold">
-                  €245
-                </div>
-              </div>
-              <div className="flex-1 bg-primary/20 h-[85%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all" />
-              <div className="flex-1 bg-primary/20 h-[95%] rounded-t-sm relative group cursor-pointer hover:bg-primary transition-all" />
-            </div>
-            <div className="flex justify-between mt-2 text-[10px] text-on-surface-variant font-bold">
-              <span>T-30 Days</span>
-              <span>Today</span>
-              <span>Departure</span>
+              {gapSuggestions.length > 0 ? (
+                gapSuggestions.map((item, idx) => (
+                  <div className="p-3 bg-surface-container-low rounded-lg border border-primary/10" key={idx}>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-bold text-xs text-on-surface">{item.route}</span>
+                      <span className="text-primary font-bold text-xs">{item.benefit}</span>
+                    </div>
+                    <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">
+                      {item.reason} ({item.seatType === "ngoi_mem" ? "Ngồi mềm" : "Giường nằm"})
+                    </p>
+                    <button className="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all cursor-pointer">
+                      Thực hiện ghép chặng
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-on-surface-variant/75 text-center py-4">Không có gợi ý ghép chặng trống nào.</p>
+              )}
             </div>
           </div>
         </div>

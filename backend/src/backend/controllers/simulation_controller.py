@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from backend.database import get_db
 from backend.services.simulation_service import SimulationService
@@ -26,7 +25,7 @@ def get_simulation_service() -> SimulationService:
 @router.get("/simulation/compare", response_model=SimulationCompareResponse)
 async def compare_policy(
     trip_id: int = Query(..., description="ID của chuyến tàu cần mô phỏng"),
-    policy_id: Optional[int] = Query(None, description="ID chính sách giá tùy chọn để áp dụng"),
+    policy_id: int | None = Query(None, description="ID chính sách giá tùy chọn để áp dụng"),
     service: SimulationService = Depends(get_simulation_service),
     db: Session = Depends(get_db),
 ) -> SimulationCompareResponse:

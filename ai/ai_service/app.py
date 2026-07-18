@@ -1,10 +1,3 @@
-"""FastAPI ai-service — phơi 3 khối AI theo hợp đồng /internal/*.
-
-Thiết kế: ai-service STATELESS về nghiệp vụ. Ở bản demo này, khi khởi động nó tự
-sinh dữ liệu + huấn luyện mô hình để endpoint chạy được ngay. Khi triển khai thật,
-backend đẩy snapshot dữ liệu vào payload thay vì ai-service tự sinh.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -18,10 +11,9 @@ from datetime import date
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 
+from . import config as C
 from . import datagen, pricing
 from . import optimization as opt
-
-MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "model.pkl")
 from .schemas import (
     BidPrice,
     ForecastItem,
@@ -35,36 +27,44 @@ from .schemas import (
     Quota,
 )
 
-STATE = {}
+MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "model.pkl")
+STATE: dict[str, object] = {}
 
 
-def _iso(d: str) -> date:
+def _iso(value: str) -> date:
     try:
-        return date.fromisoformat(d)
+        return date.fromisoformat(value)
     except ValueError as exc:
-        raise HTTPException(422, f"service_date không hợp lệ (cần ISO 8601, vd '2024-02-11'): {d}") from exc
+        raise HTTPException(422, "service_date phai dung dinh dang ISO YYYY-MM-DD") from exc
 
 
-def _feature_rows(ods, d: date):
-    _, is_hol, is_tet = datagen.calendar_factor(d)
+def _feature_rows(ods, service_date: date) -> pd.DataFrame:
+    _, is_holiday, is_tet = datagen.calendar_factor(service_date)
+    days_to_tet, is_pre_tet, is_post_tet, _ = datagen.tet_context(service_date)
+    is_rainy, promo = datagen.weather_promo(service_date)
     return pd.DataFrame(
         [
-            dict(
-                od_id=od["od_id"],
-                seat_type=od["seat_type"],
-                dow=d.weekday(),
-                month=d.month,
-                is_holiday=int(is_hol),
-                is_tet=int(is_tet),
-                is_summer=int(d.month in (6, 7, 8)),
-                distance_km=od["distance_km"],
-                base_price=od["base_price"],
-                pop_o=od["pop_o"],
-                pop_d=od["pop_d"],
-                is_hub_o=int(od["is_hub_o"]),
-                is_hub_d=int(od["is_hub_d"]),
-                crosses_bottleneck=int(od["crosses_bottleneck"]),
-            )
+            {
+                "od_id": od["od_id"],
+                "seat_type": od["seat_type"],
+                "dow": service_date.weekday(),
+                "month": service_date.month,
+                "is_holiday": int(is_holiday),
+                "is_tet": int(is_tet),
+                "is_summer": int(service_date.month in (6, 7, 8)),
+                "days_to_tet": days_to_tet,
+                "is_pre_tet": int(is_pre_tet),
+                "is_post_tet": int(is_post_tet),
+                "is_rainy": int(is_rainy),
+                "promo": int(promo),
+                "distance_km": od["distance_km"],
+                "base_price": od["base_price"],
+                "pop_o": od["pop_o"],
+                "pop_d": od["pop_d"],
+                "is_hub_o": int(od["is_hub_o"]),
+                "is_hub_d": int(od["is_hub_d"]),
+                "crosses_bottleneck": int(od["crosses_bottleneck"]),
+            }
             for od in ods
         ]
     )
@@ -72,17 +72,21 @@ def _feature_rows(ods, d: date):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Mạng lưới (ga/chặng/OD) là tất định -> dựng lại từ config, không cần sinh dữ liệu.
-    st, segs, ods, bn = datagen.build_network()
-    STATE["meta"] = {"stations": st, "segments": segs, "od_products": ods, "bottleneck_seg": bn}
-    STATE["ods"] = {od["od_id"]: od for od in ods}
-    # Nạp model đã train sẵn (KHÔNG train lúc khởi động).
-    if not os.path.exists(MODEL_PATH):
-        raise RuntimeError(f"Chưa có model tại {MODEL_PATH}. Hãy chạy trước: python scripts/train.py")
-    with open(MODEL_PATH, "rb") as f:
-        bundle = pickle.load(f)
-    STATE["forecaster"] = bundle["forecaster"]
-    STATE["eps"] = bundle["eps"]
+    stations, segments, od_products, bottleneck = datagen.build_network()
+    STATE["meta"] = {
+        "stations": stations,
+        "segments": segments,
+        "od_products": od_products,
+        "bottleneck_seg": bottleneck,
+    }
+    STATE["ods"] = {od["od_id"]: od for od in od_products}
+    STATE["forecaster"] = None
+    STATE["eps"] = C.ELASTICITY.copy()
+    if os.path.exists(MODEL_PATH):
+        with open(MODEL_PATH, "rb") as model_file:
+            bundle = pickle.load(model_file)
+        STATE["forecaster"] = bundle["forecaster"]
+        STATE["eps"] = bundle["eps"]
     STATE["opt_cache"] = {}
     yield
     STATE.clear()
@@ -93,115 +97,141 @@ app = FastAPI(title="SRRM ai-service", version="1.0", lifespan=lifespan)
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "n_od": len(STATE.get("ods", {}))}
+    return {
+        "status": "ok",
+        "n_od": len(STATE.get("ods", {})),
+        "forecast_model_ready": STATE.get("forecaster") is not None,
+    }
+
+
+def _require_forecaster():
+    forecaster = STATE.get("forecaster")
+    if forecaster is None:
+        raise HTTPException(503, "forecast model chua san sang")
+    return forecaster
 
 
 @app.post("/internal/forecast", response_model=ForecastResponse)
 def forecast(req: ForecastRequest):
-    d = _iso(req.service_date)
-    ods = STATE["meta"]["od_products"]
-    st = STATE["meta"]["stations"]
-    pred = STATE["forecaster"].predict(_feature_rows(ods, d))
+    forecaster = _require_forecaster()
+    service_date = _iso(req.service_date)
+    meta = STATE["meta"]
+    ods = meta["od_products"]
+    stations = meta["stations"]
+    od_index = STATE["ods"]
+    prediction = forecaster.predict(_feature_rows(ods, service_date))
     items = [
         ForecastItem(
-            od_id=int(r.od_id),
-            origin=st.code[STATE["ods"][r.od_id]["origin_idx"]],
-            dest=st.code[STATE["ods"][r.od_id]["dest_idx"]],
-            seat_type=r.seat_type,
-            lambda_hat=round(float(r.lambda_hat), 3),
-            p10=round(float(r.p10), 3),
-            p50=round(float(r.p50), 3),
-            p90=round(float(r.p90), 3),
+            od_id=int(row.od_id),
+            origin=stations.code[od_index[row.od_id]["origin_idx"]],
+            dest=stations.code[od_index[row.od_id]["dest_idx"]],
+            seat_type=row.seat_type,
+            lambda_hat=round(float(row.lambda_hat), 3),
+            p10=round(float(row.p10), 3),
+            p50=round(float(row.p50), 3),
+            p90=round(float(row.p90), 3),
         )
-        for r in pred.itertuples()
+        for row in prediction.itertuples()
     ]
-    return ForecastResponse(service_date=req.service_date, model_version=STATE["forecaster"].version, items=items)
+    return ForecastResponse(
+        service_date=req.service_date,
+        model_version=forecaster.version,
+        items=items,
+    )
 
 
-def _lambda_fingerprint(lam: dict) -> str:
-    """Hash nhu cầu dự báo hiện tại — dùng để phát hiện input đổi giữa 2 lần resolve.
-    Làm tròn 4 chữ số để tránh nhiễu số thực gây warm-start sai (coi là đổi trong khi
-    thực chất không đổi)."""
-    payload = repr(sorted((k, round(v, 4)) for k, v in lam.items()))
-    return hashlib.md5(payload.encode()).hexdigest()
+def _lambda_fingerprint(demand: dict[int, float]) -> str:
+    payload = "|".join(f"{od_id}:{value:.8f}" for od_id, value in sorted(demand.items()))
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _optimize(d: date, force_resolve: bool = False) -> tuple[dict, bool]:
-    """Trả về (solution, warm_started). warm_started=True nghĩa là input (nhu cầu dự
-    báo) không đổi so với lần giải gần nhất cho cùng service_date, nên tái dùng nguyên
-    lời giải cũ thay vì giải lại DLP — đây là chiến lược warm-start ở mức MVP: bài
-    toán đủ nhỏ (1-3 tàu) nên giải lại từ đầu khi có thay đổi vẫn đạt K7 (gần real-time)
-    mà không cần warm-start basis thật của bộ giải LP (scipy HiGHS không hỗ trợ qua
-    API công khai)."""
-    key = d.isoformat()
-    ods = STATE["meta"]["od_products"]
-    nseg = len(STATE["meta"]["segments"])
-    pred = STATE["forecaster"].predict(_feature_rows(ods, d))
-    lam = dict(zip(pred["od_id"], pred["lambda_hat"]))
-    fp = _lambda_fingerprint(lam)
+def _optimize(service_date: date, force_resolve: bool = False) -> tuple[dict, bool]:
+    forecaster = _require_forecaster()
+    key = service_date.isoformat()
+    meta = STATE["meta"]
+    ods = meta["od_products"]
+    prediction = forecaster.predict(_feature_rows(ods, service_date))
+    demand = dict(zip(prediction["od_id"], prediction["lambda_hat"], strict=True))
+    fingerprint = _lambda_fingerprint(demand)
 
     cached = STATE["opt_cache"].get(key)
-    if not force_resolve and cached is not None and cached["fingerprint"] == fp:
-        return cached["sol"], True
+    if not force_resolve and cached is not None and cached["fingerprint"] == fingerprint:
+        return cached["solution"], True
 
-    t0 = time.time()
-    sol = opt.solve_bid_prices(ods, lam, nseg)
-    sol["solve_ms"] = (time.time() - t0) * 1000
-    sol["run_version"] = f"{key}-{uuid.uuid4().hex[:12]}"
-    STATE["opt_cache"][key] = {"fingerprint": fp, "sol": sol}
-    return sol, False
+    started_at = time.time()
+    solution = opt.solve_bid_prices(ods, demand, len(meta["segments"]))
+    solution["solve_ms"] = (time.time() - started_at) * 1000
+    solution["run_version"] = f"{key}-{uuid.uuid4().hex[:12]}"
+    STATE["opt_cache"][key] = {"fingerprint": fingerprint, "solution": solution}
+    return solution, False
 
 
 @app.post("/internal/optimize", response_model=OptimizeResponse)
 def optimize(req: OptimizeRequest):
-    d = _iso(req.service_date)
-    sol, warm_started = _optimize(d, force_resolve=req.force_resolve)
-    bps = [
-        BidPrice(segment_id=seg, seat_type=st, bid_price=round(v, 0))
-        for (seg, st), v in sol["bid_prices"].items()
-        if v > 0
+    solution, warm_started = _optimize(_iso(req.service_date), force_resolve=req.force_resolve)
+    bid_prices = [
+        BidPrice(segment_id=segment, seat_type=seat_type, bid_price=round(value, 0))
+        for (segment, seat_type), value in solution["bid_prices"].items()
+        if value > 0
     ]
     quotas = [
         Quota(
             origin_idx=STATE["ods"][od_id]["origin_idx"],
             dest_idx=STATE["ods"][od_id]["dest_idx"],
             seat_type=STATE["ods"][od_id]["seat_type"],
-            quota=round(q, 3),
+            quota=round(value, 3),
         )
-        for od_id, q in sol["quotas"].items()
-        if q > 0
+        for od_id, value in solution["quotas"].items()
+        if value > 0
     ]
-    n_rej = sum(1 for a in sol["accept"].values() if not a["accept"])
+    rejected_count = sum(1 for item in solution["accept"].values() if not item["accept"])
     return OptimizeResponse(
         service_date=req.service_date,
-        run_version=sol["run_version"],
+        run_version=solution["run_version"],
         warm_started=warm_started,
-        solve_ms=round(sol["solve_ms"], 1),
-        revenue_lp=round(sol["revenue_lp"], 0),
-        bid_prices=bps,
+        solve_ms=round(solution["solve_ms"], 1),
+        revenue_lp=round(solution["revenue_lp"], 0),
+        bid_prices=bid_prices,
         quotas=quotas,
-        n_rejected=n_rej,
-        n_od=len(sol["accept"]),
+        n_rejected=rejected_count,
+        n_od=len(solution["accept"]),
     )
 
 
 @app.post("/internal/price", response_model=PriceResponse)
 def price(req: PriceRequest):
-    if req.od_id not in STATE["ods"]:
-        raise HTTPException(404, "od_id không tồn tại")
-    d = _iso(req.service_date)
-    sol, _warm_started = _optimize(d)
-    od = STATE["ods"][req.od_id]
+    if req.segments is not None:
+        if req.seat_type is None or req.base_price is None:
+            raise HTTPException(422, "seat_type va base_price la bat buoc khi gui snapshot")
+        od = {
+            "od_id": req.od_id,
+            "seat_type": req.seat_type,
+            "base_price": req.base_price,
+            "segments": [segment.segment_id for segment in req.segments],
+        }
+        bid_prices = {(segment.segment_id, req.seat_type): segment.bid_price for segment in req.segments}
+        return PriceResponse(**pricing.price_od(od, bid_prices, STATE.get("eps", C.ELASTICITY)))
+
+    od_index = STATE.get("ods", {})
+    if req.od_id not in od_index:
+        raise HTTPException(404, "od_id khong ton tai")
+    solution, _warm_started = _optimize(_iso(req.service_date))
     policy = None
     if req.min_price is not None and req.max_price is not None:
         policy = {"min_price": req.min_price, "max_price": req.max_price}
-    q = pricing.price_od(od, sol["bid_prices"], STATE["eps"], policy)
+    result = pricing.price_od(
+        od_index[req.od_id],
+        solution["bid_prices"],
+        STATE["eps"],
+        policy,
+        segment_load=solution.get("segment_load"),
+    )
     return PriceResponse(
-        od_id=q["od_id"],
-        seat_type=q["seat_type"],
-        opportunity_cost=q["opportunity_cost"],
-        proposed_price=q["proposed_price"],
-        final_price=q["final_price"],
-        decision=q["decision"],
-        explanation=PriceExplanation(**q["explanation"]),
+        od_id=result["od_id"],
+        seat_type=result["seat_type"],
+        opportunity_cost=result["opportunity_cost"],
+        proposed_price=result["proposed_price"],
+        final_price=result["final_price"],
+        decision=result["decision"],
+        explanation=PriceExplanation(**result["explanation"]),
     )

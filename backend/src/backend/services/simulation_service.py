@@ -1,32 +1,31 @@
-from sqlalchemy.orm import Session
+from typing import Any
+
 from sqlalchemy import text
-from typing import Dict, Any
+from sqlalchemy.orm import Session
+
 
 class SimulationService:
-    def compare_policy(self, db: Session, trip_id: int, policy_id: int | None = None) -> Dict[str, Any]:
+    def compare_policy(self, db: Session, trip_id: int, policy_id: int | None = None) -> dict[str, Any]:
         """
         Tính toán và so sánh doanh thu/sản lượng khách-km thực tế (bookings lịch sử)
         với mô phỏng đề xuất của AI (price_quotes).
         """
         # 1. Kiểm tra sự tồn tại của trip
-        trip_exists = db.execute(
-            text("SELECT id FROM trips WHERE id = :trip_id"),
-            {"trip_id": trip_id}
-        ).fetchone()
+        trip_exists = db.execute(text("SELECT id FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}).fetchone()
         if not trip_exists:
             raise ValueError(f"Không tìm thấy chuyến tàu với ID {trip_id}")
 
         # 2. Tính doanh thu và passenger-km lịch sử từ bảng bookings
         hist_res = db.execute(
             text("""
-                SELECT 
+                SELECT
                     COALESCE(SUM(b.booked_price), 0.0) AS historical_revenue,
                     COALESCE(SUM(p.distance_km), 0.0) AS historical_passenger_km
                 FROM bookings b
                 JOIN od_products p ON b.od_product_id = p.id
                 WHERE p.trip_id = :trip_id AND b.status = 'confirmed'
             """),
-            {"trip_id": trip_id}
+            {"trip_id": trip_id},
         ).fetchone()
         hist_rev = float(hist_res[0])
         hist_pkm = float(hist_res[1])
@@ -36,22 +35,51 @@ class SimulationService:
         policy_row = None
         if policy_id:
             policy_row = db.execute(
-                text("SELECT min_price, max_price FROM price_policies WHERE id = :policy_id"),
-                {"policy_id": policy_id}
+                text("SELECT min_price, max_price FROM price_policies WHERE id = :policy_id"), {"policy_id": policy_id}
             ).fetchone()
 
-        quotes_res = db.execute(
+        # Lấy active version hiện tại của chuyến tàu từ quotas
+        active_ver_row = db.execute(
             text("""
-                SELECT 
-                    q.proposed_price,
-                    q.final_price,
-                    p.distance_km
-                FROM price_quotes q
+                SELECT q.run_version FROM quotas q
                 JOIN od_products p ON q.od_product_id = p.id
-                WHERE p.trip_id = :trip_id AND q.decision = 'accepted'
+                WHERE p.trip_id = :trip_id AND q.is_active = TRUE
+                LIMIT 1
             """),
             {"trip_id": trip_id}
-        ).fetchall()
+        ).fetchone()
+        
+        active_version = active_ver_row[0] if active_ver_row else None
+
+        if active_version:
+            quotes_res = db.execute(
+                text("""
+                    SELECT
+                        q.proposed_price,
+                        q.final_price,
+                        p.distance_km
+                    FROM price_quotes q
+                    JOIN od_products p ON q.od_product_id = p.id
+                    WHERE p.trip_id = :trip_id 
+                      AND q.decision = 'accepted'
+                      AND q.run_version = :active_version
+                """),
+                {"trip_id": trip_id, "active_version": active_version},
+            ).fetchall()
+        else:
+            quotes_res = db.execute(
+                text("""
+                    SELECT
+                        q.proposed_price,
+                        q.final_price,
+                        p.distance_km
+                    FROM price_quotes q
+                    JOIN od_products p ON q.od_product_id = p.id
+                    WHERE p.trip_id = :trip_id 
+                      AND q.decision = 'accepted'
+                """),
+                {"trip_id": trip_id},
+            ).fetchall()
 
         sim_rev = 0.0
         sim_pkm = 0.0
@@ -66,7 +94,7 @@ class SimulationService:
                 if policy_row:
                     min_price, max_price = policy_row
                     min_p = float(min_price) if min_price is not None else 0.0
-                    max_p = float(max_price) if max_price is not None else float('inf')
+                    max_p = float(max_price) if max_price is not None else float("inf")
                     sim_p = max(min(proposed_price, max_p), min_p)
                 else:
                     sim_p = final_price
@@ -96,5 +124,5 @@ class SimulationService:
             "revenue_lift_pct": rev_lift,
             "historical_passenger_km": round(hist_pkm, 2),
             "simulated_passenger_km": round(sim_pkm, 2),
-            "passenger_km_lift_pct": pkm_lift
+            "passenger_km_lift_pct": pkm_lift,
         }

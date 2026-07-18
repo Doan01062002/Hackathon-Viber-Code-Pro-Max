@@ -139,6 +139,21 @@ def round_quota(raw_quota: float, tol: float = 1e-6) -> int:
     return int(np.floor(raw_quota + tol))
 
 
+def compute_segment_load(
+    od_products, x: np.ndarray, constraint_keys: list[tuple[int, str]], capacity: np.ndarray
+) -> dict[tuple[int, str], float]:
+    """Tải (utilization) mỗi (chặng, loại chỗ) = tổng x_j được phân bổ qua chặng đó /
+    sức chứa c_ℓ, tỉ lệ trong [0,1]. Dùng để diễn giải giá (AI-16.2): nút cổ chai càng
+    đầy tải thì bid price càng đáng tin/càng dễ giải thích với người dùng."""
+    load = dict.fromkeys(constraint_keys, 0.0)
+    for j, od in enumerate(od_products):
+        stype = od["seat_type"]
+        xj = float(x[j])
+        for seg in od["segments"]:
+            load[(seg, stype)] = load.get((seg, stype), 0.0) + xj
+    return {key: (load[key] / cap if cap > 0 else 0.0) for key, cap in zip(constraint_keys, capacity, strict=True)}
+
+
 def solve_bid_prices(
     od_products, lambda_hat: dict[int, float], nseg: int, capacity: dict[str, int] = C.CAPACITY
 ) -> dict:
@@ -146,7 +161,8 @@ def solve_bid_prices(
     quota + quy tắc chấp nhận. Đây là API công khai mà ai_service/app.py gọi.
 
     Trả về: bid_prices[(seg,seat_type)] -> π_ℓ, quotas[od_id] -> x_j (số thực),
-    accept[od_id] -> {opportunity_cost, accept}, revenue_lp (doanh thu tối ưu LP).
+    accept[od_id] -> {opportunity_cost, accept}, segment_load[(seg,seat_type)] -> tải
+    0..1, revenue_lp (doanh thu tối ưu LP).
     """
     dlp = build_capacity_matrix(od_products, nseg, capacity)
     ub = build_demand_bounds(od_products, lambda_hat)
@@ -157,11 +173,13 @@ def solve_bid_prices(
     bid_prices = extract_bid_prices(res, dlp.constraint_keys)
     quotas = compute_quotas(od_products, res.x)
     accept = compute_accept_decisions(od_products, bid_prices)
+    segment_load = compute_segment_load(od_products, res.x, dlp.constraint_keys, dlp.capacity)
 
     return dict(
         bid_prices=bid_prices,
         quotas=quotas,
         accept=accept,
+        segment_load=segment_load,
         revenue_lp=float(dlp.fares @ res.x),
     )
 

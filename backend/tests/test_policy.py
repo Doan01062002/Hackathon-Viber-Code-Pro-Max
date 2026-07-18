@@ -51,7 +51,7 @@ async def test_update_policy_rbac_success(client):
             "min_price": 120000.00,
             "max_price": 480000.00,
             "max_step_change": 40000.00,
-            "status": "active"
+            "status": "active",
         }
         response = await client.put(f"/api/v1/policy/limits/{policy_id}", json=update_data, headers=headers)
         assert response.status_code == 200
@@ -65,8 +65,10 @@ async def test_update_policy_rbac_success(client):
         # 3. Xác minh audit log được tạo tự động
         db.expire_all()
         audit_row = db.execute(
-            text("SELECT COUNT(*) FROM audit_logs WHERE actor = 'revenue_manager' AND action = 'UPDATE_POLICY' AND entity_id = :pid"),
-            {"pid": str(policy_id)}
+            text(
+                "SELECT COUNT(*) FROM audit_logs WHERE actor = 'revenue_manager' AND action = 'UPDATE_POLICY' AND entity_id = :pid"
+            ),
+            {"pid": str(policy_id)},
         ).fetchone()
         assert audit_row[0] > 0
 
@@ -128,10 +130,7 @@ async def test_update_policy_invalid_constraints(client):
 
         # 2. Gửi yêu cầu cập nhật vi phạm min_price > max_price (sàn lớn hơn trần)
         headers = {"x-user-role": "revenue_manager"}
-        update_data = {
-            "min_price": 600000.00,
-            "max_price": 400000.00
-        }
+        update_data = {"min_price": 600000.00, "max_price": 400000.00}
         response = await client.put(f"/api/v1/policy/limits/{policy_id}", json=update_data, headers=headers)
         assert response.status_code == 400
         assert "không được nhỏ hơn" in response.json()["detail"]

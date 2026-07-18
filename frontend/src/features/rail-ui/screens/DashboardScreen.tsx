@@ -1,49 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiClient } from "@/lib/api/client";
-import { useQuery } from "@/lib/api/useQuery";
-import { SegmentHeatmap } from "@/features/rail-ui/components/SegmentHeatmap";
+import { seatApi } from "@/features/rail-ui/api/seatApi";
+import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
+import { useForecast, buildCurveChart } from "@/features/forecast";
+import { useSegmentsLoad, buildSegmentHeatmap } from "@/features/segments";
 import {
-  bookingCurve as mockBookingCurve,
-  gapSuggestions,
-  heatmapRows as mockHeatmapRows,
+  gapSuggestions as mockGapSuggestions,
   odMatrix,
   rightRailCards,
-  alerts as mockAlerts,
 } from "@/features/rail-ui/mockData";
 
-// interfaces
-interface LegHeatmapItem {
-  segment_id: number;
-  sequence_no: number;
-  origin_station_code: string;
-  destination_station_code: string;
-  capacity: number;
-  remaining: number;
-  seat_type: string;
-  bid_price: number;
-  is_bottleneck: boolean;
-}
-
-interface LegHeatmapResponse {
-  trip_id: number;
-  legs: LegHeatmapItem[];
-}
-
-interface BookingCurvePoint {
-  lead_days: number;
-  cumulative_bookings: number;
-  forecast_demand_point: number;
-}
-
-interface ForecastResponse {
-  trip_id: number;
-  service_date: string;
-  forecasts: any[];
-  booking_curve: BookingCurvePoint[];
-}
+const DEFAULT_TRIP_ID = 1;
 
 function heatClass(value: number) {
   if (value >= 90) return "text-red-600 font-bold";
@@ -85,8 +54,8 @@ function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeCo
     <div className="relative w-full mt-2">
       {/* Min / Max indicators */}
       <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold mb-1 font-mono">
-        <span>Min: {prefix}{min.toLocaleString()}{suffix}</span>
-        <span>Max: {prefix}{max.toLocaleString()}{suffix}</span>
+        <span>Thấp nhất: {prefix}{min.toLocaleString()}{suffix}</span>
+        <span>Cao nhất: {prefix}{max.toLocaleString()}{suffix}</span>
       </div>
 
       <div className="h-10 relative">
@@ -118,7 +87,7 @@ function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeCo
                   cy={p.y}
                   r="4"
                   fill={strokeColor}
-                  stroke="#fff"
+                  stroke="#opacity"
                   strokeWidth="1.5"
                 />
               )}
@@ -182,32 +151,43 @@ function InteractiveSparkline({ data, labels, prefix = "", suffix = "", strokeCo
   );
 }
 
+// Fallback Mock Heatmap Rows (khi không có API)
+const mockHeatmapRows = [
+  { segment: "Hà Nội → Vinh", slots: [62, 68, 71, 76, 81, 79] },
+  { segment: "Vinh → Đồng Hới", slots: [58, 64, 66, 72, 75, 74] },
+  { segment: "Đồng Hới → Huế", slots: [73, 79, 82, 84, 88, 86] },
+  { segment: "Huế → Đà Nẵng", slots: [88, 92, 95, 97, 99, 96] },
+  { segment: "Đà Nẵng → Nha Trang", slots: [67, 71, 76, 79, 82, 80] },
+  { segment: "Nha Trang → Sài Gòn", slots: [59, 63, 68, 70, 74, 72] },
+];
+
 export function DashboardScreen() {
   const router = useRouter();
 
-  // Sử dụng custom hook useQuery theo yêu cầu FE-02.1
-  const {
-    data: heatmapData,
-    loading: loadingHeatmap,
-    error: errorHeatmap,
-  } = useQuery<LegHeatmapResponse>("/api/v1/analytics/legs-heatmap?trip_id=1");
+  // Custom Hooks từ develop branch
+  const forecast = useForecast(DEFAULT_TRIP_ID);
+  const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
+  const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(mockGapSuggestions);
 
-  const {
-    data: forecastData,
-    loading: loadingForecast,
-    error: errorForecast,
-  } = useQuery<ForecastResponse>("/api/v1/forecast?trip_id=1");
+  useEffect(() => {
+    async function loadGaps() {
+      try {
+        const data = await seatApi.getGapSuggestions(DEFAULT_TRIP_ID);
+        if (data && data.length > 0) {
+          setSuggestions(data);
+        }
+      } catch (err) {
+        console.warn("Không tải được gợi ý khoảng trống, dùng mock:", err);
+      }
+    }
+    loadGaps();
+  }, []);
 
-  const legs = heatmapData?.legs ?? [];
-  const curve = forecastData?.booking_curve ?? [];
+  const legs = useMemo(() => segments.data?.legs ?? [], [segments.data?.legs]);
+  const heatmap = useMemo(() => buildSegmentHeatmap(legs), [legs]);
+  const curveChart = useMemo(() => buildCurveChart(forecast.data?.booking_curve ?? []), [forecast.data]);
 
-  const loading = loadingHeatmap || loadingForecast;
-  const error = errorHeatmap || errorForecast;
-
-  const legsToRender = legs.length > 0 ? legs : null;
-  const curveToRender = curve.length > 0 ? curve : mockBookingCurve;
-
-  // Tính toán metrics động
+  // Tính toán metrics động dựa trên dữ liệu chặng thực tế từ backend
   let avgLoad = 84.2;
   let bottleneckCount = 1;
   if (legs.length > 0) {
@@ -217,32 +197,8 @@ export function DashboardScreen() {
     bottleneckCount = legs.filter((leg) => leg.is_bottleneck).length;
   }
 
-  // Cấu hình biểu đồ
-  const maxVal = Math.max(
-    ...curveToRender.map((p) => ("cumulative_bookings" in p ? (p as any).cumulative_bookings : (p as any).actual) || 0),
-    ...curveToRender.map((p) => ("forecast_demand_point" in p ? (p as any).forecast_demand_point : (p as any).forecast) || 0),
-    100
-  );
-
-  function buildPolyline(values: number[]) {
-    const width = 360;
-    const height = 180;
-    if (values.length === 0) return "";
-    return values
-      .map((value, index) => {
-        const x = (index / (values.length - 1)) * width;
-        const y = height - (value / maxVal) * 140 - 12;
-        return `${x},${y}`;
-      })
-      .join(" ");
-  }
-
-  const actualPoints = buildPolyline(
-    curveToRender.map((p) => ("cumulative_bookings" in p ? (p as any).cumulative_bookings : (p as any).actual) || 0)
-  );
-  const forecastPoints = buildPolyline(
-    curveToRender.map((p) => ("forecast_demand_point" in p ? (p as any).forecast_demand_point : (p as any).forecast) || 0)
-  );
+  // Gom lỗi hiển thị banner
+  const apiError = segments.error || forecast.error;
 
   // Sparkline data
   const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Hôm nay"];
@@ -271,25 +227,31 @@ export function DashboardScreen() {
   return (
     <div className="space-y-6">
       {/* Header / Controls */}
-      <div className="flex justify-end items-center mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-lg font-black text-on-surface">Bảng Điều Khiển Tổng Quan</h2>
+          <p className="text-xs text-on-surface-variant font-medium mt-0.5">
+            Giám sát thời gian thực hệ số tải, xu hướng đặt vé, doanh thu và cảnh báo thắt nút cổ chai.
+          </p>
+        </div>
         <div className="flex items-center space-x-3">
           <div className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2">
             <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
-            <span className="text-xs font-semibold">Today, 17 July 2026</span>
+            <span className="text-xs font-semibold">Hôm nay, 17 Tháng 7 2026</span>
           </div>
           <select
             className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-primary focus:border-primary outline-none"
-            defaultValue="Train ID: SE1, SE2, SE3"
+            defaultValue="Mã tàu: SE1, SE2, SE3"
           >
-            <option>Train ID: SE1, SE2, SE3</option>
-            <option>Train ID: SE4, SE5, SE6</option>
+            <option>Mã tàu: SE1, SE2, SE3</option>
+            <option>Mã tàu: SE4, SE5, SE6</option>
           </select>
         </div>
       </div>
 
-      {error && (
+      {apiError && (
         <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
-          ⚠️ Cảnh báo: {error} Hệ thống tự động chuyển sang chế độ mô phỏng dữ liệu Demo.
+          ⚠️ Cảnh báo kết nối: Không thể đồng bộ từ Backend API. Đang hiển thị kịch bản Demo.
         </div>
       )}
 
@@ -326,7 +288,7 @@ export function DashboardScreen() {
               </div>
               <div className="bg-surface-container-low p-3 rounded-lg border border-outline-variant/35">
                 <p className="text-[10px] text-on-surface-variant font-bold uppercase">Tác động doanh thu</p>
-                <p className="text-lg font-black text-green-600 mt-1">+190M</p>
+                <p className="text-lg font-black text-green-600 mt-1">+190 triệu</p>
                 <p className="text-[9px] text-on-surface-variant mt-1 font-semibold">Nếu mở bán đúng nhóm ghế</p>
               </div>
             </div>
@@ -346,7 +308,7 @@ export function DashboardScreen() {
               Chạy mô phỏng khuyến nghị
             </button>
             <button
-              onClick={() => router.push("/pricing")}
+              onClick={() => router.push("/quote")}
               className="px-4 py-2 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg transition-all text-xs cursor-pointer"
             >
               Mở màn hình báo giá
@@ -422,7 +384,7 @@ export function DashboardScreen() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {/* Metric Card 1 */}
         <div
-          onClick={() => router.push("/pricing")}
+          onClick={() => router.push("/quote")}
           className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
         >
           <div className="flex justify-between items-start mb-4">
@@ -449,7 +411,7 @@ export function DashboardScreen() {
 
         {/* Metric Card 2 */}
         <div
-          onClick={() => router.push("/train")}
+          onClick={() => router.push("/train-layout")}
           className="bg-surface border border-outline-variant p-5 rounded-xl hover:bg-surface-container-low transition-colors duration-200 cursor-pointer"
         >
           <div className="flex justify-between items-start mb-4">
@@ -523,10 +485,10 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      {/* Charts & Map Row */}
+      {/* Charts & Heatmap Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Dynamic Booking Curve (develop SVG chart) */}
-        <div className="lg:col-span-2 bg-white border border-outline-variant rounded-xl p-6">
+        {/* Dynamic Booking Curve */}
+        <div className="lg:col-span-2 bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-base font-bold text-on-surface">
@@ -539,59 +501,61 @@ export function DashboardScreen() {
             <div className="flex items-center space-x-4 text-xs font-semibold">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-primary" />
-                <span className="text-on-surface-variant">Thực tế</span>
+                <span className="text-on-surface-variant">Thực tế bán vé</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-0.5 bg-primary/45 border-t border-dashed" />
-                <span className="text-on-surface-variant">Dự báo</span>
+                <span className="text-on-surface-variant">Dự báo nhu cầu</span>
               </div>
             </div>
           </div>
 
-          <div className="flex gap-4 items-stretch h-64">
-            {/* Y axis labels */}
-            <div className="flex flex-col justify-between py-2 text-[9px] text-on-surface-variant font-bold font-mono">
-              <span>{Math.round(maxVal)}</span>
-              <span>{Math.round(maxVal / 2)}</span>
-              <span>0</span>
-            </div>
+          {forecast.isLoading ? (
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Đang tải dữ liệu dự báo...</p>
+          ) : curveChart ? (
+            <div className="flex gap-4 items-stretch h-64">
+              {/* Y axis labels */}
+              <div className="flex flex-col justify-between py-2 text-[9px] text-on-surface-variant font-bold font-mono">
+                <span>100%</span>
+                <span>50%</span>
+                <span>0%</span>
+              </div>
 
-            {/* SVG wrapper */}
-            <div className="flex-grow border-l border-b border-outline-variant/60 relative">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 360 180" preserveAspectRatio="none">
-                {/* grid lines */}
-                <line x1="0" y1="36" x2="360" y2="36" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
-                <line x1="0" y1="90" x2="360" y2="90" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
-                <line x1="0" y1="144" x2="360" y2="144" stroke="#e2e8f0" strokeDasharray="4 4" strokeWidth="1" />
-                
-                {/* paths */}
-                <polyline fill="none" stroke="#3525cd" strokeWidth="2.5" points={actualPoints} />
-                <polyline fill="none" stroke="#3525cd" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.6" points={forecastPoints} />
-              </svg>
+              {/* SVG wrapper */}
+              <div className="flex-grow border-l border-b border-outline-variant/60 relative">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 360 180" preserveAspectRatio="none">
+                  <path className="curve-grid-line" d="M0 28 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <path className="curve-grid-line" d="M0 88 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <path className="curve-grid-line" d="M0 148 H360" stroke="#f1f5f9" strokeDasharray="4 4" />
+                  <polyline fill="none" stroke="#ba1a1a" strokeWidth="2" strokeDasharray="4 3" opacity="0.75" points={curveChart.forecastPoints} />
+                  <polyline fill="none" stroke="#3525cd" strokeWidth="3" points={curveChart.actualPoints} />
+                </svg>
 
-              {/* X axis labels */}
-              <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[9px] text-on-surface-variant font-mono font-bold">
-                {curveToRender.map((point, idx) => (
-                  <span key={idx}>
-                    {"lead_days" in point ? `D-${(point as any).lead_days}` : (point as any).day}
-                  </span>
-                ))}
+                {/* X axis labels */}
+                <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2 text-[9px] text-on-surface-variant font-mono font-bold">
+                  {curveChart.labels.map((label) => (
+                    <span key={label}>{label}</span>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Không có dữ liệu biểu đồ.</p>
+          )}
         </div>
 
-        {/* Segment Load Factor heat levels */}
-        <div className="bg-white border border-outline-variant rounded-xl p-6 flex flex-col justify-between">
+        {/* Dynamic Gap Combining / AI Recommendation */}
+        <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-on-surface mb-6">
-              Tải trọng theo chặng
+            <h3 className="text-base font-bold text-on-surface mb-2">
+              Hệ số tải chặng Thống Nhất
             </h3>
+            <p className="text-xs text-on-surface-variant mb-6 font-medium">Theo dõi hệ số lấp đầy ba phân đoạn trọng điểm.</p>
             <div className="space-y-6">
               {/* Segment */}
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-on-surface-variant font-medium">HN → Vinh</span>
+                  <span className="text-on-surface-variant font-semibold">HN → Vinh</span>
                   <span className="font-bold text-primary">92% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
@@ -601,17 +565,17 @@ export function DashboardScreen() {
               {/* Segment */}
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-on-surface-variant font-medium">Vinh → Hue</span>
-                  <span className="font-bold text-primary">78% Hệ số tải</span>
+                  <span className="text-on-surface-variant font-semibold">Vinh → Huế</span>
+                  <span className="font-bold text-primary">{avgLoad}% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: "78%" }} />
+                  <div className="h-full bg-primary" style={{ width: `${avgLoad}%` }} />
                 </div>
               </div>
               {/* Segment */}
               <div>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="text-on-surface-variant font-medium">Hue → DN</span>
+                  <span className="text-on-surface-variant font-semibold">Huế → Đà Nẵng</span>
                   <span className="font-bold text-red-600">98% Hệ số tải</span>
                 </div>
                 <div className="h-3 w-full bg-surface-container rounded-full overflow-hidden">
@@ -622,15 +586,99 @@ export function DashboardScreen() {
           </div>
 
           <div className="mt-8 p-4 bg-surface-container-low rounded-lg border border-dashed border-outline-variant">
-            <p className="text-[11px] text-on-surface-variant italic leading-relaxed">
-              Phát hiện nút cổ chai nghiêm trọng tại <span className="font-bold">Huế - Đà Nẵng</span>. Doanh thu cao hơn khả dụng thông qua việc phân bổ lại quota chặng.
+            <p className="text-[11px] text-on-surface-variant italic leading-relaxed font-semibold">
+              Phát hiện nút cổ chai nghiêm trọng tại <span className="font-bold text-red-600">Huế - Đà Nẵng</span>. Cần tối ưu phân bổ quota chặng để mở rộng ghế.
             </p>
           </div>
         </div>
       </div>
 
       {/* Heatmap chặng chi tiết (SegmentHeatmap Grid) */}
-      <SegmentHeatmap data={mappedHeatmapRows} />
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-base font-bold text-on-surface">Bản đồ nhiệt tải chặng</h3>
+            <p className="text-xs text-on-surface-variant font-medium mt-0.5">Tỉ lệ lấp đầy chặng theo loại chỗ và thời điểm chạy.</p>
+          </div>
+        </div>
+
+        {segments.isLoading ? (
+          <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Đang tải bản đồ nhiệt...</p>
+        ) : heatmap ? (
+          <div className="overflow-x-auto">
+            <table className="data-table heatmap-table w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-[11px] font-bold text-on-surface-variant uppercase border-b border-slate-200">
+                  <th className="py-3 px-4">Chặng tàu</th>
+                  {heatmap.columns.map((col) => (
+                    <th key={col.key} className="py-3 px-4 text-center">{col.label}</th>
+                  ))}
+                  <th className="py-3 px-4 text-right">Nút cổ chai</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-semibold">
+                {heatmap.rows.map((row) => (
+                  <tr key={row.seq} className="hover:bg-slate-50/55 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-on-surface">{row.label}</td>
+                    {heatmap.columns.map((col) => {
+                      const load = row.loads[col.key];
+                      return (
+                        <td
+                          key={`${row.seq}-${col.key}`}
+                          className={`py-3.5 px-4 text-center ${load === null ? "text-slate-400 font-normal" : heatClass(load)}`}
+                        >
+                          {load === null ? "—" : `${Math.round(load)}%`}
+                        </td>
+                      );
+                    })}
+                    <td className="py-3.5 px-4 text-right">
+                      {row.isBottleneck ? (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded uppercase">
+                          Cảnh báo
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-center text-xs text-on-surface-variant py-12 font-semibold">Không có dữ liệu chặng.</p>
+        )}
+      </div>
+
+      {/* Gợi ý ghép chặng lấp chỗ trống */}
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <h3 className="text-base font-bold text-on-surface mb-2">Hành động lấp chỗ trống tối ưu (Gap Combining)</h3>
+        <p className="text-xs text-on-surface-variant mb-6 font-medium">Ghép nối hành trình chặng ngắn liên kết trống để bán vé đi suốt.</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {suggestions.slice(0, 3).map((item, index) => (
+            <article key={index} className="p-4 bg-slate-50 rounded-xl border border-outline-variant flex flex-col justify-between h-44">
+              <div>
+                <div className="flex justify-between items-start mb-2">
+                  <strong className="text-xs text-on-surface font-extrabold">{item.route}</strong>
+                  <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded font-bold">{item.benefit}</span>
+                </div>
+                <p className="text-[11px] text-on-surface-variant font-medium leading-relaxed">{item.reason}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const match = item.reason.match(/toa\s+([A-Za-z0-9]+)/i);
+                  const coachNo = match ? match[1].trim() : "01";
+                  router.push(`/train-layout?coach=${coachNo}`);
+                }}
+                className="w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all cursor-pointer text-center"
+              >
+                Xem chi tiết sơ đồ
+              </button>
+            </article>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

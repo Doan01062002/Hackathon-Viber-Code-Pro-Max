@@ -335,8 +335,8 @@ export function SimulationScreen() {
                   className="w-full accent-primary h-1.5 bg-slate-100 rounded-full appearance-none cursor-pointer"
                 />
                 <div className="flex justify-between text-[9px] text-on-surface-variant/60 font-bold font-mono">
-                  <span>Min: 5%</span>
-                  <span>Max: 30%</span>
+                  <span>Tối thiểu: 5%</span>
+                  <span>Tối đa: 30%</span>
                 </div>
               </div>
 
