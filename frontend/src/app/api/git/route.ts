@@ -27,14 +27,14 @@ export async function GET() {
   runCmd("git config user.name \"Antigravity AI\"");
   runCmd("git config user.email \"antigravity@gemini-deepmind.com\"");
 
-  // Switch/Create branch ui2
-  runCmd("git checkout -B ui2");
+  // Switch to branch ui2
+  runCmd("git checkout ui2");
 
   // Stage changes
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: redesign train layout screen, fix sleeper layout and add dynamic trip selectors\"");
+  runCmd("git commit -m \"style: scale global font size by +2px for better readability\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");
