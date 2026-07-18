@@ -14,7 +14,7 @@ export function TrainLayoutScreen() {
   const [selectedCoachNo, setSelectedCoachNo] = useState<string>("01");
   const [seatPlan, setSeatPlan] = useState<SeatPlanDto | null>(null);
   const [gapSuggestions, setGapSuggestions] = useState<GapSuggestionDto[]>([]);
-  
+  const [appliedGaps, setAppliedGaps] = useState<string[]>([]);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [loadingLayout, setLoadingLayout] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -742,10 +742,10 @@ export function TrainLayoutScreen() {
         </div>
       </div>
 
-      {/* Seat Inventory Table & AI Suggestions */}
+      {/* Seat Inventory Table */}
       <div className="grid grid-cols-12 gap-6">
         {/* Seat Inventory Card */}
-        <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+        <div className="col-span-12 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-outline-variant flex justify-between items-center">
             <div>
               <h3 className="font-bold text-on-surface text-sm">Phân Bổ Tồn Kho Chỗ Ngồi Chặng</h3>
@@ -835,43 +835,6 @@ export function TrainLayoutScreen() {
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* AI Recommendations Panel */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
-          <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
-              <h3 className="font-bold text-on-surface">Đề Xuất Ghép Chặng</h3>
-            </div>
-            <p className="text-[10px] text-on-surface-variant/80 mb-4 leading-relaxed font-semibold">
-              AI tự động phân tích và đề xuất giải phóng các ghế chặng ngắn bị phân rã liền kề để ghép bán chặng dài có doanh thu cao hơn.
-            </p>
-
-            <div className="space-y-3">
-              {gapSuggestions.length > 0 ? (
-                gapSuggestions.map((item, idx) => (
-                  <div className="p-3 bg-surface-container-low rounded-lg border border-primary/10 hover:border-primary/20 transition-all" key={idx}>
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-bold text-xs text-on-surface">{item.route}</span>
-                      <span className="text-primary font-bold text-xs">{item.benefit}</span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">
-                      {item.reason} ({item.seatType === "ngoi_mem" ? "Ngồi mềm" : "Giường nằm"})
-                    </p>
-                    <button 
-                      onClick={() => window.alert(`Đang áp dụng khuyến nghị ghép chặng cho ${item.route}`)}
-                      className="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all cursor-pointer border border-transparent hover:border-primary/25"
-                    >
-                      Thực hiện ghép chặng
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-on-surface-variant/75 text-center py-4">Không có gợi ý ghép chặng trống nào.</p>
-              )}
-            </div>
           </div>
         </div>
       </div>
