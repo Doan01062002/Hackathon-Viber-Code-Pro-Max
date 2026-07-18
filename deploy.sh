@@ -8,27 +8,21 @@ DATABASE_URL="postgresql+psycopg://appadmin:dtkien2003@viber-coding-pro-max-db.c
 EOF
 echo "Đã tạo xong file .env kết nối RDS PostgreSQL."
 
-echo "=== [2/4] Tạo và thiết lập Python Virtual Environment ==="
-# Thử tạo virtual environment bằng python3 mặc định của hệ thống
-python3 -m venv .venv || {
-    echo "Không tạo được venv. Đang cài đặt venv không dùng sudo..."
-    apt install python3-venv --user || exit 1
-    python3 -m venv .venv
-}
-source .venv/bin/activate
-pip install --upgrade pip
+echo "=== [2/4] Cài đặt dependencies (ai + backend) vào không gian User ==="
+# Nâng cấp pip cho user
+pip3 install --user --upgrade pip || echo "Bỏ qua nâng cấp pip"
 
-echo "=== [3/4] Cài đặt dependencies (ai + backend) ==="
-pip install -r requirements.txt
+# Cài đặt toàn bộ gói thư viện trực tiếp vào user space (không cần venv)
+pip3 install --user -r requirements.txt
 
-echo "=== [4/4] Khởi chạy Backend ngầm dưới cổng 8000 ==="
+echo "=== [3/4] Khởi chạy Backend ngầm dưới cổng 8000 ==="
 # Tắt tiến trình cũ đang chạy trên cổng 8000 (nếu có)
 kill -9 $(lsof -t -i:8000) 2>/dev/null || true
 
-# Chạy ngầm uvicorn bằng nohup trên cổng 8000
-nohup .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
+# Chạy ngầm uvicorn bằng nohup trên cổng 8000 thông qua module python3
+nohup python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > uvicorn.log 2>&1 &
 
-echo "Đợi 3 giây kiểm tra trạng thái máy chủ..."
+echo "=== [4/4] Đợi 3 giây kiểm tra trạng thái máy chủ ==="
 sleep 3
 
 if curl -s http://localhost:8000/health | grep -q "ok"; then
@@ -40,4 +34,5 @@ else
     echo "❌ Có lỗi xảy ra khi khởi động. Vui lòng xem log tại uvicorn.log:"
     cat uvicorn.log
 fi
+
 
