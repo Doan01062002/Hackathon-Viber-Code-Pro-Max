@@ -24,4 +24,10 @@ export const optimizeApi = {
       target_version: targetVersion,
     });
   },
+
+  async resolveOptimization(tripId: number): Promise<{ job_id: string; status: string; message: string }> {
+    return apiClient.post("/api/v1/optimize/resolve", {
+      trip_id: tripId,
+    });
+  },
 };

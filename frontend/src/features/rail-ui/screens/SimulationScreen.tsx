@@ -7,6 +7,8 @@ import {
   simulationSummary as mockSummary,
   simulationTable as mockTable,
 } from "@/features/rail-ui/mockData";
+import { policyApi } from "@/features/policy/api/policyApi";
+import { optimizeApi } from "@/features/optimize/api/optimizeApi";
 
 interface SimulationCompareData {
   trip_id: number;
@@ -31,6 +33,27 @@ export function SimulationScreen() {
   const [maxDelta, setMaxDelta] = useState(15);
   const [strategy, setStrategy] = useState("revenue");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
+  // Load thông tin chính sách thực tế khi mở Modal
+  useEffect(() => {
+    async function loadActivePolicy() {
+      try {
+        const policyId = activeScenario || 119;
+        const res = await policyApi.getPolicies();
+        const activePol = res.find((p: any) => p.id === policyId);
+        if (activePol) {
+          setFloorPrice(Math.round(activePol.min_price).toString());
+          setCeilingPrice(Math.round(activePol.max_price).toString());
+          setMaxDelta(activePol.max_step_change || 15);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy thông tin chính sách:", err);
+      }
+    }
+    if (isPolicyModalOpen) {
+      loadActivePolicy();
+    }
+  }, [isPolicyModalOpen, activeScenario]);
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
@@ -121,9 +144,9 @@ export function SimulationScreen() {
             Kịch bản mặc định (Trip #1)
           </button>
           <button
-            onClick={() => runSimulation(1)}
+            onClick={() => runSimulation(121)}
             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
-              activeScenario === 1
+              activeScenario === 121
                 ? "bg-primary text-on-primary"
                 : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
             }`}
@@ -131,8 +154,12 @@ export function SimulationScreen() {
             Chính sách Huế - Đà Nẵng
           </button>
           <button
-            onClick={() => runSimulation()}
-            className="px-4 py-2 rounded-lg font-bold text-xs bg-white border border-outline-variant text-on-surface hover:bg-slate-50 transition-all"
+            onClick={() => runSimulation(119)}
+            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+              activeScenario === 119
+                ? "bg-primary text-on-primary"
+                : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+            }`}
           >
             Cân bằng mùa cao điểm
           </button>
@@ -271,10 +298,25 @@ export function SimulationScreen() {
       {/* Decision Action Buttons */}
       <div className="bg-white border border-outline-variant p-4 rounded-xl shadow-sm flex flex-wrap gap-3">
         <button
-          onClick={() => window.alert("Đã gửi kịch bản tối ưu hóa lên hệ thống phê duyệt.")}
-          className="px-4 py-2.5 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+          onClick={async () => {
+            try {
+              setLoading(true);
+              const res = await optimizeApi.resolveOptimization(1);
+              setToastMessage(`Phê duyệt thành công! Job ID: ${res.job_id.substring(0, 8)}`);
+              setTimeout(() => setToastMessage(null), 4000);
+              await runSimulation(activeScenario ?? undefined);
+            } catch (err) {
+              console.error("Lỗi phê duyệt tối ưu hóa:", err);
+              setToastMessage("Yêu cầu phê duyệt thất bại.");
+              setTimeout(() => setToastMessage(null), 3000);
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+          className="px-4 py-2.5 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
         >
-          Phê duyệt áp dụng AI
+          {loading ? "Đang phê duyệt..." : "Phê duyệt áp dụng AI"}
         </button>
         <button className="px-4 py-2.5 border border-outline-variant text-on-surface hover:bg-slate-50 font-bold rounded-lg text-xs transition-all cursor-pointer">
           Ghi đè thủ công
@@ -381,10 +423,25 @@ export function SimulationScreen() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setIsPolicyModalOpen(false);
-                  setToastMessage("Cập nhật giới hạn chính sách thành công!");
-                  setTimeout(() => setToastMessage(null), 3000);
+                onClick={async () => {
+                  try {
+                    const policyId = activeScenario || 119;
+                    await policyApi.updatePolicy(policyId, {
+                      min_price: Number(floorPrice),
+                      max_price: Number(ceilingPrice),
+                      max_step_change: maxDelta,
+                    });
+                    
+                    setIsPolicyModalOpen(false);
+                    setToastMessage("Cập nhật giới hạn chính sách thành công!");
+                    setTimeout(() => setToastMessage(null), 3000);
+                    
+                    runSimulation(activeScenario ?? undefined);
+                  } catch (err) {
+                    console.error("Lỗi lưu chính sách:", err);
+                    setToastMessage("Lưu chính sách thất bại.");
+                    setTimeout(() => setToastMessage(null), 3000);
+                  }
                 }}
                 className="px-4 py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
