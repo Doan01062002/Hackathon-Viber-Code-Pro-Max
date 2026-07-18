@@ -228,26 +228,9 @@ export function BookingScreen() {
 
   const selectedTripProducts = products.filter((item) => item.trip_id === selectedTripId);
 
-  const getCombinedSeatInfo = (seatNo: string) => {
-    if (!isCombinedMode) return null;
-    const cleanNo = seatNo.replace(/[^0-9]/g, "");
-    if (cleanNo === "3" || cleanNo === "12") {
-      return {
-        tag: "Chặng 1",
-        style: "bg-purple-600 border-purple-800 text-white scale-105 shadow-md shadow-purple-200 ring-2 ring-purple-600 ring-offset-1"
-      };
-    }
-    if (cleanNo === "5" || cleanNo === "18") {
-      return {
-        tag: "Chặng 2",
-        style: "bg-amber-500 border-amber-700 text-white scale-105 shadow-md shadow-amber-200 ring-2 ring-amber-500 ring-offset-1"
-      };
-    }
-    return null;
-  };
-
   const triggerCombinedMode = () => {
     setIsCombinedMode(true);
+    setPickedSeats([]);
     // Setup mock combined legs (4 segments for high-granularity visual demo)
     setCombinedLegs([
       {
@@ -282,7 +265,6 @@ export function BookingScreen() {
         note: "Đổi sang Toa 03 Ghế 24 tại ga Đà Nẵng (dừng 10 phút).",
       }
     ]);
-    setSelectedSeatIds([101, 102, 103, 104]);
   };
 
   const coachEntries = selectedTripProducts
@@ -626,26 +608,9 @@ export function BookingScreen() {
                       <div key={index} className="rounded-xl border bg-white p-3">
                         <p className="text-[9px] font-black uppercase text-on-surface-variant mb-2">Khoang {index + 1}</p>
                         <div className="grid grid-cols-2 gap-2">
-<<<<<<< HEAD
-                          {compartment.map((seat, seatIndex) => {
-                            const combined = getCombinedSeatInfo(seat.seat_no);
-                            return (
-                              <SeatButton 
-                                key={seat.seat_id} 
-                                seat={seat} 
-                                selected={selectedSeatIds.includes(seat.seat_id)} 
-                                onClick={toggleSeat} 
-                                suffix={`T${Math.floor(seatIndex / 2) + 1}`} 
-                                combinedTag={combined?.tag}
-                                combinedStyle={combined?.style}
-                              />
-                            );
-                          })}
-=======
                           {compartment.map((seat, seatIndex) => (
                             <SeatButton key={seat.seat_id} seat={seat} selected={pickedSeatIds.has(seat.seat_id)} onClick={toggleSeat} suffix={`T${Math.floor(seatIndex / 2) + 1}`} />
                           ))}
->>>>>>> develop
                         </div>
                       </div>
                     ))}
@@ -661,20 +626,9 @@ export function BookingScreen() {
                             {seatRows.map((row, rIdx) => {
                               const seat = row[0];
                               if (!seat) return <div key={`empty-0-${rIdx}`} className="w-10 shrink-0" />;
-                              const combined = getCombinedSeatInfo(seat.seat_no);
                               return (
                                 <div key={seat.seat_id} className="w-10 shrink-0">
-<<<<<<< HEAD
-                                  <SeatButton 
-                                    seat={seat} 
-                                    selected={selectedSeatIds.includes(seat.seat_id)} 
-                                    onClick={toggleSeat} 
-                                    combinedTag={combined?.tag}
-                                    combinedStyle={combined?.style}
-                                  />
-=======
                                   <SeatButton seat={seat} selected={pickedSeatIds.has(seat.seat_id)} onClick={toggleSeat} />
->>>>>>> develop
                                 </div>
                               );
                             })}
@@ -685,20 +639,9 @@ export function BookingScreen() {
                             {seatRows.map((row, rIdx) => {
                               const seat = row[1];
                               if (!seat) return <div key={`empty-1-${rIdx}`} className="w-10 shrink-0" />;
-                              const combined = getCombinedSeatInfo(seat.seat_no);
                               return (
                                 <div key={seat.seat_id} className="w-10 shrink-0">
-<<<<<<< HEAD
-                                  <SeatButton 
-                                    seat={seat} 
-                                    selected={selectedSeatIds.includes(seat.seat_id)} 
-                                    onClick={toggleSeat} 
-                                    combinedTag={combined?.tag}
-                                    combinedStyle={combined?.style}
-                                  />
-=======
                                   <SeatButton seat={seat} selected={pickedSeatIds.has(seat.seat_id)} onClick={toggleSeat} />
->>>>>>> develop
                                 </div>
                               );
                             })}
@@ -716,20 +659,9 @@ export function BookingScreen() {
                             {seatRows.map((row, rIdx) => {
                               const seat = row[2];
                               if (!seat) return <div key={`empty-2-${rIdx}`} className="w-10 shrink-0" />;
-                              const combined = getCombinedSeatInfo(seat.seat_no);
                               return (
                                 <div key={seat.seat_id} className="w-10 shrink-0">
-<<<<<<< HEAD
-                                  <SeatButton 
-                                    seat={seat} 
-                                    selected={selectedSeatIds.includes(seat.seat_id)} 
-                                    onClick={toggleSeat} 
-                                    combinedTag={combined?.tag}
-                                    combinedStyle={combined?.style}
-                                  />
-=======
                                   <SeatButton seat={seat} selected={pickedSeatIds.has(seat.seat_id)} onClick={toggleSeat} />
->>>>>>> develop
                                 </div>
                               );
                             })}
@@ -740,20 +672,9 @@ export function BookingScreen() {
                             {seatRows.map((row, rIdx) => {
                               const seat = row[3];
                               if (!seat) return <div key={`empty-3-${rIdx}`} className="w-10 shrink-0" />;
-                              const combined = getCombinedSeatInfo(seat.seat_no);
                               return (
                                 <div key={seat.seat_id} className="w-10 shrink-0">
-<<<<<<< HEAD
-                                  <SeatButton 
-                                    seat={seat} 
-                                    selected={selectedSeatIds.includes(seat.seat_id)} 
-                                    onClick={toggleSeat} 
-                                    combinedTag={combined?.tag}
-                                    combinedStyle={combined?.style}
-                                  />
-=======
                                   <SeatButton seat={seat} selected={pickedSeatIds.has(seat.seat_id)} onClick={toggleSeat} />
->>>>>>> develop
                                 </div>
                               );
                             })}
@@ -787,13 +708,8 @@ export function BookingScreen() {
               Tìm kiếm hành trình
             </h3>
             <div className="grid grid-cols-2 gap-2">
-<<<<<<< HEAD
-              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setSelectedSeatIds([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
-              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
-=======
-              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setPickedSeats([]); }} />
-              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setPickedSeats([]); }} />
->>>>>>> develop
+              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
+              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
             </div>
             <div className="space-y-1">
               <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
@@ -804,7 +720,7 @@ export function BookingScreen() {
                   type="button"
                   onClick={() => {
                     setIsCombinedMode(false);
-                    setSelectedSeatIds([]);
+                    setPickedSeats([]);
                     setCombinedLegs([]);
                   }}
                   className="w-full py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-extrabold text-[10.5px] rounded-lg transition-all cursor-pointer border border-outline-variant/35"
@@ -831,7 +747,6 @@ export function BookingScreen() {
             <div className="space-y-3 text-xs font-semibold">
               <SummaryRow label="Hành trình" value={`${origin} - ${destination}`} />
               <SummaryRow label="Chuyến tàu" value={selectedPlan?.train_code ?? "Chưa chọn"} />
-<<<<<<< HEAD
               {isCombinedMode ? (
                 <>
                   <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2.5 text-[11px] font-semibold text-slate-700">
@@ -855,8 +770,8 @@ export function BookingScreen() {
                       setBooking(true);
                       setTimeout(() => {
                         setConfirmed([
-                          { booking_id: 101, booking_code: "SE3-COMBINED", seat_no: isSleeper ? "Giường 03 (T2 A)" : "Ghế 12", coach_no: "02" },
-                          { booking_id: 102, booking_code: "SE3-COMBINED", seat_no: isSleeper ? "Giường 05 (T3 A)" : "Ghế 18", coach_no: "02" }
+                          { booking_id: 101, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 101, seat_no: isSleeper ? "Giường 03 (T2 A)" : "Ghế 12", coach_no: "02" },
+                          { booking_id: 102, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 102, seat_no: isSleeper ? "Giường 05 (T3 A)" : "Ghế 18", coach_no: "02" }
                         ]);
                         setPaidPrice(850000);
                         setBooking(false);
@@ -870,28 +785,16 @@ export function BookingScreen() {
                 <>
                   <SummaryRow label="Toa" value={selectedCoachNo || "Chưa chọn"} />
                   <SummaryRow label="Loại chỗ" value={selectedProduct?.seat_type_name ?? "Chưa chọn"} />
-                  <SummaryRow label="Số ghế" value={selectedSeatIds.length ? selectedSeatIds.map((id) => selectedSeats.find((seat) => seat.seat_id === id)?.seat_no).join(", ") : "Chưa chọn"} />
+                  <SummaryRow label="Số ghế" value={pickedSeats.length ? pickedSeats.map((item) => `Toa ${item.coachNo}-${item.seatNo}`).join(", ") : "Chưa chọn"} />
                   <div className="flex justify-between items-end pt-2">
                     <span className="text-on-surface-variant font-bold">Tạm tính</span>
                     <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(estimatedTotal)}</span>
                   </div>
-                  <Button className="w-full py-2.5" disabled={!selectedProduct || selectedSeatIds.length === 0 || booking} onClick={handleConfirm}>
+                  <Button className="w-full py-2.5" disabled={pickedSeats.length === 0 || booking} onClick={handleConfirm}>
                     {booking ? "Đang giữ chỗ..." : "Xác nhận và đặt vé"}
                   </Button>
                 </>
               )}
-=======
-              <SummaryRow label="Toa" value={selectedCoachNo || "Chưa chọn"} />
-              <SummaryRow label="Loại chỗ" value={selectedProduct?.seat_type_name ?? "Chưa chọn"} />
-              <SummaryRow label="Số ghế" value={pickedSeats.length ? pickedSeats.map((item) => `Toa ${item.coachNo}-${item.seatNo}`).join(", ") : "Chưa chọn"} />
-              <div className="flex justify-between items-end pt-2">
-                <span className="text-on-surface-variant font-bold">Tạm tính</span>
-                <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(estimatedTotal)}</span>
-              </div>
-              <Button className="w-full py-2.5" disabled={pickedSeats.length === 0 || booking} onClick={handleConfirm}>
-                {booking ? "Đang giữ chỗ..." : "Xác nhận và đặt vé"}
-              </Button>
->>>>>>> develop
               {confirmed.length > 0 ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-green-800 space-y-1">
                   <p className="font-black">Đã đặt {confirmed.length} vé trong phiên này</p>
@@ -907,13 +810,12 @@ export function BookingScreen() {
   );
 }
 
-function SeatButton({ seat, selected, onClick, suffix, combinedTag, combinedStyle }: { seat: BookingSeat; selected: boolean; onClick: (seat: BookingSeat) => void; suffix?: string; combinedTag?: string; combinedStyle?: string }) {
-  const unavailable = seat.status !== "available" && !combinedTag;
+function SeatButton({ seat, selected, onClick, suffix }: { seat: BookingSeat; selected: boolean; onClick: (seat: BookingSeat) => void; suffix?: string }) {
+  const unavailable = seat.status !== "available";
   return (
-    <button type="button" disabled={unavailable} onClick={() => onClick(seat)} title={`Ghe ${seat.seat_no} · ${seat.status}`} className={`h-10 w-full rounded-md text-[9px] font-black transition-all relative ${combinedStyle ? combinedStyle : selected ? "bg-primary text-white shadow-md scale-105" : unavailable ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-outline-variant hover:border-primary text-on-surface"}`}>
+    <button type="button" disabled={unavailable} onClick={() => onClick(seat)} title={`Ghế ${seat.seat_no} · ${seat.status}`} className={`h-10 w-full rounded-md text-[9px] font-black transition-all relative ${selected ? "bg-primary text-white shadow-md scale-105" : unavailable ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-outline-variant hover:border-primary text-on-surface"}`}>
       {seat.seat_no}
       {suffix ? <span className="block text-[7px] opacity-70">{suffix}</span> : null}
-      {combinedTag ? <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-slate-900/90 text-white rounded text-[5px] font-black tracking-wider uppercase z-20 whitespace-nowrap">{combinedTag}</span> : null}
     </button>
   );
 }
