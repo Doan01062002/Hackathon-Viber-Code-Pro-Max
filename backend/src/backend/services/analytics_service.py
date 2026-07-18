@@ -179,12 +179,22 @@ class AnalyticsService:
             booking_lead_days.append(lead_day)
 
         # 4. Tính toán Booking Curve tích lũy từ 60 ngày về 0
+        #
+        # demand_forecasts lưu nhu cầu PHÁT SINH ở từng lead day (61 mốc cộng lại bằng λ̂),
+        # còn cột này theo hợp đồng là nhu cầu TÍCH LŨY — nên phải cộng dồn ở đây. Trước
+        # đây lấy thẳng giá trị từng mốc, tức là đem một đường mật độ vẽ chung khung với
+        # đường lũy kế thực tế. Với ngày thường hai đường gần trùng nhau (mật độ mũ có
+        # dạng chuẩn hóa trùng hàm sống sót) nên lỗi bị che; nhưng với chuyến trong 60 ngày
+        # trước Tết, phần nhô quanh lead 45 khiến đường vẽ ra LÕM XUỐNG giữa chừng — điều
+        # không bao giờ xảy ra với một đường lũy kế — và lệch tới ~35 điểm phần trăm.
         booking_curve = []
+        cum_forecast = 0.0
         for t in range(60, -1, -1):
             # Số bookings có lead_days >= t (đặt từ trước hoặc đúng ngày t)
             cum_bookings = sum(1 for ld in booking_lead_days if ld >= t)
-            # Lấy dự báo nhu cầu tích lũy tại lead_days = t
-            fc_demand = float(forecast_by_lead_day.get(t, 0.0))
+            # Cộng dồn theo chiều lead giảm dần -> tổng phần đã phát sinh khi còn t ngày.
+            cum_forecast += float(forecast_by_lead_day.get(t, 0.0))
+            fc_demand = cum_forecast
 
             booking_curve.append(
                 BookingCurvePoint(
