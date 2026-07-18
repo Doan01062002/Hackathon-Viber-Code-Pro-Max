@@ -520,7 +520,6 @@ export function BookingScreen() {
                 <span className="text-on-surface-variant font-bold">Tạm tính</span>
                 <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(estimatedTotal)}</span>
               </div>
-              <p className="text-[9px] text-on-surface-variant">Giá cuối cùng được lấy từ API quote khi xác nhận.</p>
               <Button className="w-full py-2.5" disabled={!selectedProduct || selectedSeatIds.length === 0 || booking} onClick={handleConfirm}>
                 {booking ? "Đang giữ chỗ..." : "Xác nhận và đặt vé"}
               </Button>

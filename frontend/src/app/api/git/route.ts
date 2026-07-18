@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: remove settings and help links, translate all UI texts to proper Vietnamese\"");
+  runCmd("git commit -m \"feat: remove API quote notice from booking summary screen\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");
