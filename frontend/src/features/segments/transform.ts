@@ -6,6 +6,8 @@ import type { LegHeatmapItemDto } from "./types";
 const SEAT_TYPE_LABELS: Record<string, string> = {
   giuong_nam_k6: "Giường nằm K6",
   ngoi_mem: "Ngồi mềm",
+  soft_seat: "Ngồi mềm",
+  sleeper_k6: "Giường nằm K6",
 };
 
 export function seatTypeLabel(code: string): string {

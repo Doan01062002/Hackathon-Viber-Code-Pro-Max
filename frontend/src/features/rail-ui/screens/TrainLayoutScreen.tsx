@@ -215,7 +215,7 @@ export function TrainLayoutScreen() {
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <span className="text-[10px] uppercase font-black text-primary tracking-wider">Cơ Hội Ghép Chặng AI</span>
-              <h4 className="text-xs font-black text-on-surface">Đề xuất tối ưu (Gap Combining)</h4>
+              <h4 className="text-xs font-black text-on-surface">Đề xuất tối ưu ghép chặng</h4>
               <p className="text-[10.5px] text-on-surface-variant/80 font-medium leading-relaxed mt-1">
                 AI tự động phát hiện các khoảng trống ngắn liền kề trên sơ đồ ghế để ghép thành chặng dài nguyên vẹn.
               </p>
@@ -607,7 +607,7 @@ export function TrainLayoutScreen() {
         <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-outline-variant flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-on-surface text-sm">Phân Bổ Tồn Kho Chỗ Ngồi Chặng (Inventory Allocation)</h3>
+              <h3 className="font-bold text-on-surface text-sm">Phân Bổ Tồn Kho Chỗ Ngồi Chặng</h3>
               <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">
                 Cơ cấu phân bổ số ghế bán chặng dài và chặng ngắn trên tàu.
               </p>
@@ -702,7 +702,7 @@ export function TrainLayoutScreen() {
           <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden">
             <div className="flex items-center gap-2 mb-2">
               <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
-              <h3 className="font-bold text-on-surface">Đề Xuất Ghép Chặng (Gap Combining)</h3>
+              <h3 className="font-bold text-on-surface">Đề Xuất Ghép Chặng</h3>
             </div>
             <p className="text-[10px] text-on-surface-variant/80 mb-4 leading-relaxed font-semibold">
               AI tự động phân tích và đề xuất giải phóng các ghế chặng ngắn bị phân rã liền kề để ghép bán chặng dài có doanh thu cao hơn.
