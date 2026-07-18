@@ -124,6 +124,7 @@ export function QuoteScreen() {
                 />
                 <SearchableStationSelect
                   label="Ga đến"
+                  align="right"
                   options={stationOptions.filter((option) => option.code !== request.origin)}
                   value={request.destination}
                   onChange={(destination) => setRequest({ ...request, destination })}

@@ -15,6 +15,7 @@ type SearchableStationSelectProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  align?: "left" | "right";
   className?: string;
 };
 
@@ -24,6 +25,7 @@ export function SearchableStationSelect({
   value,
   onChange,
   placeholder = "Tìm theo mã ga, tên ga hoặc khu vực",
+  align = "left",
   className,
 }: SearchableStationSelectProps) {
   const [open, setOpen] = useState(false);
@@ -110,9 +112,14 @@ export function SearchableStationSelect({
           </span>
         </button>
 
-        {/* Dropdown Overlay */}
+        {/* Dropdown Overlay - Custom Width to prevent name truncation and aligned based on prop */}
         {open ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-xl border border-outline-variant bg-white shadow-xl p-3 space-y-3">
+          <div
+            className={cn(
+              "absolute top-[calc(100%+8px)] z-30 rounded-xl border border-outline-variant bg-white shadow-xl p-3 space-y-3 w-[280px] sm:w-[320px]",
+              align === "right" ? "right-0" : "left-0"
+            )}
+          >
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-on-surface-variant">
                 search
@@ -126,7 +133,7 @@ export function SearchableStationSelect({
               />
             </div>
 
-            {/* List options with list style instead of card style */}
+            {/* List options with list style instead of card style - No text truncation */}
             <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-slate-100 pr-1">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => {
@@ -141,21 +148,21 @@ export function SearchableStationSelect({
                         setOpen(false);
                       }}
                       className={cn(
-                        "w-full px-3 py-2 text-left transition-all duration-150 flex items-center justify-between cursor-pointer first:rounded-t-lg last:rounded-b-lg",
+                        "w-full px-3 py-2.5 text-left transition-all duration-150 flex items-center justify-between cursor-pointer first:rounded-t-lg last:rounded-b-lg",
                         isSelected
                           ? "bg-primary/10 text-primary font-bold"
                           : "hover:bg-slate-50 text-on-surface"
                       )}
                     >
-                      <div className="min-w-0 flex-grow">
+                      <div className="min-w-0 flex-grow pr-2">
                         <span className={cn(
-                          "block text-xs truncate",
+                          "block text-xs",
                           isSelected ? "font-black text-primary" : "font-bold text-on-surface"
                         )}>
                           {option.name}
                         </span>
                         {option.region ? (
-                          <span className="block text-[10px] text-on-surface-variant/80 font-medium truncate mt-0.5">
+                          <span className="block text-[10px] text-on-surface-variant/80 font-medium mt-0.5">
                             {option.region}
                           </span>
                         ) : null}

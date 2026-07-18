@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: set fixed height for station selectors and redesign dropdown options list with badges\"");
+  runCmd("git commit -m \"feat: align destination dropdown to the right and remove truncation on dropdown list options\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");

@@ -479,7 +479,7 @@ export function BookingScreen() {
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
-              <SearchableStationSelect label="Ga đến" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
+              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
             </div>
             <div className="space-y-1">
               <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
