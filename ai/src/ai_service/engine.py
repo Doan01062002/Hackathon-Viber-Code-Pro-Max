@@ -17,8 +17,10 @@ from __future__ import annotations
 import hashlib
 import os
 import pickle
+import tempfile
 import threading
 import time
+import urllib.request
 import uuid
 from datetime import date
 
@@ -44,6 +46,44 @@ from .schemas import (
 # engine.py nằm ở ai/src/ai_service/ nên phải lùi 3 cấp mới tới ai/ (chứa models/).
 _AI_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MODEL_PATH = os.path.join(_AI_ROOT, "models", "model.pkl")
+
+
+def _sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as model_file:
+        for chunk in iter(lambda: model_file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _resolve_model_path(model_path: str | None) -> str | None:
+    """Return a local model path, downloading the pinned artifact for serverless runtimes."""
+    if model_path and os.path.exists(model_path):
+        return model_path
+
+    model_url = os.getenv("AI_MODEL_URL", "").strip()
+    if not model_url:
+        return model_path
+    if not model_url.startswith("https://"):
+        raise AIEngineError("AI_MODEL_URL phai dung HTTPS")
+
+    expected_sha256 = os.getenv("AI_MODEL_SHA256", "").strip().lower()
+    cached_path = os.path.join(tempfile.gettempdir(), "srrm-model.pkl")
+    if os.path.exists(cached_path) and (not expected_sha256 or _sha256_file(cached_path) == expected_sha256):
+        return cached_path
+
+    with urllib.request.urlopen(model_url, timeout=30) as response:  # noqa: S310 - HTTPS is enforced above
+        payload = response.read()
+
+    actual_sha256 = hashlib.sha256(payload).hexdigest()
+    if expected_sha256 and actual_sha256 != expected_sha256:
+        raise AIEngineError("AI model checksum khong khop")
+
+    temporary_path = f"{cached_path}.tmp"
+    with open(temporary_path, "wb") as model_file:
+        model_file.write(payload)
+    os.replace(temporary_path, cached_path)
+    return cached_path
 
 
 class AIEngineError(RuntimeError):
@@ -132,8 +172,9 @@ class AIEngine:
         # khóa này không ai đọc nên backend phải tự viết lại một đường cong lý thuyết.
         self.booking_curve = None
 
-        if model_path and os.path.exists(model_path):
-            with open(model_path, "rb") as model_file:
+        resolved_model_path = _resolve_model_path(model_path)
+        if resolved_model_path and os.path.exists(resolved_model_path):
+            with open(resolved_model_path, "rb") as model_file:
                 bundle = pickle.load(model_file)
             self.forecaster = bundle["forecaster"]
             self.eps = bundle["eps"]

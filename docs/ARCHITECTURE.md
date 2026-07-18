@@ -98,6 +98,10 @@ Chia theo **feature**, không theo loại file. Thêm chức năng = thêm một
 
 Mỗi feature có `index.ts` làm interface công khai; bên ngoài không import sâu vào trong.
 
+Tailwind CSS được biên dịch bằng PostCSS trong `next build` từ
+`frontend/tailwind.config.ts`; production không phụ thuộc Tailwind CDN ở runtime để
+tránh flash giao diện chưa có style trong lần tải đầu.
+
 ## Database Architecture
 
 Schema nguồn nằm tại `schema.sql`. Các bảng được chia theo mục đích:
@@ -215,6 +219,28 @@ graph LR
 Lưu ý: `NEXT_PUBLIC_API_URL` được nhúng vào bundle **lúc build**, không phải lúc chạy,
 nên nó là build arg trong `frontend/Dockerfile`. Trình duyệt là bên gọi backend, nên
 giá trị phải là URL nhìn từ máy user — không phải hostname nội bộ của compose.
+
+### Vercel
+
+Vercel uses two projects from this monorepo:
+
+- The frontend project uses `frontend/` as its Root Directory and builds Next.js.
+- The API project uses the repository root and `Dockerfile.vercel`. The container
+  installs `libgomp1` for LightGBM, installs the local `ai/` and `backend/` packages,
+  and starts `backend.main:app` on Vercel's injected `PORT`. The AI model remains
+  in-process inside the backend container; it is not a separate HTTP service.
+- `AI_MODEL_URL` and `AI_MODEL_SHA256` provide a checksum-verified fallback for
+  serverless environments that omit `ai/models/model.pkl` from their bundle. The
+  Vercel container normally reads the model directly from the image.
+- The API function runs in Vercel `sin1`, matching the PostgreSQL database in
+  AWS `ap-southeast-1`. AI modules and the LightGBM artifact are lazy-loaded on
+  the first AI request so database-only dashboard traffic has a smaller cold start.
+
+The frontend project must define `NEXT_PUBLIC_API_URL` with the API project domain.
+The API project requires `APP_ENV=production`, `DATABASE_URL`, and `CORS_ORIGINS`
+containing the frontend domain. LLM provider keys are only required when the graph
+actually calls a provider; forecast, optimize, and price currently use
+`ai/models/model.pkl` without an external AI API key.
 
 ## Security
 
