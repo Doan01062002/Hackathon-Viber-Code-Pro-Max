@@ -10,7 +10,7 @@ export function LoginScreen() {
         <h1 className="text-xl font-extrabold text-on-surface mt-2 mb-4">Đăng nhập vào Revenue Control Tower</h1>
         <p className="text-xs text-on-surface-variant leading-relaxed mb-6 font-semibold">
           Truy cập một không gian điều hành nhẹ nhàng, rõ ràng và đủ sâu để theo dõi tải
-          chặng, báo giá, mô phỏng và kiểm toán trên cùng một luồng làm việc.
+          chặng, báo giá và kiểm toán trên cùng một luồng làm việc.
         </p>
 
         <div className="space-y-4">

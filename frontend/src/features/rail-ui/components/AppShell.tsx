@@ -16,7 +16,6 @@ function getIconName(icon: string) {
     case "confirmation_number": return "confirmation_number";
     case "dashboard": return "dashboard";
     case "price": return "payments";
-    case "simulation": return "analytics";
     case "alert": return "notifications";
     case "audit": return "history";
     case "train": return "train";

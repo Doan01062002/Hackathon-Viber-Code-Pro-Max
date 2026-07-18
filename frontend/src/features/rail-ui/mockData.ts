@@ -9,7 +9,6 @@ export const navItems: NavItem[] = [
   { href: "/booking", label: "Đặt vé tàu", icon: "confirmation_number", group: "passenger" },
   { href: "/dashboard", label: "Tổng quan", icon: "dashboard", group: "admin" },
   { href: "/quote", label: "Báo giá", icon: "price", group: "admin" },
-  { href: "/simulation", label: "Mô phỏng", icon: "simulation", group: "admin" },
   { href: "/alerts", label: "Cảnh báo", icon: "alert", group: "admin" },
   { href: "/audit", label: "Kiểm toán", icon: "audit", group: "admin" },
   { href: "/train-layout", label: "Toa tàu", icon: "train", group: "admin" },
@@ -70,27 +69,6 @@ export const gapSuggestions = [
     priority: "Theo dõi",
     reason: "Tốc độ bán thấp hơn dự báo nên có thể nới bán để tăng lấp đầy cuối chặng.",
   },
-];
-
-export const simulationSummary = {
-  policy: "Cuối tuần tháng 7 nhu cầu cao",
-  revenueLift: "+8,2%",
-  utilizationLift: "+5,1%",
-  rejectedShortTrips: "-13%",
-  note: "Doanh thu tăng nhưng vẫn giữ được room bán cho ga trung gian và giảm sold-out giả.",
-};
-
-export const simulationTable = [
-  { metric: "Doanh thu", current: "2,41 tỷ", ai: "2,61 tỷ" },
-  { metric: "Hệ số lấp đầy", current: "74%", ai: "79%" },
-  { metric: "Vé ga trung gian", current: "1.840", ai: "2.110" },
-  { metric: "Lượt tìm sold-out", current: "420", ai: "301" },
-];
-
-export const scenarioChart = [
-  { name: "Hiện tại", revenue: 72, volume: 64 },
-  { name: "AI đề xuất", revenue: 84, volume: 71 },
-  { name: "AI + quota trung gian", revenue: 79, volume: 76 },
 ];
 
 export const alerts = [
@@ -199,10 +177,6 @@ export const rightRailCards = {
       meta: "03 route đang dư năng lực nhưng tốc độ bán thấp",
     },
   ],
-  simulationStatus: {
-    value: "41 / 60 lượt",
-    body: "Nhóm đã dùng 68% hạn mức mô phỏng trong tháng này.",
-  },
   updateStatus: {
     title: "Dữ liệu vừa cập nhật",
     body: "Đồng bộ giá, quota và tồn ghế lần cuối lúc 16:55, chậm 5 phút so với realtime.",
