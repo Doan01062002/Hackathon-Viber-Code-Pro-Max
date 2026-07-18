@@ -102,7 +102,7 @@ export function QuoteScreen() {
     <div className="space-y-6">
       {error || catalogError ? (
         <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-yellow-700 text-xs font-semibold">
-          Canh bao: {error ?? catalogError}. Dang dung du lieu du phong.
+          Cảnh báo: {error ?? catalogError}. Đang dùng dữ liệu dự phòng.
         </div>
       ) : null}
 
@@ -111,19 +111,19 @@ export function QuoteScreen() {
           <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm space-y-4">
             <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-sm">payments</span>
-              Bao gia hanh trinh
+              Báo giá hành trình
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <SearchableStationSelect
-                  label="Ga di"
+                  label="Ga đi"
                   options={stationOptions}
                   value={request.origin}
                   onChange={(origin) => setRequest({ ...request, origin })}
                 />
                 <SearchableStationSelect
-                  label="Ga den"
+                  label="Ga đến"
                   options={stationOptions.filter((option) => option.code !== request.origin)}
                   value={request.destination}
                   onChange={(destination) => setRequest({ ...request, destination })}
@@ -133,7 +133,7 @@ export function QuoteScreen() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
-                    Loai cho
+                    Loại chỗ
                   </label>
                   <select
                     className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
@@ -141,8 +141,8 @@ export function QuoteScreen() {
                     onChange={(event) => setRequest({ ...request, seat_type: event.target.value })}
                   >
                     {(catalog?.seat_types ?? [
-                      { code: "ngoi_mem", name: "Ngoi mem dieu hoa" },
-                      { code: "giuong_nam_k6", name: "Giuong nam K6" },
+                      { code: "ngoi_mem", name: "Ngồi mềm điều hòa" },
+                      { code: "giuong_nam_k6", name: "Giường nằm K6" },
                     ]).map((seatType) => (
                       <option key={seatType.code} value={seatType.code}>{seatType.name}</option>
                     ))}
@@ -150,7 +150,7 @@ export function QuoteScreen() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
-                    Ngay di
+                    Ngày đi
                   </label>
                   <Input
                     type="date"
@@ -165,7 +165,7 @@ export function QuoteScreen() {
 
               <div className="pt-2 flex justify-end">
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Dang tinh toan..." : "Lay bao gia toi uu"}
+                  {isLoading ? "Đang tính toán..." : "Lấy báo giá tối ưu"}
                 </Button>
               </div>
             </form>
@@ -185,14 +185,14 @@ export function QuoteScreen() {
             }`}
           >
             <h3 className="font-bold text-xs text-on-surface uppercase tracking-wider mb-3 border-b border-outline-variant/30 pb-2">
-              Ket qua bao gia toi uu
+              Kết quả báo giá tối ưu
             </h3>
 
             {quote ? (
               <div className="space-y-4">
                 <div>
                   <span className="text-[10px] text-on-surface-variant font-bold uppercase">
-                    Gia de xuat toi uu
+                    Giá đề xuất tối ưu
                   </span>
                   <p className="text-2xl font-black text-primary font-mono mt-1">
                     {formatMoney(quote.final_price)}
@@ -202,7 +202,7 @@ export function QuoteScreen() {
                 <div className="grid grid-cols-2 gap-4 text-xs font-semibold pt-1">
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-outline-variant/30">
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase">
-                      Quyet dinh
+                      Quyết định
                     </span>
                     <p
                       className={`font-extrabold mt-0.5 ${
@@ -210,15 +210,15 @@ export function QuoteScreen() {
                       }`}
                     >
                       {quote.decision === "accepted"
-                        ? "Chap nhan (AI)"
+                        ? "Chấp nhận (AI)"
                         : quote.decision === "rejected"
-                          ? "Tu choi (AI)"
-                          : "Chan ban (AI)"}
+                          ? "Từ chối (AI)"
+                          : "Chặn bán (AI)"}
                     </p>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-outline-variant/30">
                     <span className="text-[9px] text-on-surface-variant font-bold uppercase">
-                      Chi phi co hoi
+                      Chi phí cơ hội
                     </span>
                     <p className="font-bold mt-0.5 text-on-surface font-mono">
                       {formatMoney(quote.opportunity_cost)}
@@ -227,13 +227,13 @@ export function QuoteScreen() {
                 </div>
 
                 <div className="text-[10px] text-on-surface-variant font-semibold bg-slate-50/50 p-2 rounded border border-dashed border-outline-variant flex justify-between">
-                  <span>Kha dung:</span>
-                  <span className="font-bold text-primary">Con {quote.availability} cho</span>
+                  <span>Khả dụng:</span>
+                  <span className="font-bold text-primary">Còn {quote.availability} chỗ</span>
                 </div>
               </div>
             ) : (
               <div className="text-xs font-semibold text-on-surface-variant py-4 text-center">
-                Vui long dien thong tin va lay bao gia toi uu.
+                Vui lòng điền thông tin và lấy báo giá tối ưu.
               </div>
             )}
           </div>
@@ -241,20 +241,20 @@ export function QuoteScreen() {
           {quote ? (
             <div className="bg-white border border-outline-variant rounded-xl p-5 shadow-sm space-y-3">
               <h3 className="font-bold text-xs text-on-surface uppercase tracking-wider border-b border-outline-variant/30 pb-2">
-                Dien giai bao gia
+                Diễn giải báo giá
               </h3>
 
               <div className="text-xs font-semibold leading-relaxed text-on-surface-variant space-y-3">
                 <p>
-                  Nut co chai:{" "}
+                  Nút cổ chai:{" "}
                   <strong className="text-on-surface">
-                    {quote.explanation.bottleneck_segment ?? "Khong xac dinh"}
+                    {quote.explanation.bottleneck_segment ?? "Không xác định"}
                   </strong>
-                  . Gia ve duoc doi chieu voi tong bid price cua toan bo chang OD.
+                  . Giá vé được đối chiếu với tổng giá chào mua (bid price) của toàn bộ chặng O-D.
                 </p>
                 <div className="pt-2">
                   <span className="text-[10px] font-bold text-on-surface-variant uppercase">
-                    Chinh sach ap dung:
+                    Chính sách áp dụng:
                   </span>
                   <div className="flex flex-wrap gap-1.5 mt-1.5">
                     {quote.explanation.applied_policies.length > 0 ? (
@@ -268,7 +268,7 @@ export function QuoteScreen() {
                       ))
                     ) : (
                       <span className="bg-slate-100 text-slate-500 border border-outline-variant/35 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase">
-                        Khong co rang buoc
+                        Không có ràng buộc
                       </span>
                     )}
                   </div>
@@ -280,15 +280,15 @@ export function QuoteScreen() {
           <div className="bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm h-64 relative">
             <img
               className="w-full h-full object-cover"
-              alt="Ban do mang luoi chang"
+              alt="Bản đồ mạng lưới chặng"
               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDqefbziBtF-K_WFMPtQn5LoS4TRXshMSMORahY21cRunFCAS-YIGVYOapfQPJs_AVTnCAAOIvB4JmcTGxKcMvoE9inf24681pb8l_PTPzNQy4nHdsaxk1pqUGEPmMNBqoB-GPFiXrKkzMVVdYLW5m3wn-z7nzBhIAhzge2n5DIF_iPrLuB-6MTh-i4kpwtsfjRb529jgpp9l6kPZ3AZRilbpzO34_FLgDy--x43QtVqGi__FnW0G1pyd8X45cCLP7L-NmERI4PPWS2"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
             <div className="absolute bottom-4 left-4 text-white">
               <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-                Ban do lop phu mang luoi
+                Bản đồ lớp phủ mạng lưới
               </p>
-              <p className="text-sm font-semibold">Dang theo doi 4 diem tac nghen</p>
+              <p className="text-sm font-semibold">Đang theo dõi 4 điểm tắc nghẽn</p>
             </div>
             <button className="absolute top-4 right-4 bg-white/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-white/40 transition-all flex items-center justify-center">
               <span className="material-symbols-outlined text-sm">fullscreen</span>

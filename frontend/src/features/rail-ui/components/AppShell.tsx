@@ -48,7 +48,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
           {/* Passenger Section */}
           <div className="px-3">
             <p className="px-4 text-[11px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-2">
-              Cổng Hành Khách (Portal)
+              Cổng Hành Khách
             </p>
             {navItems
               .filter((item) => item.group === "passenger")
@@ -74,7 +74,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
           {/* Admin Section */}
           <div className="px-3">
             <p className="px-4 text-[11px] font-black text-on-surface-variant/60 uppercase tracking-widest mb-2">
-              Điều Hành Doanh Thu (Control Tower)
+              Điều Hành Doanh Thu
             </p>
             {navItems
               .filter((item) => item.group === "admin")
@@ -98,29 +98,13 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
           </div>
         </nav>
 
-        <div className="px-3 mt-auto space-y-1.5 pt-2 border-t border-outline-variant">
+        <div className="px-3 mt-auto pt-2 border-t border-outline-variant">
           <button
             className="w-full py-2 bg-primary text-on-primary rounded-xl font-bold text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
             onClick={() => window.alert("Đang chuẩn bị xuất báo cáo doanh thu động...")}
           >
             Xuất báo cáo
           </button>
-          <div>
-            <a
-              className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
-              href="#"
-            >
-              <span className="material-symbols-outlined text-base">settings</span>
-              <span className="text-xs">Cài đặt</span>
-            </a>
-            <a
-              className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
-              href="#"
-            >
-              <span className="material-symbols-outlined text-base">help_outline</span>
-              <span className="text-xs">Hỗ trợ</span>
-            </a>
-          </div>
         </div>
       </aside>
 

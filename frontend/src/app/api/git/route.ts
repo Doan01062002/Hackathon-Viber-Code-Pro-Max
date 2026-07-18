@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: add train logo to sidebar, scale sidebar headings size, and remove useless header filter button\"");
+  runCmd("git commit -m \"feat: remove settings and help links, translate all UI texts to proper Vietnamese\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");

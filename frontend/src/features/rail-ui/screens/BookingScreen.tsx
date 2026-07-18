@@ -299,15 +299,15 @@ export function BookingScreen() {
             <div className="flex items-center justify-between gap-3 mb-4">
               <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-sm">train</span>
-                So do doan tau {selectedPlan ? `· ${selectedPlan.train_code}` : ""}
+                Sơ đồ đoàn tàu {selectedPlan ? `· ${selectedPlan.train_code}` : ""}
               </h3>
-              {loadingPlans ? <span className="text-[10px] font-bold text-primary animate-pulse">Dang cap nhat DB...</span> : null}
+              {loadingPlans ? <span className="text-[10px] font-bold text-primary animate-pulse">Đang cập nhật...</span> : null}
             </div>
 
             {coachEntries.length > 0 ? (
               <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 pt-1">
                 <div className="w-24 h-[70px] shrink-0 bg-slate-50 border border-slate-200 rounded-lg flex flex-col items-center justify-center gap-1 p-2 select-none text-slate-400">
-                  <span className="w-full text-center text-[10px] font-black uppercase tracking-wider leading-none">Dau tau</span>
+                  <span className="w-full text-center text-[10px] font-black uppercase tracking-wider leading-none">Đầu tàu</span>
                   <div className="flex items-center justify-center">
                     <span className="material-symbols-outlined text-xl leading-none">train</span>
                   </div>
@@ -348,7 +348,7 @@ export function BookingScreen() {
               </div>
             ) : (
               <div className="h-20 rounded-lg border border-dashed border-outline-variant flex items-center justify-center text-xs font-semibold text-on-surface-variant">
-                {loadingProducts || loadingPlans ? "Dang tai cau hinh doan tau..." : "Khong co doan tau phu hop."}
+                {loadingProducts || loadingPlans ? "Đang tải cấu hình đoàn tàu..." : "Không có đoàn tàu phù hợp."}
               </div>
             )}
           </div>
@@ -357,12 +357,12 @@ export function BookingScreen() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-sm">airline_seat_recline_normal</span>
-                Toa {selectedCoachNo || "--"} · {isSleeper ? "Giuong nam khoang 6" : "Ngoi mem dieu hoa"}
+                Toa {selectedCoachNo || "--"} · {isSleeper ? "Giường nằm khoang 6" : "Ngồi mềm điều hòa"}
               </h3>
               <div className="flex gap-3 text-[9px] font-bold">
-                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded border bg-white" />Con trong</span>
-                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded bg-slate-300" />Da giu/ban</span>
-                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded bg-primary" />Dang chon</span>
+                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded border bg-white" />Còn trống</span>
+                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded bg-slate-300" />Đã giữ/bán</span>
+                <span className="flex items-center gap-1"><i className="w-3 h-3 rounded bg-primary" />Đang chọn</span>
               </div>
             </div>
 
@@ -457,13 +457,13 @@ export function BookingScreen() {
               </div>
             ) : (
               <div className="h-36 rounded-xl border border-dashed border-outline-variant flex items-center justify-center text-xs font-semibold text-on-surface-variant">
-                Chon toa de xem ghe tu database.
+                Chọn toa để xem ghế từ database.
               </div>
             )}
           </div>
 
           <RouteMap
-            title={`Ban do tai chang ${selectedPlan ? `· ${selectedPlan.origin_code} - ${selectedPlan.destination_code}` : ""}`}
+            title={`Bản đồ tải chặng ${selectedPlan ? `· ${selectedPlan.origin_code} - ${selectedPlan.destination_code}` : ""}`}
             segments={routeSegments}
             loading={loadingPlans}
             selectedOrigin={origin}
@@ -475,29 +475,29 @@ export function BookingScreen() {
           <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm space-y-4">
             <h3 className="font-bold text-sm text-on-surface flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-sm">search</span>
-              Tim kiem hanh trinh
+              Tìm kiếm hành trình
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              <SearchableStationSelect label="Ga di" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
-              <SearchableStationSelect label="Ga den" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
+              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
+              <SearchableStationSelect label="Ga đến" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <DateField label="Ngay di" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
-              <DateField label="Ngay ve" value={returnDate} onChange={setReturnDate} dates={bookingOptions?.return_dates ?? []} optional />
+              <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
+              <DateField label="Ngày về" value={returnDate} onChange={setReturnDate} dates={bookingOptions?.return_dates ?? []} optional />
             </div>
             {bookingOptions && bookingOptions.return_dates.length === 0 ? (
               <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[10px] font-semibold text-amber-800">
-                DB chua co chuyen chieu {destination} - {origin}; ngay ve tam thoi khong kha dung.
+                Cơ sở dữ liệu chưa có chuyến chiều {destination} - {origin}; ngày về tạm thời không khả dụng.
               </p>
             ) : null}
             {returnDate ? (
               <p className="text-[10px] font-semibold text-on-surface-variant">
-                Chieu ve: {returnProducts.length > 0 ? `${returnProducts.length} lua chon` : "khong co chuyen"}
+                Chiều về: {returnProducts.length > 0 ? `${returnProducts.length} lựa chọn` : "không có chuyến"}
               </p>
             ) : null}
             {tripChoices.length > 0 ? (
               <div className="space-y-1">
-                <label className="text-[9px] uppercase font-bold text-on-surface-variant">Chuyen tau</label>
+                <label className="text-[9px] uppercase font-bold text-on-surface-variant">Chuyến tàu</label>
                 <select value={selectedTripId ?? ""} onChange={(event) => { setSelectedTripId(Number(event.target.value)); setSelectedSeatIds([]); }} className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold">
                   {tripChoices.map((trip) => <option key={trip.trip_id} value={trip.trip_id}>{trip.train_code} · {formatTime(trip.departure_at)} - {formatTime(trip.arrival_at)}</option>)}
                 </select>
@@ -508,27 +508,27 @@ export function BookingScreen() {
           <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
             <h3 className="font-bold text-sm text-on-surface mb-3 flex items-center gap-2 border-b border-outline-variant/30 pb-2">
               <span className="material-symbols-outlined text-primary text-sm">shopping_bag</span>
-              Chi tiet ve dat
+              Chi tiết vé đặt
             </h3>
             <div className="space-y-3 text-xs font-semibold">
-              <SummaryRow label="Hanh trinh" value={`${origin} - ${destination}`} />
-              <SummaryRow label="Chuyen tau" value={selectedPlan?.train_code ?? "Chua chon"} />
-              <SummaryRow label="Toa" value={selectedCoachNo || "Chua chon"} />
-              <SummaryRow label="Loai cho" value={selectedProduct?.seat_type_name ?? "Chua chon"} />
-              <SummaryRow label="So ghe" value={selectedSeatIds.length ? selectedSeatIds.map((id) => selectedSeats.find((seat) => seat.seat_id === id)?.seat_no).join(", ") : "Chua chon"} />
+              <SummaryRow label="Hành trình" value={`${origin} - ${destination}`} />
+              <SummaryRow label="Chuyến tàu" value={selectedPlan?.train_code ?? "Chưa chọn"} />
+              <SummaryRow label="Toa" value={selectedCoachNo || "Chưa chọn"} />
+              <SummaryRow label="Loại chỗ" value={selectedProduct?.seat_type_name ?? "Chưa chọn"} />
+              <SummaryRow label="Số ghế" value={selectedSeatIds.length ? selectedSeatIds.map((id) => selectedSeats.find((seat) => seat.seat_id === id)?.seat_no).join(", ") : "Chưa chọn"} />
               <div className="flex justify-between items-end pt-2">
-                <span className="text-on-surface-variant font-bold">Tam tinh</span>
+                <span className="text-on-surface-variant font-bold">Tạm tính</span>
                 <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(estimatedTotal)}</span>
               </div>
-              <p className="text-[9px] text-on-surface-variant">Gia cuoi cung duoc lay tu API quote khi xac nhan.</p>
+              <p className="text-[9px] text-on-surface-variant">Giá cuối cùng được lấy từ API quote khi xác nhận.</p>
               <Button className="w-full py-2.5" disabled={!selectedProduct || selectedSeatIds.length === 0 || booking} onClick={handleConfirm}>
-                {booking ? "Dang giu cho..." : "Xac nhan va dat ve"}
+                {booking ? "Đang giữ chỗ..." : "Xác nhận và đặt vé"}
               </Button>
               {confirmed.length > 0 ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-green-800 space-y-1">
-                  <p className="font-black">Dat ve thanh cong</p>
-                  {confirmed.map((item) => <p key={item.booking_id} className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghe {item.seat_no}</p>)}
-                  <p className="border-t border-green-200 pt-1 font-bold">Da thanh toan: {moneyFormatter.format(paidPrice)}</p>
+                  <p className="font-black">Đặt vé thành công</p>
+                  {confirmed.map((item) => <p key={item.booking_id} className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghế {item.seat_no}</p>)}
+                  <p className="border-t border-green-200 pt-1 font-bold">Đã thanh toán: {moneyFormatter.format(paidPrice)}</p>
                 </div>
               ) : null}
             </div>

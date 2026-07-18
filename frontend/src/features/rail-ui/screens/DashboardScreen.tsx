@@ -652,7 +652,7 @@ export function DashboardScreen() {
 
       {/* Gợi ý ghép chặng lấp chỗ trống */}
       <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
-        <h3 className="text-base font-bold text-on-surface mb-2">Hành động lấp chỗ trống tối ưu (Gap Combining)</h3>
+        <h3 className="text-base font-bold text-on-surface mb-2">Hành động lấp chỗ trống tối ưu</h3>
         <p className="text-xs text-on-surface-variant mb-6 font-medium">Ghép nối hành trình chặng ngắn liên kết trống để bán vé đi suốt.</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
