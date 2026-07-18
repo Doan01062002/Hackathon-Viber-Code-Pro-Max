@@ -14,10 +14,47 @@ export function TrainLayoutScreen() {
   const [selectedCoachNo, setSelectedCoachNo] = useState<string>("01");
   const [seatPlan, setSeatPlan] = useState<SeatPlanDto | null>(null);
   const [gapSuggestions, setGapSuggestions] = useState<GapSuggestionDto[]>([]);
-  
+  const [appliedGaps, setAppliedGaps] = useState<string[]>([]);
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [loadingLayout, setLoadingLayout] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // State for interactive seat selection
+  const [selectedSeatNum, setSelectedSeatNum] = useState<number | null>(null);
+  const [seatLegsState, setSeatLegsState] = useState<{ leg: string; status: "empty" | "sold" | "blocked" }[]>([]);
+
+  const handleSeatClick = (seatNum: number, currentStatus: string) => {
+    setSelectedSeatNum(seatNum);
+    
+    if (currentStatus === "blocked" || currentStatus === "held") {
+      setSeatLegsState([
+        { leg: "HN → Vinh", status: "blocked" },
+        { leg: "Vinh → Huế", status: "blocked" },
+        { leg: "Huế → Đà Nẵng", status: "blocked" }
+      ]);
+    } else if (currentStatus === "confirmed") {
+      setSeatLegsState([
+        { leg: "HN → Vinh", status: "sold" },
+        { leg: "Vinh → Huế", status: "sold" },
+        { leg: "Huế → Đà Nẵng", status: "sold" }
+      ]);
+    } else {
+      const isOdd = seatNum % 2 !== 0;
+      if (isOdd) {
+        setSeatLegsState([
+          { leg: "HN → Vinh", status: "empty" },
+          { leg: "Vinh → Huế", status: "empty" },
+          { leg: "Huế → Đà Nẵng", status: "sold" }
+        ]);
+      } else {
+        setSeatLegsState([
+          { leg: "HN → Vinh", status: "sold" },
+          { leg: "Vinh → Huế", status: "empty" },
+          { leg: "Huế → Đà Nẵng", status: "empty" }
+        ]);
+      }
+    }
+  };
 
   // 1. Tải danh sách chuyến tàu lúc khởi động
   async function loadInitialData() {
@@ -115,7 +152,10 @@ export function TrainLayoutScreen() {
   }, [selectedTripId, selectedCoachNo]);
 
   // CSS classes map for seats layout
-  const getSeatStyles = (status: string) => {
+  const getSeatStyles = (status: string, seatNum?: number) => {
+    if (selectedSeatNum !== null && selectedSeatNum === seatNum) {
+      return "bg-primary text-white shadow-md shadow-primary/20 scale-105 border-primary ring-2 ring-primary ring-offset-2";
+    }
     if (status === "selected") return "bg-primary text-white shadow-md shadow-primary/20 scale-105 border-primary";
     if (status === "held") return "bg-yellow-100 border-yellow-300 text-yellow-800 font-bold";
     if (status === "confirmed") return "bg-slate-200 text-slate-500 cursor-not-allowed border-transparent";
@@ -389,7 +429,9 @@ export function TrainLayoutScreen() {
                         return (
                           <button
                             key={`seat-${rowIndex}-0`}
-                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-default ${getSeatStyles(seat)}`}
+                            type="button"
+                            onClick={() => handleSeatClick(seatNum, seat)}
+                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(seat, seatNum)}`}
                           >
                             {seatNum}
                           </button>
@@ -405,7 +447,9 @@ export function TrainLayoutScreen() {
                         return (
                           <button
                             key={`seat-${rowIndex}-1`}
-                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-default ${getSeatStyles(seat)}`}
+                            type="button"
+                            onClick={() => handleSeatClick(seatNum, seat)}
+                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(seat, seatNum)}`}
                           >
                             {seatNum}
                           </button>
@@ -428,7 +472,9 @@ export function TrainLayoutScreen() {
                         return (
                           <button
                             key={`seat-${rowIndex}-2`}
-                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-default ${getSeatStyles(seat)}`}
+                            type="button"
+                            onClick={() => handleSeatClick(seatNum, seat)}
+                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(seat, seatNum)}`}
                           >
                             {seatNum}
                           </button>
@@ -444,7 +490,9 @@ export function TrainLayoutScreen() {
                         return (
                           <button
                             key={`seat-${rowIndex}-3`}
-                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-default ${getSeatStyles(seat)}`}
+                            type="button"
+                            onClick={() => handleSeatClick(seatNum, seat)}
+                            className={`w-10 h-10 rounded-lg text-xs font-bold border flex items-center justify-center transition-all flex-shrink-0 cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(seat, seatNum)}`}
                           >
                             {seatNum}
                           </button>
@@ -475,7 +523,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">A - Trên (T3)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[4])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 5, cabinSeats[4])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[4], cabinIdx * 6 + 5)}`}
                               >
                                 {cabinIdx * 6 + 5}
                               </button>
@@ -485,7 +534,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">A - Giữa (T2)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[2])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 3, cabinSeats[2])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[2], cabinIdx * 6 + 3)}`}
                               >
                                 {cabinIdx * 6 + 3}
                               </button>
@@ -495,7 +545,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">A - Dưới (T1)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[0])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 1, cabinSeats[0])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[0], cabinIdx * 6 + 1)}`}
                               >
                                 {cabinIdx * 6 + 1}
                               </button>
@@ -513,7 +564,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">B - Trên (T3)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[5])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 6, cabinSeats[5])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[5], cabinIdx * 6 + 6)}`}
                               >
                                 {cabinIdx * 6 + 6}
                               </button>
@@ -523,7 +575,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">B - Giữa (T2)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[3])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 4, cabinSeats[3])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[3], cabinIdx * 6 + 4)}`}
                               >
                                 {cabinIdx * 6 + 4}
                               </button>
@@ -533,7 +586,8 @@ export function TrainLayoutScreen() {
                               <span className="text-[7px] text-on-surface-variant/60 font-bold uppercase">B - Dưới (T1)</span>
                               <button
                                 type="button"
-                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-default ${getSeatStyles(cabinSeats[1])}`}
+                                onClick={() => handleSeatClick(cabinIdx * 6 + 2, cabinSeats[1])}
+                                className={`w-10 h-8 rounded text-xs font-black border flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95 ${getSeatStyles(cabinSeats[1], cabinIdx * 6 + 2)}`}
                               >
                                 {cabinIdx * 6 + 2}
                               </button>
@@ -561,50 +615,137 @@ export function TrainLayoutScreen() {
         </div>
 
         {/* Legend and Operations Panel */}
-        <div className="col-span-12 lg:col-span-4 bg-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="font-bold text-sm text-on-surface mb-2 border-b border-outline-variant/30 pb-2">
-              Chú Giải & Can Thiệp Quota
-            </h3>
-            <p className="text-[10px] text-on-surface-variant/75 font-semibold mb-4 leading-normal">
-              Điều chỉnh trạng thái ghế để mở khóa bán chặng ngắn hoặc khóa bảo vệ giữ chỗ chặng dài.
-            </p>
-
-            {seatPlan ? (
-              <div className="space-y-3 mb-6">
-                {seatPlan.seatLegend.map((item) => (
-                  <div className="flex items-center gap-3 py-1" key={item.label}>
-                    <span 
-                      className={`w-6 h-6 rounded border ${getSeatStyles(item.tone)} flex items-center justify-center`}
-                    />
-                    <span className="text-xs font-bold text-on-surface-variant">{item.label}</span>
+        <div className="col-span-12 lg:col-span-4 bg-white border border-outline-variant rounded-xl p-6 shadow-sm flex flex-col justify-between min-h-[360px]">
+          {selectedSeatNum !== null ? (
+            <div className="space-y-5 flex flex-col justify-between h-full">
+              <div className="space-y-4">
+                <div className="p-3.5 bg-primary/10 rounded-lg border border-primary/20">
+                  <span className="text-[10px] text-primary font-black uppercase tracking-wider">ĐANG CHỌN</span>
+                  <div className="text-sm font-black text-on-surface mt-0.5">
+                    Toa {selectedCoachNo} • Ghế số {selectedSeatNum}
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </div>
+                </div>
 
-          <div className="space-y-2 pt-4 border-t border-slate-100">
-            <button
-              onClick={() => window.alert("Đã gửi yêu cầu điều chỉnh trạng thái ghế lên hệ thống vận hành.")}
-              className="w-full py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-sm"
-            >
-              Giữ hoặc mở khóa ghế
-            </button>
-            <button className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50/50 font-bold rounded-lg text-xs transition-all cursor-pointer">
-              Ưu tiên bán nhóm ghế
-            </button>
-            <button className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50/50 font-bold rounded-lg text-xs transition-all cursor-pointer">
-              Chuyển sang Quota chặng ngắn
-            </button>
-          </div>
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">TRẠNG THÁI PHÂN ĐOẠN (LEGS)</h4>
+                  <div className="space-y-1.5">
+                    {seatLegsState.map((legItem, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border border-slate-100 text-xs">
+                        <span className="font-extrabold text-on-surface">{legItem.leg}</span>
+                        {legItem.status === "empty" ? (
+                          <span className="px-2.5 py-0.5 bg-green-100 text-green-700 text-[9px] font-black rounded-full uppercase">Trống</span>
+                        ) : legItem.status === "sold" ? (
+                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded-full uppercase">Đã bán</span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 bg-red-100 text-red-700 text-[9px] font-black rounded-full uppercase">Khóa</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gộp chặng Action */}
+                {seatLegsState.filter(l => l.status === "empty").length >= 2 ? (
+                  <div className="p-3.5 bg-green-50/50 border border-green-200/50 rounded-xl space-y-2">
+                    <p className="text-[10px] text-green-700 font-extrabold">✦ PHÁT HIỆN CƠ HỘI GỘP CHẶNG</p>
+                    <p className="text-[10.5px] text-on-surface-variant/90 font-medium leading-relaxed">
+                      Ghế này đang trống ở các chặng ngắn liên tiếp. Bạn có thể gộp chúng lại để bán vé suốt chặng dài.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.alert(`Đã áp dụng Gộp chặng thành công cho ghế ${selectedSeatNum}! Toàn bộ chặng đã được quy về 1 quota vé chặng dài.`);
+                        setSeatLegsState(prev => prev.map(l => l.status === "empty" ? { ...l, leg: l.leg + " (Đã gộp)" } : l));
+                      }}
+                      className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-black rounded-lg transition-all cursor-pointer shadow-sm"
+                    >
+                      Thực hiện Gộp chặng bán suốt
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Tách chặng Action */}
+                {seatLegsState.some(l => l.status === "sold") ? (
+                  <div className="p-3.5 bg-amber-50/50 border border-amber-200/50 rounded-xl space-y-2">
+                    <p className="text-[10px] text-amber-700 font-extrabold">⚠ TÁCH CHẶNG ĐỂ MỞ QUOTA NGẮN</p>
+                    <p className="text-[10.5px] text-on-surface-variant/90 font-medium leading-relaxed">
+                      Tách quota bán chặng dài còn dư của ghế này thành các quota chặng ngắn độc lập để ưu tiên khách đi chặng trung gian.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        window.alert(`Đã thực hiện Tách chặng thành công cho ghế ${selectedSeatNum}! Đã giải phóng quota cho các chặng ngắn.`);
+                        setSeatLegsState(prev => prev.map(l => l.status === "sold" ? { ...l, leg: l.leg + " (Đã tách)" } : l));
+                      }}
+                      className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-lg transition-all cursor-pointer shadow-sm"
+                    >
+                      Thực hiện Tách chặng quota ngắn
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSeatNum(null);
+                    setSeatLegsState([]);
+                  }}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200/80 text-on-surface font-bold rounded-lg text-xs transition-all cursor-pointer border border-outline-variant/35"
+                >
+                  Hủy chọn ghế
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col justify-between h-full">
+              <div>
+                <h3 className="font-bold text-sm text-on-surface mb-2 border-b border-outline-variant/30 pb-2">
+                  Chú Giải & Can Thiệp Quota
+                </h3>
+                <p className="text-[10px] text-on-surface-variant/75 font-semibold mb-4 leading-normal">
+                  Điều chỉnh trạng thái ghế để mở khóa bán chặng ngắn hoặc khóa bảo vệ giữ chỗ chặng dài.
+                </p>
+
+                {seatPlan ? (
+                  <div className="space-y-3 mb-6">
+                    {seatPlan.seatLegend.map((item) => (
+                      <div className="flex items-center gap-3 py-1" key={item.label}>
+                        <span 
+                          className={`w-6 h-6 rounded border ${getSeatStyles(item.tone)} flex items-center justify-center`}
+                        />
+                        <span className="text-xs font-bold text-on-surface-variant">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-2 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => window.alert("Đã gửi yêu cầu điều chỉnh trạng thái ghế lên hệ thống vận hành.")}
+                  className="w-full py-2 bg-primary text-on-primary font-bold rounded-lg text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-md"
+                >
+                  Giữ hoặc mở khóa ghế
+                </button>
+                <button type="button" className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50/50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+                  Ưu tiên bán nhóm ghế
+                </button>
+                <button type="button" className="w-full py-2 border border-outline-variant text-on-surface hover:bg-slate-50/50 font-bold rounded-lg text-xs transition-all cursor-pointer">
+                  Chuyển sang Quota chặng ngắn
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Seat Inventory Table & AI Suggestions */}
+      {/* Seat Inventory Table */}
       <div className="grid grid-cols-12 gap-6">
         {/* Seat Inventory Card */}
-        <div className="col-span-12 lg:col-span-8 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+        <div className="col-span-12 bg-white border border-outline-variant rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-outline-variant flex justify-between items-center">
             <div>
               <h3 className="font-bold text-on-surface text-sm">Phân Bổ Tồn Kho Chỗ Ngồi Chặng</h3>
@@ -694,43 +835,6 @@ export function TrainLayoutScreen() {
                 </tr>
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* AI Recommendations Panel */}
-        <div className="col-span-12 lg:col-span-4 space-y-6">
-          <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="material-symbols-outlined text-primary text-sm">auto_awesome</span>
-              <h3 className="font-bold text-on-surface">Đề Xuất Ghép Chặng</h3>
-            </div>
-            <p className="text-[10px] text-on-surface-variant/80 mb-4 leading-relaxed font-semibold">
-              AI tự động phân tích và đề xuất giải phóng các ghế chặng ngắn bị phân rã liền kề để ghép bán chặng dài có doanh thu cao hơn.
-            </p>
-
-            <div className="space-y-3">
-              {gapSuggestions.length > 0 ? (
-                gapSuggestions.map((item, idx) => (
-                  <div className="p-3 bg-surface-container-low rounded-lg border border-primary/10 hover:border-primary/20 transition-all" key={idx}>
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-bold text-xs text-on-surface">{item.route}</span>
-                      <span className="text-primary font-bold text-xs">{item.benefit}</span>
-                    </div>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed font-medium">
-                      {item.reason} ({item.seatType === "ngoi_mem" ? "Ngồi mềm" : "Giường nằm"})
-                    </p>
-                    <button 
-                      onClick={() => window.alert(`Đang áp dụng khuyến nghị ghép chặng cho ${item.route}`)}
-                      className="mt-2 w-full py-1.5 bg-primary/10 text-primary font-bold text-[10px] rounded hover:bg-primary/20 transition-all cursor-pointer border border-transparent hover:border-primary/25"
-                    >
-                      Thực hiện ghép chặng
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-on-surface-variant/75 text-center py-4">Không có gợi ý ghép chặng trống nào.</p>
-              )}
-            </div>
           </div>
         </div>
       </div>
