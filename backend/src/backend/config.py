@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./data/app.db"
 
+    # Khối 1-2-3 (forecast/optimize/price) chạy in-process qua ai_service.engine.AIEngine
+    # (xem backend/services/ai_client.py) — không còn URL/timeout vì không còn gọi mạng.
+
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+
 
 @lru_cache
 def get_settings() -> Settings:

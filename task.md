@@ -1,0 +1,86 @@
+- [x] Triển khai BE-01.1: PostgreSQL & Redis Services
+  - [x] Thêm dịch vụ db (PostgreSQL 15-alpine) vào docker-compose.yml
+  - [x] Thêm dịch vụ redis (Redis 7-alpine) vào docker-compose.yml
+  - [x] Khai báo volumes pgdata & redisdata
+- [x] Triển khai BE-01.2: Backend Integration & Environment
+  - [x] Cập nhật depends_on của backend (chờ db & redis healthy)
+  - [x] Thiết lập DATABASE_URL cho backend trỏ sang PostgreSQL container
+  - [x] Cập nhật tệp cấu hình môi trường .env.example
+- [x] Triển khai BE-02: Khởi tạo database & kiểm thử (SRRM-D1)
+  - [x] Khởi tạo 21 bảng trong PostgreSQL
+  - [x] Đăng ký 5 indexes tối ưu hiệu suất
+  - [x] Thiết lập trigger tự động updated_at
+  - [x] Cập nhật trạng thái các task BE-02.1 đến BE-02.4 thành "Hoàn thành" trên Google Sheet
+- [x] Kiểm tra tích hợp và chất lượng (BE-01/02)
+  - [x] Kiểm tra cấu hình docker compose config
+  - [x] Xác minh trigger và indexes hoạt động chính xác qua test_db_schema.py
+  - [x] Chạy toàn bộ unit test AI & Backend thành công
+- [x] Triển khai BE-05: Endpoint /v1/forecast
+  - [x] Tạo analytics_view.py chứa Pydantic response models
+  - [x] Viết service analytics_service.py tính toán lũy kế đặt vé & dự báo
+  - [x] Viết controller analytics_controller.py định nghĩa route /forecast
+  - [x] Viết unit test cho endpoint /forecast
+- [x] Triển khai BE-06: Endpoint /v1/segments/load
+  - [x] Viết service analytics_service.py tính toán tải chặng & bottleneck
+  - [x] Viết controller analytics_controller.py định nghĩa route /segments/load
+  - [x] Viết unit test cho endpoint /segments/load
+- [x] Triển khai BE-07: Endpoint /v1/quote
+  - [x] Tạo pricing_view.py chứa Pydantic models
+  - [x] Viết service pricing_service.py tính toán opportunity cost & proposed_price
+  - [x] Viết controller pricing_controller.py định nghĩa route /quote
+  - [x] Viết unit test cho endpoint /quote
+- [x] Triển khai BE-08: Bộ lọc ràng buộc Trần/Sàn & Max Step Change
+  - [x] Tích hợp kiểm tra trần/sàn trong pricing_service.py
+  - [x] Tích hợp giới hạn biến đổi giá max_step_change
+  - [x] Thêm các unit test kiểm tra safeguards
+- [x] Triển khai BE-09: Endpoint /v1/booking & luồng giữ chỗ
+  - [x] Tạo booking_view.py chứa Pydantic models
+  - [x] Viết service booking_service.py thực hiện giữ chỗ (Select For Update + ORDER BY segment_id ASC)
+  - [x] Viết logic gán ghế vật lý không trùng chặng trong confirm_booking
+  - [x] Viết logic giải phóng giữ chỗ hết hạn trong release_expired_bookings
+  - [x] Viết controller booking_controller.py định nghĩa route /booking và các alias
+  - [x] Viết unit test cho endpoint /booking
+- [x] Triển khai BE-10: Lập lịch chạy tối ưu DLP định kỳ (Orchestrator Batch Job)
+  - [x] Job đọc dữ liệu đầu vào (BE-10.1)
+  - [x] Gọi forecast & lưu kết quả (BE-10.2)
+  - [x] Gọi optimize & lưu bid price/quota (BE-10.3)
+  - [x] Gọi price & lưu price_quote mới (BE-10.4)
+  - [x] Lập lịch định kỳ & hoán đổi active swap nguyên tử (BE-10.5)
+- [x] Triển khai BE-11: Redis event queue + worker
+  - [x] Cấu hình Redis Stream (BE-11.1)
+  - [x] Worker tiêu thụ sự kiện (BE-11.2)
+  - [x] Re-solve warm-start (BE-11.3)
+  - [x] Debounce & test (BE-11.4)
+- [x] Triển khai BE-12: Endpoint /v1/events
+  - [x] Endpoint nhận sự kiện + đẩy queue (BE-12.1)
+  - [x] Viết test (BE-12.2)
+- [x] Triển khai BE-17: Cơ chế Rollback tối ưu hóa
+  - [x] Lưu phiên bản bid_price/price_quote (BE-17.1)
+  - [x] Cơ chế khôi phục điểm trước (Rollback) (BE-17.2)
+  - [x] Viết test kiểm thử rollback (BE-17.3)
+- [x] Triển khai BE-18: Client gọi AI tích hợp *(ai-service sau đó đổi thành thư viện import thẳng — bỏ HTTP/retry, cache dời vào AIEngine)*
+  - [x] Client gọi AI + retry/cache (BE-18.1)
+  - [x] Cache bid price (BE-18.2)
+  - [x] Viết test (BE-18.3)
+- [x] Triển khai BE-19: Tài liệu hóa API
+  - [x] Soạn schema chung trong contracts/ (BE-19.1)
+  - [x] Kiểm tra khớp 3 dịch vụ (BE-19.2)
+- [x] Triển khai BE-20: Test tích hợp đầu-cuối
+  - [x] Test luồng quote đầu-cuối (BE-20.1)
+  - [x] Test luồng batch (BE-20.2)
+  - [x] Test sự kiện re-solve (BE-20.3)
+  - [x] Test Policy Guard tích hợp (BE-20.4)
+- [x] Triển khai FE-01: Khởi tạo React + layout + routing
+  - [x] Cài đặt dependencies, layout & shell routing thành công
+- [x] Triển khai FE-02: API Client & React integration
+  - [x] Cấu hình HTTP client + hook cho endpoint
+- [x] Triển khai FE-04 & FE-05: Dashboard + SegmentHeatmap + BookingCurve
+  - [x] Rút trích dữ liệu chặng & luồng dự báo từ live APIs
+- [x] Triển khai FE-07 & FE-08: Quote + PriceExplainCard
+  - [x] Tích hợp biểu mẫu báo giá và thẻ chính sách tối ưu
+- [x] Triển khai FE-10 & FE-11: Simulation + ScenarioCompareChart
+  - [x] Bảng so sánh chỉ số và biểu đồ cột so sánh AI vs lịch sử
+- [x] Triển khai FE-12: Màn hình Cảnh báo (Alerts)
+  - [x] Phát hiện bottleneck chặng & đoạn trống từ cơ sở dữ liệu thời gian thực
+- [x] Triển khai FE-13, FE-14, FE-15, FE-16: i18n, states, responsive & tests
+  - [x] Tất cả các ranh giới kiến trúc và kiểm thử đều được kiểm chứng thành công

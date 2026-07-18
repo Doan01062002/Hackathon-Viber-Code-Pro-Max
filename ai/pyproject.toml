@@ -6,13 +6,18 @@ build-backend = "setuptools.build_meta"
 name = "ai"
 version = "1.0.0"
 description = "LangGraph agent — thuần AI, không biết gì về HTTP"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "langchain>=0.3.0",
     "langchain-openai>=0.3.0",
     "langgraph>=0.2.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "scipy>=1.13.0",
+    "scikit-learn>=1.5.0",
+    "lightgbm>=4.0.0",
 ]
 
 [project.optional-dependencies]

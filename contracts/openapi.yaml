@@ -1,0 +1,385 @@
+openapi: 3.0.3
+info:
+  title: Smart Rail Revenue Management (SRRM) - OpenAPI Contracts
+  description: |
+    Tài liệu đặc tả API chuẩn hóa cho tích hợp Frontend và Backend của dự án SRRM.
+
+    AI (Khối 1-2-3) không còn là service riêng: package `ai` được cài thẳng vào
+    backend và gọi in-process qua `ai_service.engine.AIEngine`. Các endpoint
+    `/internal/forecast|optimize|price` trên cổng 8001 đã bị bỏ — bề mặt HTTP duy
+    nhất của AI giờ là `/ai/*` do backend expose (xem `backend/controllers/ai_controller.py`).
+  version: 2.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Backend Server API
+
+paths:
+  # --- BACKEND ENDPOINTS ---
+  /chat:
+    post:
+      tags:
+        - Chat
+      summary: Tương tác với trợ lý ảo AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Tin nhắn của người dùng
+                session_id:
+                  type: string
+                  description: ID phiên chat
+              required:
+                - message
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id:
+                    type: string
+                  role:
+                    type: string
+                  content:
+                    type: string
+                  action_type:
+                    type: string
+                  payload:
+                    type: object
+
+  /analytics/legs-heatmap:
+    get:
+      tags:
+        - Analytics
+      summary: Lấy biểu đồ nhiệtLegs Heatmap của chuyến tàu
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /pricing/quote:
+    get:
+      tags:
+        - Pricing
+      summary: Yêu cầu đề xuất giá động cho sản phẩm OD
+      parameters:
+        - name: od_product_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve:
+    post:
+      tags:
+        - Optimize
+      summary: Đẩy job chạy ngầm tối ưu hóa phân bổ hạn ngạch (DLP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trip_id:
+                  type: integer
+              required:
+                - trip_id
+      responses:
+        "200":
+          description: Đã đưa vào hàng đợi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  status:
+                    type: string
+                  message:
+                    type: string
+
+  /optimize/resolve/jobs/{job_id}:
+    get:
+      tags:
+        - Optimize
+      summary: Kiểm tra tiến độ/trạng thái của job tối ưu hóa
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve/versions:
+    get:
+      tags:
+        - Optimize
+      summary: Lấy danh sách các phiên bản chạy tối ưu của chuyến tàu
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /optimize/resolve/rollback:
+    post:
+      tags:
+        - Optimize
+      summary: Khôi phục cấu hình tối ưu của chuyến tàu về phiên bản chạy trước
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trip_id:
+                  type: integer
+                target_version:
+                  type: string
+              required:
+                - trip_id
+                - target_version
+      responses:
+        "200":
+          description: Thành công
+
+  /simulation/compare:
+    get:
+      tags:
+        - Simulation
+      summary: Chạy và so sánh chính sách mô phỏng giá với dữ liệu lịch sử
+      parameters:
+        - name: trip_id
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: policy_id
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Thành công
+
+  /policy/limits:
+    get:
+      tags:
+        - Policy
+      summary: Lấy danh sách giới hạn chính sách giá (Yêu cầu RBAC Header)
+      parameters:
+        - name: od_product_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /policy/limits/{policy_id}:
+    put:
+      tags:
+        - Policy
+      summary: Cập nhật giới hạn chính sách giá (Yêu cầu RBAC Header)
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                min_price:
+                  type: number
+                max_price:
+                  type: number
+                max_step_change:
+                  type: number
+                status:
+                  type: string
+      responses:
+        "200":
+          description: Thành công
+
+  /audit/logs:
+    get:
+      tags:
+        - Audit
+      summary: Truy vấn nhật ký kiểm toán hệ thống (Yêu cầu RBAC Header)
+      parameters:
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: entity_type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Thành công
+
+  # --- AI PREVIEW ENDPOINTS ---
+  # Preview/debug kết quả AI, KHÔNG ghi database (khác /optimize/resolve chạy batch
+  # rồi ghi demand_forecasts + bid_prices). Backend gọi AIEngine in-process.
+  /ai/forecast:
+    post:
+      tags:
+        - AI
+      summary: Khối 1 — dự báo nhu cầu (λ̂, p10/p50/p90) cho một ngày chạy tàu
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_date:
+                  type: string
+                  format: date
+                  example: "2024-02-11"
+              required:
+                - service_date
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service_date:
+                    type: string
+                  model_version:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        od_id:
+                          type: integer
+                        origin:
+                          type: string
+                        dest:
+                          type: string
+                        seat_type:
+                          type: string
+                        lambda_hat:
+                          type: number
+                        p10:
+                          type: number
+                        p50:
+                          type: number
+                        p90:
+                          type: number
+        "422":
+          description: service_date không hợp lệ
+        "503":
+          description: Chưa có model — cần chạy `python ai/scripts/train.py` trước
+
+  /ai/optimize:
+    post:
+      tags:
+        - AI
+      summary: Khối 2 — giải DLP sinh bid price (engine cache theo fingerprint của λ̂)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_date:
+                  type: string
+                  format: date
+                  example: "2024-02-11"
+              required:
+                - service_date
+      responses:
+        "200":
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service_date:
+                    type: string
+                  run_version:
+                    type: string
+                  warm_started:
+                    type: boolean
+                    description: True nếu trả từ cache (λ̂ không đổi từ lần giải trước)
+                  solve_ms:
+                    type: number
+                  revenue_lp:
+                    type: number
+                  bid_prices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        segment_id:
+                          type: integer
+                        seat_type:
+                          type: string
+                        bid_price:
+                          type: number
+                  n_rejected:
+                    type: integer
+                  n_od:
+                    type: integer
+        "422":
+          description: service_date không hợp lệ
+        "503":
+          description: Chưa có model — cần chạy `python ai/scripts/train.py` trước
+
+  # Khối 3 (định giá) không có endpoint AI riêng: nó chạy bên trong /quote, nơi
+  # backend đọc bid price từ DB, gọi engine, rồi áp Policy Guard trước khi trả giá.

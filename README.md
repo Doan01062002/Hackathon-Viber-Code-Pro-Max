@@ -43,7 +43,7 @@ Chưa cần `.env` hay API key — agent mẫu chạy được ngay.
 ## 📁 Cấu trúc
 
 Ranh giới giữa 3 module được kiểm tra bằng `make boundaries` — chi tiết ở
-[ARCHITECTURE.md](ARCHITECTURE.md).
+[ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```
 ├── ai/                       # 🧠 LangGraph agent — KHÔNG biết gì về HTTP
@@ -84,7 +84,7 @@ Ranh giới giữa 3 module được kiểm tra bằng `make boundaries` — chi
 │   ├── check_boundaries.sh   #    ⭐ Chặn vi phạm ranh giới module
 │   └── setup.sh              #    Dựng venv + npm install + .env
 │
-├── ARCHITECTURE.md           # 📐 Ranh giới module + luồng dữ liệu
+├── docs/                     # 📚 Kiến trúc, schema, specs, ADRs, planning, tasks
 ├── .github/workflows/ci.yml  # ⚡ CI: ai + backend + frontend + boundaries
 ├── docker-compose.yml        # 🐙 backend:8000 + frontend:3000
 └── Makefile                  # make run / run-fe / test / lint / boundaries
@@ -148,11 +148,16 @@ không phải sửa backend; đổi giao diện không phải sửa agent.
 | Lệnh | Việc |
 |---|---|
 | `make run` / `make run-fe` | Chạy backend / frontend |
-| `make test` | Test cả `ai` và `backend` (12 test) |
+| `make test` | Test toàn bộ `ai` và `backend` |
 | `make lint` | ruff + ESLint |
 | `make boundaries` | Kiểm tra ranh giới module |
 | `make check` | Cả ba việc trên |
 | `docker compose up --build` | Chạy full stack, không cần cài gì |
+
+Backend integration tests dùng PostgreSQL thật về mặt tính năng SQL, nhưng luôn chạy
+trên database test cô lập. GitHub Actions tự dựng PostgreSQL tạm, nạp `schema.sql` và
+fixture xác định; không kết nối RDS. Khi chạy local, xem phần kiểm thử trong
+[`docs/AWS_RDS_POSTGRES_SETUP.md`](docs/AWS_RDS_POSTGRES_SETUP.md).
 
 ## 🛠 Tech Stack
 
@@ -165,7 +170,19 @@ không phải sửa backend; đổi giao diện không phải sửa agent.
 | DevOps | Docker + GitHub Actions |
 | Testing | pytest + pytest-asyncio |
 
-## 📊 Trace Agent (LangSmith)
+## 📊 AI logging and Trace Agent (LangSmith)
+
+Agent application logs are enabled by default and written to stdout as JSON. Configure them
+in `.env`:
+
+```bash
+AI_LOG_LEVEL=INFO       # DEBUG, INFO, WARNING, ERROR, CRITICAL
+AI_LOG_FORMAT=json      # json for production, text for local development
+```
+
+Every `run_agent()` call gets a `run_id` and emits start, completion, or failure events with
+its processing time. Query and prompt content is never logged; only query length is included
+for diagnostics without exposing user data.
 
 Khi agent trả kết quả lạ, trace cho thấy từng node chạy gì và LLM nhận prompt nào.
 Bật bằng 3 biến trong `.env`:
