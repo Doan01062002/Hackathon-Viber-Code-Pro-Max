@@ -24,6 +24,7 @@ from datetime import date
 
 import pandas as pd
 
+from . import booking_curve as bc_module
 from . import config as C
 from . import datagen, pricing
 from . import optimization as opt
@@ -127,11 +128,17 @@ class AIEngine:
         # _optimize; khóa lại để không giải trùng cùng một ngày.
         self._lock = threading.Lock()
 
+        # Đường cong đặt vé — train.py fit từ lead time thật rồi lưu vào bundle. Trước đây
+        # khóa này không ai đọc nên backend phải tự viết lại một đường cong lý thuyết.
+        self.booking_curve = None
+
         if model_path and os.path.exists(model_path):
             with open(model_path, "rb") as model_file:
                 bundle = pickle.load(model_file)
             self.forecaster = bundle["forecaster"]
             self.eps = bundle["eps"]
+            if bundle.get("booking_curve"):
+                self.booking_curve = bc_module.BookingCurve.from_dict(bundle["booking_curve"])
 
     # --- hạ tầng ---
 

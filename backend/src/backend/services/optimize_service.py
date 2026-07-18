@@ -123,18 +123,7 @@ class OptimizeService:
         feature_df = feature_rows(valid_network_ods, service_date)
         pred_df = forecaster.predict(feature_df)
 
-        # Phân phối point forecast qua 61 lead days (60 về 0)
-        import numpy as np
-
-        t = np.arange(60, -1, -1, dtype=float)
-        w = np.exp(-t / 15.0)
-        # Tet features check
-        for yr, tet_date in {2024: date(2024, 2, 10), 2025: date(2025, 1, 29), 2026: date(2026, 2, 17)}.items():
-            delta_tet = (tet_date - service_date).days
-            if 0 < delta_tet <= 60:
-                w += 0.5 * np.exp(-((t - 45) ** 2) / (2 * 64.0))
-        w /= w.sum()
-        weights = w.tolist()
+        weights = self._lead_day_weights(service_date)
 
         # Xóa các dự báo cũ của chuyến tàu này
         db.execute(
@@ -330,6 +319,50 @@ class OptimizeService:
             "gap_combinations_count": gap_count,
             "message": "Đã chạy tối ưu hóa DLP và swap phiên bản active thành công.",
         }
+
+    def _lead_day_weights(self, service_date: date) -> list[float]:
+        """Tỉ lệ nhu cầu phát sinh ở từng lead day, chỉ số 0 ứng với lead 60 ... 60 ứng với lead 0.
+
+        Dùng đường cong đặt vé ĐÃ TRAIN (fit từ lead time thật, lưu trong model.pkl). Trước
+        đây chỗ này tự viết lại `exp(-lead/15)` — đúng bằng đường LÝ THUYẾT
+        `booking_curve.fit_theoretical(60, 15)`, thứ mà module đó ghi rõ là chỉ dùng khi
+        chưa có lead time thật. Đường học được lệch đáng kể: ở lead 14 mới đặt ~28.6% chứ
+        không phải ~39.3% như đường lý thuyết.
+
+        `curve[τ]` = tỉ lệ vé đã đặt xong khi còn τ ngày (giảm dần theo τ, curve[0] = 1),
+        nên phần phát sinh đúng vào ngày còn τ ngày là `curve[τ] - curve[τ+1]`. Tổng 61 mốc
+        telescoping về `curve[0] = 1`.
+        """
+        import numpy as np
+
+        curve = getattr(get_engine(), "booking_curve", None)
+        if curve is not None:
+            c = np.asarray(curve.curve, dtype=float)[: 60 + 2]
+            if len(c) < 62:
+                c = np.concatenate([c, np.zeros(62 - len(c))])
+            # increments[lead] = c[lead] - c[lead + 1]
+            increments = np.clip(c[:61] - c[1:62], 0.0, None)
+        else:
+            # Chưa có model: quay về đường lý thuyết như cũ.
+            increments = np.exp(-np.arange(61, dtype=float) / 15.0)
+
+        # Cao điểm Tết: khách đặt sớm hơn thường lệ. Đường cong trên là trung bình toàn cục
+        # nên không bắt được hiệu ứng này — giữ lại phần nhô quanh lead 45 như bản trước.
+        for tet_date in (date(2024, 2, 10), date(2025, 1, 29), date(2026, 2, 17)):
+            delta_tet = (tet_date - service_date).days
+            if 0 < delta_tet <= 60:
+                leads = np.arange(61, dtype=float)
+                increments = increments + 0.5 * increments.max() * np.exp(-((leads - 45) ** 2) / (2 * 64.0))
+                break
+
+        total = increments.sum()
+        if total <= 0:
+            increments = np.full(61, 1.0 / 61)
+        else:
+            increments = increments / total
+
+        # Đảo về thứ tự vị trí mà chỗ gọi dùng: index 0 = lead 60, index 60 = lead 0.
+        return increments[::-1].tolist()
 
     def _persist_gap_combinations(
         self, trip_id: int, segments_rows: list, run_version: str, db: Session
