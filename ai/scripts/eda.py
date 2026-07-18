@@ -75,7 +75,8 @@ def main():
     for flag, lab in [("is_tet", "Tết"), ("is_holiday", "Lễ"), ("is_pre_tet", "Trước Tết (đi)"),
                       ("is_post_tet", "Sau Tết (về)"), ("is_rainy", "Mùa mưa"), ("promo", "Khuyến mãi")]:
         if flag in h and h[flag].sum() > 0:
-            on = h.loc[h[flag] == 1, "demand"].mean(); off = h.loc[h[flag] == 0, "demand"].mean()
+            on = h.loc[h[flag] == 1, "demand"].mean()
+            off = h.loc[h[flag] == 0, "demand"].mean()
             print(f"  {lab:16s}: cầu TB {on:5.2f} vs thường {off:5.2f}  (×{on/max(off,1e-9):.2f})")
 
     # ---------- 4) LEAD TIME (nếu có seeds) ----------
@@ -96,7 +97,8 @@ def main():
     problems = []
     for c in forecasting.FEATURES:
         if c not in d:
-            problems.append(f"{c}: THIẾU"); continue
+            problems.append(f"{c}: THIẾU")
+            continue
         col = d[c]
         if col.isna().any():
             problems.append(f"{c}: có NaN ({col.isna().sum()})")
@@ -105,7 +107,8 @@ def main():
     print(f"  {len(forecasting.FEATURES)} đặc trưng: " +
           ("✅ hợp lệ (đủ cột, kiểu số, không NaN)" if not problems else "⚠ " + "; ".join(problems)))
     # tương quan với cầu (lọc feature vô ích)
-    num = d[forecasting.FEATURES].copy(); num["demand"] = h["demand"].values
+    num = d[forecasting.FEATURES].copy()
+    num["demand"] = h["demand"].values
     corr = num.corr()["demand"].drop("demand").abs().sort_values(ascending=False)
     print("  |corr| cao nhất với cầu:", ", ".join(f"{k}={v:.2f}" for k, v in corr.head(6).items()))
     weak = corr[corr < 0.02]

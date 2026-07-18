@@ -4,13 +4,27 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   # Mỗi package Python lint + test độc lập. Job ai/ fail nghĩa là lỗi thuộc về AI,
   # không phải backend — đó là điểm của việc tách module.
   python:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ${{ matrix.module == 'backend' && 'postgres:15-alpine' || '' }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: srrm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d srrm_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +54,8 @@ jobs:
         env:
           APP_ENV: test
           OPENAI_API_KEY: test-key
+          DATABASE_URL: ${{ matrix.module == 'backend' && 'postgresql+psycopg://postgres:postgres@127.0.0.1:5432/srrm_test' || '' }}
+          SRRM_BOOTSTRAP_TEST_DB: ${{ matrix.module == 'backend' && '1' || '0' }}
 
   # Ranh giới module chỉ có giá trị khi có thứ gì đó kiểm tra nó.
   boundaries:

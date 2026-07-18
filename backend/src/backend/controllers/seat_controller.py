@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -18,15 +18,27 @@ class SeatLegendItem(BaseModel):
     label: str
 
 class SeatPlanResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     route: str = Field(..., description="Hành trình chuyến tàu (e.g. SE1 · 19/07/2026)")
     coach: str = Field(..., description="Tên toa tàu")
     seat_type: str = Field(..., description="Mã loại chỗ (ngoi_mem, giuong_nam_k6)")
     seats: list[list[str]] = Field(..., description="Ma trận 2D trạng thái các ghế")
-    seatLegend: list[SeatLegendItem] = Field(..., description="Chú giải màu sắc trạng thái")
+    seat_legend: list[SeatLegendItem] = Field(
+        ...,
+        alias="seatLegend",
+        description="Chú giải màu sắc trạng thái",
+    )
 
 class GapSuggestionResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     route: str = Field(..., description="Tuyến đường trống (e.g. Vinh → Huế)")
-    seatType: str = Field(..., description="Loại chỗ tiếng Việt (e.g. Giường nằm K6)")
+    seat_type: str = Field(
+        ...,
+        alias="seatType",
+        description="Loại chỗ tiếng Việt (e.g. Giường nằm K6)",
+    )
     benefit: str = Field(..., description="Lợi ích khả dụng (e.g. +17 chỗ khả dụng)")
     priority: str = Field(..., description="Độ ưu tiên (Cao, Trung bình, Theo dõi)")
     reason: str = Field(..., description="Lý do chi tiết gợi ý từ thuật toán")
@@ -41,9 +53,9 @@ async def get_all_trips(db: Session = Depends(get_db)) -> list[TripOptionRespons
     """Lấy danh sách tất cả các chuyến tàu và ngày chạy tàu để cấu hình chọn trên frontend."""
     try:
         query = text("""
-            SELECT 
-                t.id AS trip_id, 
-                tr.code AS train_code, 
+            SELECT
+                t.id AS trip_id,
+                tr.code AS train_code,
                 t.service_date
             FROM trips t
             JOIN trains tr ON t.train_id = tr.id
@@ -132,7 +144,7 @@ async def get_seat_layout(
     # 1. Kiểm tra sự tồn tại của trip và lấy thông tin cơ bản
     trip_row = db.execute(
         text("""
-            SELECT t.service_date, tr.code 
+            SELECT t.service_date, tr.code
             FROM trips t
             JOIN trains tr ON t.train_id = tr.id
             WHERE t.id = :trip_id
@@ -212,7 +224,7 @@ async def get_seat_layout(
         coach=f"Toa {coach_no}",
         seat_type=seat_type,
         seats=seats_2d,
-        seatLegend=legend
+        seat_legend=legend
     )
 
 @router.get("/seats/gap-suggestions", response_model=list[GapSuggestionResponse])
@@ -234,7 +246,7 @@ async def get_gap_suggestions(
 
     # 2. Truy vấn khoảng trống
     gap_query = text("""
-        SELECT 
+        SELECT
             s.coach_no,
             st_from.name AS from_station_name,
             st_to.name AS to_station_name,
@@ -274,7 +286,7 @@ async def get_gap_suggestions(
         suggestions.append(
             GapSuggestionResponse(
                 route=f"{from_st} → {to_st}",
-                seatType=seat_type_vn,
+                seat_type=seat_type_vn,
                 benefit=f"+{count} chỗ khả dụng",
                 priority=priority,
                 reason=f"Có {count} khoảng trống liên tiếp trong toa {coaches_str} sau khi mở lại quota ngắn."

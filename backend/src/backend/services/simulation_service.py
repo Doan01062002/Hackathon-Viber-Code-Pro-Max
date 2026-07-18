@@ -60,7 +60,7 @@ class SimulationService:
                         p.distance_km
                     FROM price_quotes q
                     JOIN od_products p ON q.od_product_id = p.id
-                    WHERE p.trip_id = :trip_id 
+                    WHERE p.trip_id = :trip_id
                       AND q.decision = 'accepted'
                       AND q.run_version = :active_version
                 """),
@@ -75,7 +75,7 @@ class SimulationService:
                         p.distance_km
                     FROM price_quotes q
                     JOIN od_products p ON q.od_product_id = p.id
-                    WHERE p.trip_id = :trip_id 
+                    WHERE p.trip_id = :trip_id
                       AND q.decision = 'accepted'
                 """),
                 {"trip_id": trip_id},

@@ -225,9 +225,32 @@ security group và trạng thái RDS theo các mục phía trên.
 
 ## 5. Kiểm tra code trước khi push
 
+Backend integration tests không được chạy trên RDS. CI tự dựng một PostgreSQL 15 tạm,
+nạp `schema.sql` cùng `backend/tests/postgres_seed.sql`, rồi xóa toàn bộ service sau
+job. Fixture có chốt an toàn: chỉ cho phép bootstrap PostgreSQL trên localhost và tên
+database kết thúc bằng `_test`.
+
+Để chạy tương đương CI trên máy local bằng Docker:
+
 ```powershell
-python -m ruff check backend scripts/init_db.py
-python -m pytest backend/tests -q
+docker run --rm -d --name srrm-ci-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=srrm_test `
+  -p 55432:5432 postgres:15-alpine
+
+$env:APP_ENV = "test"
+$env:OPENAI_API_KEY = "test-key"
+$env:DATABASE_URL = "postgresql+psycopg://postgres:postgres@127.0.0.1:55432/srrm_test"
+$env:SRRM_BOOTSTRAP_TEST_DB = "1"
+
+python -m ruff check backend
+Push-Location backend
+python -m pytest tests -q
+Pop-Location
+
+docker stop srrm-ci-postgres
 ```
 
-Kết quả tại thời điểm viết tài liệu: Ruff đạt và `6 passed`.
+Không đặt `SRRM_BOOTSTRAP_TEST_DB=1` với endpoint bên ngoài; guard sẽ từ chối, nhưng
+việc giữ RDS ngoài hoàn toàn luồng test vẫn là nguyên tắc bắt buộc.

@@ -10,7 +10,7 @@ trước nếu file chưa tồn tại — xem README/AGENTS.md).
 import os
 
 import pytest
-from ai_service.engine import AIEngine, InvalidRequestError, ODNotFoundError, MODEL_PATH
+from ai_service.engine import MODEL_PATH, AIEngine, InvalidRequestError, ODNotFoundError
 from ai_service.schemas import ForecastRequest, OptimizeRequest, PriceRequest
 
 pytestmark = pytest.mark.skipif(

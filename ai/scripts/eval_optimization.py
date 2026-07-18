@@ -41,7 +41,9 @@ def replay(reqs, bid=None):
         if ok:
             for s in segs:
                 rem[st][s] -= 1
-            rev += fare; paxkm += dist; served += 1
+            rev += fare
+            paxkm += dist
+            served += 1
         else:
             rejected += 1
     return dict(revenue=rev, paxkm=paxkm, served=served, rejected=rejected)
@@ -92,7 +94,8 @@ def main():
     for b in buckets.values():
         b["nen"] = dict(revenue=0, paxkm=0, served=0, rejected=0)
         b["ai"] = dict(revenue=0, paxkm=0, served=0, rejected=0)
-        b["days"] = 0; b["capkm"] = 0.0
+        b["days"] = 0
+        b["capkm"] = 0.0
 
     for sd, reqs in reqs_by_date.items():
         # bid price cho ngày này
@@ -114,9 +117,12 @@ def main():
         ra = replay(reqs, bid)
         tag = "peak" if sd in peak_dates else "normal"
         for grp in ("all", tag):
-            for k in rn: buckets[grp]["nen"][k] += rn[k]
-            for k in ra: buckets[grp]["ai"][k] += ra[k]
-            buckets[grp]["days"] += 1; buckets[grp]["capkm"] += CAP_KM
+            for k in rn:
+                buckets[grp]["nen"][k] += rn[k]
+            for k in ra:
+                buckets[grp]["ai"][k] += ra[k]
+            buckets[grp]["days"] += 1
+            buckets[grp]["capkm"] += CAP_KM
 
     # --- in báo cáo ---
     def pct(a, n): return (a - n) / n * 100 if n else 0.0

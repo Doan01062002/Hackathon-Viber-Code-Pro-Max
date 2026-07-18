@@ -55,15 +55,16 @@ export function TrainLayoutScreen() {
   }, []);
 
   useEffect(() => {
-    if (!selectedTripId) return;
+    if (selectedTripId === null) return;
+    const tripId = selectedTripId;
 
     let active = true;
     async function loadTripData() {
       try {
         setLoadingCoaches(true);
         const [coachesData, suggestionsData] = await Promise.all([
-          seatApi.getCoaches(selectedTripId),
-          seatApi.getGapSuggestions(selectedTripId)
+          seatApi.getCoaches(tripId),
+          seatApi.getGapSuggestions(tripId)
         ]);
         if (!active) return;
         setCoaches(coachesData);
@@ -93,13 +94,14 @@ export function TrainLayoutScreen() {
 
   // 3. Tải sơ đồ ghế của toa tàu đang chọn
   useEffect(() => {
-    if (!selectedTripId || !selectedCoachNo) return;
+    if (selectedTripId === null || !selectedCoachNo) return;
+    const tripId = selectedTripId;
 
     let active = true;
     async function loadSeatLayout() {
       try {
         setLoadingLayout(true);
-        const data = await seatApi.getSeatLayout(selectedTripId, selectedCoachNo);
+        const data = await seatApi.getSeatLayout(tripId, selectedCoachNo);
         if (active) setSeatPlan(data);
       } catch (err) {
         console.error("Lỗi tải sơ đồ ghế:", err);
