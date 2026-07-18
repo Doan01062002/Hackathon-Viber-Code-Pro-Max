@@ -6,12 +6,17 @@ set -e
 export PIP_BREAK_SYSTEM_PACKAGES=1
 
 
-echo "=== [1/4] Tạo file môi trường .env ==="
-cat << 'EOF' > .env
+echo "=== [1/4] Thiết lập file môi trường .env ==="
+if [ ! -f .env ]; then
+    cat << 'EOF' > .env
 DATABASE_URL="postgresql+psycopg://appadmin:dtkien2003@viber-coding-pro-max-db.czciyckimjww.ap-southeast-1.rds.amazonaws.com:5432/viber_coding_pro_max?sslmode=require"
 CORS_ORIGINS="*"
 EOF
-echo "Đã tạo xong file .env kết nối RDS PostgreSQL và cấu hình CORS origins."
+    echo "Đã tạo xong file .env mới kết nối RDS PostgreSQL."
+else
+    echo "File .env đã tồn tại. Giữ nguyên cấu hình cũ để tránh ghi đè (ví dụ cấu hình Redis)."
+fi
+
 
 
 echo "=== [2/4] Kiểm tra và tự động cài đặt pip cho User ==="
