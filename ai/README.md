@@ -41,10 +41,7 @@ pip install -r requirements.txt   # gồm lightgbm, shap (tự fallback nếu th
 # 0) Khám phá dữ liệu + kiểm định feature set
 python scripts/eda.py --from-seeds out/seeds
 
-# 1) Demo end-to-end nhanh (sinh data -> dự báo -> bid price -> gán ghế -> định giá)
-python scripts/run_pipeline.py
-
-# 2) (Xem thử) sinh 21 bảng seeds (+ thời tiết, khuyến mãi)
+# 1) (Xem thử) sinh 21 bảng seeds (+ thời tiết, khuyến mãi)
 python scripts/gen_data.py --days 300 --start 2024-01-01
 
 # 3) HUẤN LUYỆN MỘT LẦN -> lưu model ra models/model.pkl  (MVP: chạy tay, chưa cần định kỳ)
