@@ -25,6 +25,31 @@ fi
 python3 -m pip install --user --upgrade pip || echo "Bỏ qua nâng cấp pip"
 python3 -m pip install --user -r requirements.txt
 
+echo "=== [2.5/4] Kiểm tra và cấu hình libgomp.so.1 cho LightGBM ==="
+mkdir -p $HOME/local_libs
+if [ ! -f "$HOME/local_libs/libgomp.so.1" ]; then
+    echo "Tự động tải và giải nén libgomp1 cục bộ..."
+    TEMP_DIR=$(mktemp -d)
+    cd "$TEMP_DIR"
+    apt-get download libgomp1 || true
+    # Giải nén package deb
+    dpkg -x libgomp1_*.deb . || true
+    # Tìm file libgomp.so.1 và copy về thư mục cố định
+    GOMP_FILE=$(find . -name "libgomp.so.1" | head -n 1)
+    if [ -n "$GOMP_FILE" ]; then
+        cp "$GOMP_FILE" "$HOME/local_libs/"
+        echo "Đã cấu hình xong libgomp.so.1 tại $HOME/local_libs"
+    else
+        echo "⚠️ Không tìm thấy libgomp.so.1 trong file tải về."
+    fi
+    cd - >/dev/null
+    rm -rf "$TEMP_DIR"
+fi
+
+# Thiết lập LD_LIBRARY_PATH để Python có thể gọi thư viện này
+export LD_LIBRARY_PATH="$HOME/local_libs:$LD_LIBRARY_PATH"
+
+
 
 echo "=== [3/4] Khởi chạy Backend ngầm dưới cổng 8000 ==="
 # Tắt tiến trình cũ đang chạy trên cổng 8000 (nếu có)
