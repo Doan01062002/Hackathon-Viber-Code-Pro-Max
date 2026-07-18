@@ -123,9 +123,9 @@ export function SimulationScreen() {
             Kịch bản mặc định (Trip #1)
           </button>
           <button
-            onClick={() => runSimulation(1)}
+            onClick={() => runSimulation(121)}
             className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
-              activeScenario === 1
+              activeScenario === 121
                 ? "bg-primary text-on-primary"
                 : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
             }`}
@@ -133,8 +133,12 @@ export function SimulationScreen() {
             Chính sách Huế - Đà Nẵng
           </button>
           <button
-            onClick={() => runSimulation()}
-            className="px-4 py-2 rounded-lg font-bold text-xs bg-white border border-outline-variant text-on-surface hover:bg-slate-50 transition-all"
+            onClick={() => runSimulation(119)}
+            className={`px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+              activeScenario === 119
+                ? "bg-primary text-on-primary"
+                : "bg-white border border-outline-variant text-on-surface hover:bg-slate-50"
+            }`}
           >
             Cân bằng mùa cao điểm
           </button>
