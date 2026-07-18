@@ -33,6 +33,27 @@ export function SimulationScreen() {
   const [maxDelta, setMaxDelta] = useState(15);
   const [strategy, setStrategy] = useState("revenue");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
+  // Load thông tin chính sách thực tế khi mở Modal
+  useEffect(() => {
+    async function loadActivePolicy() {
+      try {
+        const policyId = activeScenario || 119;
+        const res = await policyApi.getPolicies();
+        const activePol = res.find((p: any) => p.id === policyId);
+        if (activePol) {
+          setFloorPrice(Math.round(activePol.min_price).toString());
+          setCeilingPrice(Math.round(activePol.max_price).toString());
+          setMaxDelta(activePol.max_step_change || 15);
+        }
+      } catch (err) {
+        console.error("Lỗi lấy thông tin chính sách:", err);
+      }
+    }
+    if (isPolicyModalOpen) {
+      loadActivePolicy();
+    }
+  }, [isPolicyModalOpen, activeScenario]);
 
   // Gọi API so sánh mô phỏng khi component mount hoặc khi bấm chạy
   async function runSimulation(policyId?: number) {
@@ -404,7 +425,7 @@ export function SimulationScreen() {
                 type="button"
                 onClick={async () => {
                   try {
-                    const policyId = activeScenario === 1 ? 121 : 119;
+                    const policyId = activeScenario || 119;
                     await policyApi.updatePolicy(policyId, {
                       min_price: Number(floorPrice),
                       max_price: Number(ceilingPrice),
