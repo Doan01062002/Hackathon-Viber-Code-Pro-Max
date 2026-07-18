@@ -15,12 +15,12 @@ export interface RouteSegment {
 }
 
 export const MOCK_ROUTE_SEGMENTS: RouteSegment[] = [
-  { id: "HAN-NDI", label: "Ha Noi - Nam Dinh", loadPct: 55, originCode: "HAN", originName: "Ha Noi", destinationCode: "NDI", destinationName: "Nam Dinh" },
-  { id: "NDI-NBH", label: "Nam Dinh - Ninh Binh", loadPct: 68, originCode: "NDI", originName: "Nam Dinh", destinationCode: "NBH", destinationName: "Ninh Binh" },
-  { id: "NBH-THH", label: "Ninh Binh - Thanh Hoa", loadPct: 45, originCode: "NBH", originName: "Ninh Binh", destinationCode: "THH", destinationName: "Thanh Hoa" },
-  { id: "THH-VIH", label: "Thanh Hoa - Vinh", loadPct: 92, originCode: "THH", originName: "Thanh Hoa", destinationCode: "VIH", destinationName: "Vinh" },
-  { id: "VIH-HUE", label: "Vinh - Hue", loadPct: 74, originCode: "VIH", originName: "Vinh", destinationCode: "HUE", destinationName: "Hue" },
-  { id: "HUE-DAN", label: "Hue - Da Nang", loadPct: 88, originCode: "HUE", originName: "Hue", destinationCode: "DAN", destinationName: "Da Nang" },
+  { id: "HAN-NDI", label: "Hà Nội - Nam Định", loadPct: 55, originCode: "HAN", originName: "Hà Nội", destinationCode: "NDI", destinationName: "Nam Định" },
+  { id: "NDI-NBH", label: "Nam Định - Ninh Bình", loadPct: 68, originCode: "NDI", originName: "Nam Định", destinationCode: "NBH", destinationName: "Ninh Bình" },
+  { id: "NBH-THH", label: "Ninh Bình - Thanh Hóa", loadPct: 45, originCode: "NBH", originName: "Ninh Bình", destinationCode: "THH", destinationName: "Thanh Hóa" },
+  { id: "THH-VIH", label: "Thanh Hóa - Vinh", loadPct: 92, originCode: "THH", originName: "Thanh Hóa", destinationCode: "VIH", destinationName: "Vinh" },
+  { id: "VIH-HUE", label: "Vinh - Huế", loadPct: 74, originCode: "VIH", originName: "Vinh", destinationCode: "HUE", destinationName: "Huế" },
+  { id: "HUE-DAN", label: "Huế - Đà Nẵng", loadPct: 88, originCode: "HUE", originName: "Huế", destinationCode: "DAN", destinationName: "Đà Nẵng" },
 ];
 
 interface RouteMapProps {

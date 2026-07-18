@@ -22,7 +22,7 @@ export function useRailCatalog() {
       })
       .catch((caught: unknown) => {
         catalogRequest = null;
-        if (active) setError(caught instanceof Error ? caught.message : "Khong tai duoc danh muc");
+        if (active) setError(caught instanceof Error ? caught.message : "Không tải được danh mục");
       });
     };
 

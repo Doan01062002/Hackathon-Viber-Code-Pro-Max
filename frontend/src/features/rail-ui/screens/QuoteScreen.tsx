@@ -38,9 +38,9 @@ export function QuoteScreen() {
 
   const translatePolicy = (policy: string) => {
     const clean = policy.replace(/_ENFORCED|_CAPPED/g, "");
-    if (clean === "FLOOR_PRICE") return "Bao ve gia san";
-    if (clean === "CEILING_PRICE") return "Gioi han gia tran";
-    if (clean === "MAX_DAILY_DELTA") return "Bien do ngay toi da";
+    if (clean === "FLOOR_PRICE") return "Bảo vệ giá sàn";
+    if (clean === "CEILING_PRICE") return "Giới hạn giá trần";
+    if (clean === "MAX_DAILY_DELTA") return "Biên độ ngày tối đa";
     return clean;
   };
 
@@ -91,7 +91,7 @@ export function QuoteScreen() {
       setError(
         caught instanceof ApiError
           ? caught.message
-          : "Khong the ket noi he thong tinh toan gia dong.",
+          : "Không thể kết nối hệ thống tính toán giá động.",
       );
     } finally {
       setIsLoading(false);

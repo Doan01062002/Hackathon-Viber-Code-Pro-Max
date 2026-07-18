@@ -94,7 +94,7 @@ export function BookingScreen() {
         })
         .catch((caught: unknown) => {
           if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-            setError(caught instanceof Error ? caught.message : "Khong tai duoc lua chon hanh trinh");
+            setError(caught instanceof Error ? caught.message : "Không tải được lựa chọn hành trình");
           }
         })
         .finally(() => setLoadingOptions(false));
@@ -128,7 +128,7 @@ export function BookingScreen() {
         })
         .catch((caught: unknown) => {
           if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-            setError(caught instanceof Error ? caught.message : "Khong tim duoc chuyen tau");
+            setError(caught instanceof Error ? caught.message : "Không tìm được chuyến tàu");
             setProducts([]);
           }
         })
@@ -185,7 +185,7 @@ export function BookingScreen() {
           coachNumbers.includes(current) ? current : (coachNumbers[0] ?? ""),
         );
       } catch (caught) {
-        if (active) setError(caught instanceof Error ? caught.message : "Khong tai duoc so do tau");
+        if (active) setError(caught instanceof Error ? caught.message : "Không tải được sơ đồ tàu");
       } finally {
         if (active) setLoadingPlans(false);
       }
@@ -278,7 +278,7 @@ export function BookingScreen() {
       setSelectedSeatIds([]);
       setRefreshVersion((value) => value + 1);
     } catch (caught) {
-      setError(caught instanceof ApiError ? caught.message : "Dat ve that bai, vui long thu lai");
+      setError(caught instanceof ApiError ? caught.message : "Đặt vé thất bại, vui lòng thử lại");
       setRefreshVersion((value) => value + 1);
     } finally {
       setBooking(false);
@@ -522,7 +522,7 @@ export function BookingScreen() {
 function SeatButton({ seat, selected, onClick, suffix }: { seat: BookingSeat; selected: boolean; onClick: (seat: BookingSeat) => void; suffix?: string }) {
   const unavailable = seat.status !== "available";
   return (
-    <button type="button" disabled={unavailable} onClick={() => onClick(seat)} title={`Ghe ${seat.seat_no} · ${seat.status}`} className={`h-10 w-full rounded-md text-[9px] font-black transition-all ${selected ? "bg-primary text-white shadow-md scale-105" : unavailable ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-outline-variant hover:border-primary text-on-surface"}`}>
+    <button type="button" disabled={unavailable} onClick={() => onClick(seat)} title={`Ghế ${seat.seat_no} · ${seat.status}`} className={`h-10 w-full rounded-md text-[9px] font-black transition-all ${selected ? "bg-primary text-white shadow-md scale-105" : unavailable ? "bg-slate-300 text-slate-500 cursor-not-allowed" : "bg-white border border-outline-variant hover:border-primary text-on-surface"}`}>
       {seat.seat_no}{suffix ? <span className="block text-[7px] opacity-70">{suffix}</span> : null}
     </button>
   );
