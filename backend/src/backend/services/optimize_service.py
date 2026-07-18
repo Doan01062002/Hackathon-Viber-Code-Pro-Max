@@ -370,7 +370,7 @@ class OptimizeService:
     ) -> int:
         """Khối 2 Lớp B — gán ghế (interval partitioning) rồi ghép đoạn trống, ghi gap_combinations.
 
-        Khác Lớp A (chạy trên mạng lưới mô phỏng của AI rồi ánh xạ ngược về DB), Lớp B chạy
+        Khác Lớp A (chạy trên mạng lưới dự báo của AI rồi ánh xạ ngược về DB), Lớp B chạy
         thẳng trên dữ liệu DB: booking thật, ghế thật, OD thật. Nhờ vậy `od_id` truyền cho AI
         chính là `od_products.id`, không cần bảng ánh xạ nào.
 
