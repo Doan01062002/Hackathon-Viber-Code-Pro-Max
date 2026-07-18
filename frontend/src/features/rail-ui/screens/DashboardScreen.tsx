@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { seatApi } from "@/features/rail-ui/api/seatApi";
 import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
@@ -13,6 +13,19 @@ import {
 } from "@/features/rail-ui/mockData";
 
 const DEFAULT_TRIP_ID = 1;
+
+/** Ngày hôm nay theo giờ máy người dùng, dạng YYYY-MM-DD cho <input type="date">. */
+function todayIso() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+/** "2026-07-18" → "18 Tháng 7 2026". */
+function formatVnDate(iso: string) {
+  const [year, month, day] = iso.split("-");
+  return `${Number(day)} Tháng ${Number(month)} ${year}`;
+}
 
 function heatClass(value: number) {
   if (value >= 90) return "text-red-600 font-bold";
@@ -169,6 +182,28 @@ export function DashboardScreen() {
   const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
   const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(mockGapSuggestions);
 
+  // Ngày đang xem. Khởi tạo rỗng rồi set sau khi mount để tránh lệch hydration
+  // giữa timezone của server và của trình duyệt.
+  const [today, setToday] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const iso = todayIso();
+    setToday(iso);
+    setSelectedDate((current) => current || iso);
+  }, []);
+
+  function openDatePicker() {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.focus();
+    }
+  }
+
   useEffect(() => {
     async function loadGaps() {
       try {
@@ -201,7 +236,9 @@ export function DashboardScreen() {
   const apiError = segments.error || forecast.error;
 
   // Sparkline data
-  const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", "Hôm nay"];
+  // Nhãn cuối bám theo ngày đang chọn để không mâu thuẫn với bộ chọn ngày ở header.
+  const lastSparkLabel = !selectedDate || selectedDate === today ? "Hôm nay" : formatVnDate(selectedDate);
+  const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", lastSparkLabel];
   const revenueTrend = [1.10, 1.12, 1.08, 1.15, 1.13, 1.18, 1.16, 1.22, 1.20, 1.24];
   const loadTrend = [86.5, 87.2, 86.0, 85.3, 85.5, 84.8, 85.0, 84.2, 84.5, avgLoad];
   const seatUseTrend = [0.85, 0.88, 0.86, 0.89, 0.87, 0.90, 0.88, 0.91, 0.90, 0.92];
@@ -234,18 +271,33 @@ export function DashboardScreen() {
             Giám sát thời gian thực hệ số tải, xu hướng đặt vé, doanh thu và cảnh báo thắt nút cổ chai.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <div className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2">
-            <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
-            <span className="text-xs font-semibold">Hôm nay, 17 Tháng 7 2026</span>
-          </div>
-          <select
-            className="bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-primary focus:border-primary outline-none"
-            defaultValue="Mã tàu: SE1, SE2, SE3"
+        <div className="flex items-center space-x-3 mr-16">
+          <div
+            onClick={openDatePicker}
+            className="relative bg-surface border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2 cursor-pointer hover:bg-surface-container-low focus-within:ring-1 focus-within:ring-primary transition-colors"
           >
-            <option>Mã tàu: SE1, SE2, SE3</option>
-            <option>Mã tàu: SE4, SE5, SE6</option>
-          </select>
+            <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
+            <span className="text-xs font-semibold whitespace-nowrap">
+              {selectedDate
+                ? `${selectedDate === today ? "Hôm nay, " : ""}${formatVnDate(selectedDate)}`
+                : "Chọn ngày"}
+            </span>
+            <input
+              ref={dateInputRef}
+              type="date"
+              aria-label="Chọn ngày xem dữ liệu"
+              // Chặn ngày quá khứ: dashboard chỉ phục vụ dự báo từ hôm nay trở đi.
+              min={today}
+              value={selectedDate}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (!value) return;
+                // Gõ tay có thể vượt qua `min`, nên kẹp lại về hôm nay.
+                setSelectedDate(today && value < today ? today : value);
+              }}
+              className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+            />
+          </div>
         </div>
       </div>
 
