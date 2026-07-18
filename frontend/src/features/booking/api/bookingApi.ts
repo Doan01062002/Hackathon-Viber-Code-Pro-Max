@@ -3,11 +3,19 @@ import { apiClient } from "@/lib/api/client";
 import type {
   BookingConfirmResponse,
   BookingCreateRequest,
+  BookingDetail,
   BookingOptions,
   BookingResponse,
   BookingSearchItem,
   BookingSeatPlan,
 } from "@/features/booking/types";
+
+export function getBookingDetail(
+  bookingCode: string,
+  signal?: AbortSignal,
+): Promise<BookingDetail> {
+  return apiClient.get<BookingDetail>(`/api/v1/booking/code/${encodeURIComponent(bookingCode)}`, { signal });
+}
 
 export function getBookingOptions(
   origin: string,

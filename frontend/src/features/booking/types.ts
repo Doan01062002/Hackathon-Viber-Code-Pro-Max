@@ -90,3 +90,44 @@ export type BookingSeatPlan = {
   coaches: BookingCoach[];
   segments: BookingSegment[];
 };
+
+export type BookingDetailSegment = {
+  segment_id: number;
+  sequence_no: number;
+  origin_code: string;
+  origin_name: string;
+  destination_code: string;
+  destination_name: string;
+  departure_at: string;
+  arrival_at: string;
+  distance_km: number;
+};
+
+export type BookingDetail = {
+  booking_id: number;
+  booking_code: string;
+  od_product_id: number;
+  status: "held" | "confirmed" | "cancelled" | "refunded";
+  channel: string | null;
+  booked_price: number;
+  booked_at: string;
+  expires_at: string | null;
+  trip_id: number;
+  train_code: string;
+  train_name: string | null;
+  trip_status: "scheduled" | "boarding" | "departed" | "completed" | "cancelled";
+  service_date: string;
+  departure_at: string;
+  arrival_at: string;
+  origin_code: string;
+  origin_name: string;
+  destination_code: string;
+  destination_name: string;
+  seat_type: string;
+  seat_type_name: string;
+  fare_class: string;
+  distance_km: number;
+  coach_no: string | null;
+  seat_no: string | null;
+  segments: BookingDetailSegment[];
+};

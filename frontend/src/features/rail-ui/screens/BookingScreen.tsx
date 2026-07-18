@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { SearchableStationSelect } from "@/components/ui/SearchableStationSelect";
@@ -760,25 +761,11 @@ export function BookingScreen() {
                     ))}
                   </div>
                   <div className="flex justify-between items-end pt-2">
-                    <span className="text-on-surface-variant font-bold">Tổng tiền ghép</span>
-                    <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(850000)}</span>
+                    <span className="text-on-surface-variant font-bold">Giá vé ghép</span>
+                    <span className="text-xs font-black text-amber-700">Chờ backend báo giá</span>
                   </div>
-                  <Button
-                    className="w-full py-2.5 bg-primary"
-                    disabled={booking}
-                    onClick={async () => {
-                      setBooking(true);
-                      setTimeout(() => {
-                        setConfirmed([
-                          { booking_id: 101, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 101, seat_no: isSleeper ? "Giường 03 (T2 A)" : "Ghế 12", coach_no: "02" },
-                          { booking_id: 102, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 102, seat_no: isSleeper ? "Giường 05 (T3 A)" : "Ghế 18", coach_no: "02" }
-                        ]);
-                        setPaidPrice(850000);
-                        setBooking(false);
-                      }, 1000);
-                    }}
-                  >
-                    {booking ? "Đang đặt vé ghép..." : "Xác nhận & Đặt vé ghép chặng"}
+                  <Button className="w-full py-2.5" disabled>
+                    Đặt vé ghép chưa được backend hỗ trợ
                   </Button>
                 </>
               ) : (
@@ -798,7 +785,14 @@ export function BookingScreen() {
               {confirmed.length > 0 ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-green-800 space-y-1">
                   <p className="font-black">Đã đặt {confirmed.length} vé trong phiên này</p>
-                  {confirmed.map((item) => <p key={item.booking_id} className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghế {item.seat_no}</p>)}
+                  {confirmed.map((item) => (
+                    <div key={item.booking_id} className="flex items-center justify-between gap-2">
+                      <p className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghế {item.seat_no}</p>
+                      <Link href={`/ticket-details?code=${encodeURIComponent(item.booking_code)}`} className="shrink-0 font-bold text-primary hover:underline">
+                        Xem vé
+                      </Link>
+                    </div>
+                  ))}
                   <p className="border-t border-green-200 pt-1 font-bold">Tổng đã thanh toán: {moneyFormatter.format(paidPrice)}</p>
                 </div>
               ) : null}
