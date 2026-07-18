@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: remove return date and return warning messages for single-direction layout\"");
+  runCmd("git commit -m \"feat: set fixed height for station selectors and redesign dropdown options list with badges\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");
