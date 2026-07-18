@@ -2,6 +2,10 @@
 
 set -e
 
+# Bỏ qua kiểm tra môi trường quản lý bên ngoài (PEP 668) trên Ubuntu đời mới
+export PIP_BREAK_SYSTEM_PACKAGES=1
+
+
 echo "=== [1/4] Tạo file môi trường .env ==="
 cat << 'EOF' > .env
 DATABASE_URL="postgresql+psycopg://appadmin:dtkien2003@viber-coding-pro-max-db.czciyckimjww.ap-southeast-1.rds.amazonaws.com:5432/viber_coding_pro_max?sslmode=require"
