@@ -175,7 +175,8 @@ Các REST API được cung cấp tại base URL `/api/v1`. Kiểu dữ liệu s
   }
   ```
 * Backend maps the OD product to `od_product_segments`, sums active bid prices,
-  calls `POST /internal/price` on ai-service, applies the active pricing policy,
+  calls the in-process AI pricing engine (`AIClient.price` -> `ai_service.engine.AIEngine`;
+  no longer an HTTP call to a separate ai-service), applies the active pricing policy,
   and accepts only when inventory is available and `final_price >= opportunity_cost`.
 * `origin` and `destination` accept either a station code or its exact name.
   `trip_id` is optional; when omitted, the earliest matching trip is selected.
@@ -213,4 +214,6 @@ Error responses use FastAPI's `detail` envelope:
 
 - `404`: OD cannot be mapped to an active product.
 - `422`: request body validation failed.
-- `502`: ai-service `/internal/price` is unavailable or returned an invalid payload.
+- `502`: the AI pricing engine raised `AIServiceError` (model not ready, or it returned
+  an invalid result). Kept as 502 for backward compatibility with existing clients even
+  though the engine now runs in-process rather than behind the network.

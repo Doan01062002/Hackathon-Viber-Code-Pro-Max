@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.services.ai_pricing_client import AIPriceClient, SegmentBidPrice
+from backend.services.ai_client import AIClient, SegmentBidPrice
 from backend.views.pricing_view import (
     PricingExplanation,
     PricingQuoteODResponse,
@@ -21,8 +21,8 @@ def evaluate_bid_price(fare: float, opportunity_cost: float, availability: int) 
 
 
 class PricingService:
-    def __init__(self, ai_client: AIPriceClient | None = None) -> None:
-        self._ai_client = ai_client or AIPriceClient()
+    def __init__(self, ai_client: AIClient | None = None) -> None:
+        self._ai_client = ai_client or AIClient()
 
     def create_pricing_quote(
         self, od_product_id: int, db: Session, run_version: str | None = None

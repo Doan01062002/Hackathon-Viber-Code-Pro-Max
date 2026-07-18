@@ -1,6 +1,3 @@
-import os
-import pickle
-import sys
 from datetime import date, datetime, timezone
 UTC = timezone.utc
 from typing import Any
@@ -8,14 +5,9 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-# Thêm thư mục ai vào sys.path để import ai_service
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
-ai_path = os.path.join(root_dir, "ai")
-if ai_path not in sys.path:
-    sys.path.append(ai_path)
-
 from ai_service import datagen
 from ai_service import optimization as opt
+from ai_service.engine import MODEL_PATH, feature_rows, get_engine
 
 
 class OptimizeService:
@@ -79,14 +71,11 @@ class OptimizeService:
         run_version = "ver-" + datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         solved_at = datetime.now(UTC).isoformat()
 
-        # Tải Forecaster model
-        model_path = os.path.join(ai_path, "models", "model.pkl")
-        if not os.path.exists(model_path):
-            raise RuntimeError(f"Không tìm thấy tệp model tại {model_path}. Hãy chạy train script trước.")
-
-        with open(model_path, "rb") as f:
-            bundle = pickle.load(f)
-        forecaster = bundle["forecaster"]
+        # Dùng chung forecaster của engine singleton — trước đây chỗ này tự pickle.load
+        # model.pkl lần nữa, khiến model nằm trong RAM hai bản trong cùng process.
+        forecaster = get_engine().forecaster
+        if forecaster is None:
+            raise RuntimeError(f"Không tìm thấy tệp model tại {MODEL_PATH}. Hãy chạy train script trước.")
 
         # 2. Gọi forecast & lưu (BE-10.2)
         st, segs, ods, bn = datagen.build_network()
@@ -102,9 +91,7 @@ class OptimizeService:
             raise ValueError("Không tìm thấy sản phẩm OD khớp giữa cấu hình AI và database")
 
         # Dự báo nhu cầu GBDT
-        from ai_service.app import _feature_rows
-
-        feature_df = _feature_rows(valid_network_ods, service_date)
+        feature_df = feature_rows(valid_network_ods, service_date)
         pred_df = forecaster.predict(feature_df)
 
         # Phân phối point forecast qua 61 lead days (60 về 0)
