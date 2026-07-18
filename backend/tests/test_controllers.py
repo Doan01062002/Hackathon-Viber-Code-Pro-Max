@@ -26,3 +26,24 @@ async def test_chat_returns_agent_response(client):
 async def test_agent_status(client):
     response = await client.get("/api/v1/status")
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_swagger_docs_page(client):
+    response = await client.get("/docs")
+
+    assert response.status_code == 200
+    assert "swagger-ui" in response.text
+    assert "/openapi.json" in response.text
+
+
+@pytest.mark.asyncio
+async def test_openapi_schema_lists_backend_urls(client):
+    response = await client.get("/openapi.json")
+
+    assert response.status_code == 200
+    schema = response.json()
+    assert schema["info"]["title"] == "SRRM Backend API"
+    assert "/health" in schema["paths"]
+    assert "/api/v1/chat" in schema["paths"]
+    assert "/checkdata" in schema["paths"]
