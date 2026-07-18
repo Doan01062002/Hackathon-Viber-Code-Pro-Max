@@ -190,13 +190,13 @@ select {
 
 .rail-brand-copy strong,
 .topbar-user-chip strong {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .rail-brand-copy span,
 .topbar-user-chip small {
   color: var(--caption);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .rail-nav {
@@ -325,7 +325,7 @@ select {
 }
 
 .topbar h1 {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
 }
 
@@ -423,20 +423,20 @@ select {
 
 .data-table thead th {
   z-index: 1;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--caption);
   background: var(--surface-soft);
 }
 
 .data-table tbody th {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
 }
 
 .data-table tbody td {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--body);
 }
 

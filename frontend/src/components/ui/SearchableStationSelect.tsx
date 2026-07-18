@@ -15,6 +15,7 @@ type SearchableStationSelectProps = {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  align?: "left" | "right";
   className?: string;
 };
 
@@ -23,7 +24,8 @@ export function SearchableStationSelect({
   options,
   value,
   onChange,
-  placeholder = "Tim theo ma ga, ten ga hoac khu vuc",
+  placeholder = "Tìm theo mã ga, tên ga hoặc khu vực",
+  align = "left",
   className,
 }: SearchableStationSelectProps) {
   const [open, setOpen] = useState(false);
@@ -67,35 +69,42 @@ export function SearchableStationSelect({
   }, [open]);
 
   return (
-    <div className={cn("space-y-1", className)} ref={rootRef}>
-      <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
+    <div className={cn("space-y-1 w-full", className)} ref={rootRef}>
+      <label className="text-[10px] uppercase font-black tracking-wider text-slate-400">
         {label}
       </label>
 
-      <div className="relative">
+      <div className="relative w-full">
+        {/* Select Button - Fixed Height 64px to ensure perfect alignment */}
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
           className={cn(
             "w-full bg-surface-container-low border border-outline-variant rounded-lg px-3 py-2 text-xs text-left",
-            "focus:ring-1 focus:ring-primary outline-none transition-all min-h-11",
-            "flex items-center justify-between gap-3",
+            "focus:ring-1 focus:ring-primary outline-none transition-all h-[64px]",
+            "flex items-center justify-between gap-2.5 shadow-sm hover:bg-slate-50/50 cursor-pointer",
+            open ? "ring-1 ring-primary border-primary" : ""
           )}
         >
-          <span className="min-w-0">
+          <span className="min-w-0 flex-grow flex flex-col justify-center">
             {selected ? (
-              <span className="block">
-                <span className="block font-semibold text-on-surface">
-                  {selected.name} ({selected.code})
+              <span className="block leading-tight">
+                <span className="block font-black text-on-surface text-xs truncate">
+                  {selected.name}
                 </span>
-                {selected.region ? (
-                  <span className="block text-[10px] text-on-surface-variant truncate">
-                    {selected.region}
+                <span className="flex items-center gap-1.5 mt-0.5">
+                  <span className="px-1 py-0.2 bg-primary/10 text-primary text-[8px] font-black rounded uppercase tracking-wider font-mono">
+                    {selected.code}
                   </span>
-                ) : null}
+                  {selected.region ? (
+                    <span className="text-[10px] text-on-surface-variant font-medium truncate">
+                      {selected.region}
+                    </span>
+                  ) : null}
+                </span>
               </span>
             ) : (
-              <span className="text-outline">{placeholder}</span>
+              <span className="text-outline text-xs truncate font-medium">{placeholder}</span>
             )}
           </span>
           <span className="material-symbols-outlined text-sm text-on-surface-variant shrink-0">
@@ -103,8 +112,14 @@ export function SearchableStationSelect({
           </span>
         </button>
 
+        {/* Dropdown Overlay - Custom Width to prevent name truncation and aligned based on prop */}
         {open ? (
-          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-30 rounded-xl border border-outline-variant bg-white shadow-xl p-3 space-y-3">
+          <div
+            className={cn(
+              "absolute top-[calc(100%+8px)] z-30 rounded-xl border border-outline-variant bg-white shadow-xl p-3 space-y-3 w-[280px] sm:w-[320px]",
+              align === "right" ? "right-0" : "left-0"
+            )}
+          >
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-on-surface-variant">
                 search
@@ -113,12 +128,13 @@ export function SearchableStationSelect({
                 ref={inputRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={placeholder}
-                className="w-full rounded-lg border border-outline-variant bg-surface-container-low py-2 pl-10 pr-3 text-xs font-medium text-on-surface outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Nhập tên ga hoặc mã ga..."
+                className="w-full rounded-lg border border-outline-variant bg-surface-container-low py-2 pl-10 pr-3 text-xs font-semibold text-on-surface outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
 
-            <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+            {/* List options with list style instead of card style - No text truncation */}
+            <div className="max-h-60 overflow-y-auto custom-scrollbar divide-y divide-slate-100 pr-1">
               {filteredOptions.length > 0 ? (
                 filteredOptions.map((option) => {
                   const isSelected = option.code === value;
@@ -132,26 +148,45 @@ export function SearchableStationSelect({
                         setOpen(false);
                       }}
                       className={cn(
-                        "w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                        "w-full px-3 py-2.5 text-left transition-all duration-150 flex items-center justify-between cursor-pointer first:rounded-t-lg last:rounded-b-lg",
                         isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-outline-variant bg-surface-container-low hover:border-primary/40 hover:bg-primary/5",
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "hover:bg-slate-50 text-on-surface"
                       )}
                     >
-                      <span className="block text-xs font-semibold text-on-surface">
-                        {option.name} ({option.code})
-                      </span>
-                      {option.region ? (
-                        <span className="block text-[10px] text-on-surface-variant">
-                          {option.region}
+                      <div className="min-w-0 flex-grow pr-2">
+                        <span className={cn(
+                          "block text-xs",
+                          isSelected ? "font-black text-primary" : "font-bold text-on-surface"
+                        )}>
+                          {option.name}
                         </span>
-                      ) : null}
+                        {option.region ? (
+                          <span className="block text-[10px] text-on-surface-variant/80 font-medium mt-0.5">
+                            {option.region}
+                          </span>
+                        ) : null}
+                      </div>
+                      
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[9px] font-black uppercase font-mono tracking-wider",
+                          isSelected ? "bg-primary text-white" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {option.code}
+                        </span>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-primary text-sm font-bold">
+                            check
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })
               ) : (
-                <div className="rounded-lg border border-dashed border-outline-variant px-3 py-4 text-center text-xs font-medium text-on-surface-variant">
-                  Khong tim thay ga phu hop.
+                <div className="rounded-lg border border-dashed border-outline-variant px-3 py-4 text-center text-xs font-semibold text-on-surface-variant">
+                  Không tìm thấy ga phù hợp.
                 </div>
               )}
             </div>
