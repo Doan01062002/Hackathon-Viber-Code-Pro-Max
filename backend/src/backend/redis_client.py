@@ -71,7 +71,15 @@ def get_redis_client():
     settings = get_settings()
     try:
         # Thử kết nối đến Redis thực tế
-        client = redis.Redis.from_url(settings.redis_url, socket_timeout=1.0, decode_responses=True)
+        # XREAD blocks for 1 second in EventWorker, so the socket timeout must be
+        # comfortably longer than the blocking read window.
+        client = redis.Redis.from_url(
+            settings.redis_url,
+            socket_connect_timeout=2.0,
+            socket_timeout=5.0,
+            health_check_interval=30,
+            decode_responses=True,
+        )
         client.ping()
         return client
     except Exception as e:

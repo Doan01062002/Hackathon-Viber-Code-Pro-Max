@@ -37,7 +37,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
         <div className="px-6 mb-4">
           <h1 className="text-xl font-extrabold text-primary leading-tight">SRRM AI</h1>
           <p className="text-[9px] uppercase font-bold tracking-widest text-on-surface-variant opacity-70 mt-0.5">
-            Rail Revenue Management
+            Quản lý Doanh thu Đường sắt
           </p>
         </div>
 
@@ -98,8 +98,9 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
         <div className="px-3 mt-auto space-y-1.5 pt-2 border-t border-outline-variant">
           <button
             className="w-full py-2 bg-primary text-on-primary rounded-xl font-bold text-xs shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+            onClick={() => window.alert("Đang chuẩn bị xuất báo cáo doanh thu động...")}
           >
-            Generate Report
+            Xuất báo cáo
           </button>
           <div>
             <a
@@ -107,14 +108,14 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
               href="#"
             >
               <span className="material-symbols-outlined text-base">settings</span>
-              <span className="text-xs">Settings</span>
+              <span className="text-xs">Cài đặt</span>
             </a>
             <a
               className="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors"
               href="#"
             >
               <span className="material-symbols-outlined text-base">help_outline</span>
-              <span className="text-xs">Support</span>
+              <span className="text-xs">Hỗ trợ</span>
             </a>
           </div>
         </div>
@@ -132,7 +133,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline text-sm">search</span>
             <input
               className="pl-10 pr-4 py-1.5 bg-surface-container-low border border-outline-variant rounded-full text-xs w-[400px] focus:w-[480px] focus:border-primary transition-all focus:outline-none"
-              placeholder="Search routes or inventory..."
+              placeholder="Tìm kiếm chặng hoặc tồn kho ghế..."
               type="text"
             />
           </div>
@@ -142,7 +143,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
               className="flex items-center gap-2 px-4 py-1.5 bg-primary-container text-on-primary-container rounded-lg font-bold text-xs hover:brightness-110 transition-all scale-95 active:scale-90"
             >
               <span className="material-symbols-outlined text-sm">filter_alt</span>
-              Apply Filters
+              Áp dụng bộ lọc
             </button>
             <div className="flex gap-2 items-center">
               <span className="material-symbols-outlined p-2 hover:bg-surface-container-high rounded-full cursor-pointer transition-colors text-on-surface-variant text-base leading-none">notifications</span>
@@ -159,14 +160,14 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
                     alt="User Avatar"
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcaWGkMGSlfdSbZpcl7uvv_GMlm-69Dc8roJ9Mu4gxrm3kekOE1Fuod-yisy0jt6nLjqGMLkC6qEPmtyWJdu8YP4c-ogy74ljysoAYRJmM1uzMpj0kyxTLH4i7RpHix3mI25ilCn1lV82r3WykYOsUt8o7MPvk72_GQBc0PZ4_C3vocTpESy54l0fLLxuj1Rv-pNkOxlHNAgxvrLiu0A-dZT4ycszZ7mWP2pPSUc9QidKUJwYJ86MOtPKGRCI-sMq4SKPNwhVbqXaw"
                   />
-                  <span className="text-xs font-bold text-on-surface truncate max-w-[80px]">Admin User</span>
+                  <span className="text-xs font-bold text-on-surface truncate max-w-[80px]">Quản trị viên</span>
                   <span className="material-symbols-outlined text-xs leading-none">arrow_drop_down</span>
                 </button>
 
                 {showProfileMenu && (
                   <div className="absolute right-0 mt-2 w-48 bg-white border border-outline-variant rounded-xl shadow-lg py-2 z-50">
                     <div className="px-4 py-2 border-b border-outline-variant/30">
-                      <p className="font-bold text-xs text-on-surface">Admin User</p>
+                      <p className="font-bold text-xs text-on-surface">Quản trị viên</p>
                       <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">administrator@srrm.vn</p>
                     </div>
                     <div className="py-1">

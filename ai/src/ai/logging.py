@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone
-UTC = timezone.utc
+from datetime import UTC, datetime
+
+UTC = UTC
 from threading import Lock
 from typing import Literal
 

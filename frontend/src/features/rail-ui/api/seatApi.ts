@@ -28,7 +28,16 @@ export interface GapSuggestionDto {
   reason: string;
 }
 
+export interface TripOptionDto {
+  trip_id: number;
+  train_code: string;
+  service_date: string;
+}
+
 export const seatApi = {
+  getTrips: (): Promise<TripOptionDto[]> =>
+    apiClient.get<TripOptionDto[]>("/api/v1/seats/trips"),
+
   getCoaches: (tripId: number): Promise<CoachDto[]> =>
     apiClient.get<CoachDto[]>(`/api/v1/seats/coaches?trip_id=${tripId}`),
 

@@ -10,6 +10,8 @@ import logging
 import threading
 import time
 
+from redis.exceptions import TimeoutError as RedisTimeoutError
+
 from backend.database import get_session_factory
 from backend.redis_client import get_redis_client
 from backend.services.optimize_service import OptimizeService
@@ -111,6 +113,10 @@ class EventWorker:
                                 f"[EventWorker] Scheduled resolve for trip_id {trip_id} at current + {self.debounce_seconds}s"
                             )
 
+            except RedisTimeoutError:
+                # A blocking stream read may time out when no event arrives.
+                # This is an idle poll, not a worker failure.
+                continue
             except Exception as e:
                 print(f"[EventWorker] Error in consume loop: {str(e)}")
                 time.sleep(2.0)
@@ -129,7 +135,7 @@ class EventWorker:
                 # 1. Tìm các trip_id đã sẵn sàng giải tối ưu (hết thời gian debounce)
                 with self.pending_resolves_lock:
                     if self.pending_resolves:
-                        print(f"[EventWorker] Debounce loop checking. Pending: {dict(self.pending_resolves)}")
+                        logger.debug("Pending debounce jobs: %s", self.pending_resolves)
                     for trip_id, run_time in list(self.pending_resolves.items()):
                         if now >= run_time:
                             to_run.append(trip_id)

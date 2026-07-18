@@ -9,11 +9,19 @@ Chạy:  python scripts/gen_data.py               # mặc định 2 năm
 Kết quả ghi vào:  out/seeds/
 """
 from __future__ import annotations
-import sys, os, csv, json, argparse
+
+import argparse
+import csv
+import json
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date, datetime, timedelta, timezone
+
 import numpy as np
-from ai_service import datagen, config as C
+from ai_service import config as C
+from ai_service import datagen
 
 TZ = timezone(timedelta(hours=7))
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

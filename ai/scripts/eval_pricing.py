@@ -32,11 +32,18 @@ HAI GIẢ ĐỊNH QUAN TRỌNG (ghi rõ để minh bạch):
 Chạy:  python scripts/eval_pricing.py --days 120 --start 2024-02-01 --seed 202
 """
 from __future__ import annotations
-import sys, os, argparse
+
+import argparse
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date, timedelta
+
 import numpy as np
-from ai_service import datagen, optimization as opt, pricing, config as C
+from ai_service import config as C
+from ai_service import datagen, pricing
+from ai_service import optimization as opt
 
 # ---- hằng số mạng ----
 KM = [s[2] for s in C.STATIONS]

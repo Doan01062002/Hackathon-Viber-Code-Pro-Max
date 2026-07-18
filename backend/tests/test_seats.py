@@ -1,5 +1,5 @@
 import pytest
-from backend.database import get_session_factory
+
 
 @pytest.mark.asyncio
 async def test_get_coaches_success(client):
@@ -9,7 +9,7 @@ async def test_get_coaches_success(client):
     coaches = response.json()
     assert isinstance(coaches, list)
     assert len(coaches) > 0
-    
+
     first_coach = coaches[0]
     assert "name" in first_coach
     assert "type" in first_coach
@@ -29,7 +29,7 @@ async def test_get_seat_layout_success(client):
     response = await client.get("/api/v1/seats/layout?trip_id=1&coach_no=01")
     assert response.status_code == 200
     layout = response.json()
-    
+
     assert "route" in layout
     assert layout["coach"] == "Toa 01"
     assert layout["seat_type"] == "ngoi_mem"
@@ -51,7 +51,7 @@ async def test_get_gap_suggestions_success(client):
     assert response.status_code == 200
     suggestions = response.json()
     assert isinstance(suggestions, list)
-    
+
     if len(suggestions) > 0:
         first_sug = suggestions[0]
         assert "route" in first_sug
