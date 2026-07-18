@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: translate all station options and datefield labels to proper accented Vietnamese\"");
+  runCmd("git commit -m \"feat: remove return date and return warning messages for single-direction layout\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");

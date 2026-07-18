@@ -481,20 +481,9 @@ export function BookingScreen() {
               <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
               <SearchableStationSelect label="Ga đến" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setSelectedSeatIds([]); }} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
               <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
-              <DateField label="Ngày về" value={returnDate} onChange={setReturnDate} dates={bookingOptions?.return_dates ?? []} optional />
             </div>
-            {bookingOptions && bookingOptions.return_dates.length === 0 ? (
-              <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[10px] font-semibold text-amber-800">
-                Cơ sở dữ liệu chưa có chuyến chiều {destination} - {origin}; ngày về tạm thời không khả dụng.
-              </p>
-            ) : null}
-            {returnDate ? (
-              <p className="text-[10px] font-semibold text-on-surface-variant">
-                Chiều về: {returnProducts.length > 0 ? `${returnProducts.length} lựa chọn` : "không có chuyến"}
-              </p>
-            ) : null}
             {tripChoices.length > 0 ? (
               <div className="space-y-1">
                 <label className="text-[9px] uppercase font-bold text-on-surface-variant">Chuyến tàu</label>
