@@ -34,7 +34,7 @@ export async function GET() {
   runCmd("git add .");
 
   // Commit changes
-  runCmd("git commit -m \"feat: align destination dropdown to the right and remove truncation on dropdown list options\"");
+  runCmd("git commit -m \"feat: remove tripChoices select box since database only contains one train route\"");
 
   // Push to remote origin
   runCmd("git push origin ui2 --force");

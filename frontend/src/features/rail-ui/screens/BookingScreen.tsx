@@ -484,14 +484,6 @@ export function BookingScreen() {
             <div className="space-y-1">
               <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
             </div>
-            {tripChoices.length > 0 ? (
-              <div className="space-y-1">
-                <label className="text-[9px] uppercase font-bold text-on-surface-variant">Chuyến tàu</label>
-                <select value={selectedTripId ?? ""} onChange={(event) => { setSelectedTripId(Number(event.target.value)); setSelectedSeatIds([]); }} className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold">
-                  {tripChoices.map((trip) => <option key={trip.trip_id} value={trip.trip_id}>{trip.train_code} · {formatTime(trip.departure_at)} - {formatTime(trip.arrival_at)}</option>)}
-                </select>
-              </div>
-            ) : null}
           </div>
 
           <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
