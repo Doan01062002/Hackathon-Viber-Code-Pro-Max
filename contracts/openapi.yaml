@@ -1,13 +1,17 @@
 openapi: 3.0.3
 info:
   title: Smart Rail Revenue Management (SRRM) - OpenAPI Contracts
-  description: Tài liệu đặc tả API chuẩn hóa cho tích hợp Frontend, Backend và AI Service của dự án SRRM.
-  version: 1.0.0
+  description: |
+    Tài liệu đặc tả API chuẩn hóa cho tích hợp Frontend và Backend của dự án SRRM.
+
+    AI (Khối 1-2-3) không còn là service riêng: package `ai` được cài thẳng vào
+    backend và gọi in-process qua `ai_service.engine.AIEngine`. Các endpoint
+    `/internal/forecast|optimize|price` trên cổng 8001 đã bị bỏ — bề mặt HTTP duy
+    nhất của AI giờ là `/ai/*` do backend expose (xem `backend/controllers/ai_controller.py`).
+  version: 2.0.0
 servers:
   - url: http://localhost:8000/api/v1
     description: Backend Server API
-  - url: http://localhost:8001
-    description: Internal AI Service API
 
 paths:
   # --- BACKEND ENDPOINTS ---
@@ -261,12 +265,14 @@ paths:
         "200":
           description: Thành công
 
-  # --- INTERNAL AI SERVICE ENDPOINTS ---
-  /internal/forecast:
+  # --- AI PREVIEW ENDPOINTS ---
+  # Preview/debug kết quả AI, KHÔNG ghi database (khác /optimize/resolve chạy batch
+  # rồi ghi demand_forecasts + bid_prices). Backend gọi AIEngine in-process.
+  /ai/forecast:
     post:
       tags:
-        - AI-Internal
-      summary: Tạo dự báo nhu cầu cho một ngày
+        - AI
+      summary: Khối 1 — dự báo nhu cầu (λ̂, p10/p50/p90) cho một ngày chạy tàu
       requestBody:
         required: true
         content:
@@ -276,17 +282,53 @@ paths:
               properties:
                 service_date:
                   type: string
+                  format: date
+                  example: "2024-02-11"
               required:
                 - service_date
       responses:
         "200":
           description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service_date:
+                    type: string
+                  model_version:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        od_id:
+                          type: integer
+                        origin:
+                          type: string
+                        dest:
+                          type: string
+                        seat_type:
+                          type: string
+                        lambda_hat:
+                          type: number
+                        p10:
+                          type: number
+                        p50:
+                          type: number
+                        p90:
+                          type: number
+        "422":
+          description: service_date không hợp lệ
+        "503":
+          description: Chưa có model — cần chạy `python ai/scripts/train.py` trước
 
-  /internal/optimize:
+  /ai/optimize:
     post:
       tags:
-        - AI-Internal
-      summary: Chạy tối ưu hóa DLP để sinh bid prices
+        - AI
+      summary: Khối 2 — giải DLP sinh bid price (engine cache theo fingerprint của λ̂)
       requestBody:
         required: true
         content:
@@ -296,35 +338,48 @@ paths:
               properties:
                 service_date:
                   type: string
+                  format: date
+                  example: "2024-02-11"
               required:
                 - service_date
       responses:
         "200":
           description: Thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service_date:
+                    type: string
+                  run_version:
+                    type: string
+                  warm_started:
+                    type: boolean
+                    description: True nếu trả từ cache (λ̂ không đổi từ lần giải trước)
+                  solve_ms:
+                    type: number
+                  revenue_lp:
+                    type: number
+                  bid_prices:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        segment_id:
+                          type: integer
+                        seat_type:
+                          type: string
+                        bid_price:
+                          type: number
+                  n_rejected:
+                    type: integer
+                  n_od:
+                    type: integer
+        "422":
+          description: service_date không hợp lệ
+        "503":
+          description: Chưa có model — cần chạy `python ai/scripts/train.py` trước
 
-  /internal/price:
-    post:
-      tags:
-        - AI-Internal
-      summary: Định giá động sản phẩm OD
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                od_id:
-                  type: integer
-                service_date:
-                  type: string
-                min_price:
-                  type: number
-                max_price:
-                  type: number
-              required:
-                - od_id
-                - service_date
-      responses:
-        "200":
-          description: Thành công
+  # Khối 3 (định giá) không có endpoint AI riêng: nó chạy bên trong /quote, nơi
+  # backend đọc bid price từ DB, gọi engine, rồi áp Policy Guard trước khi trả giá.

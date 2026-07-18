@@ -69,6 +69,26 @@ async def test_optimize_resolve_success(client):
         ).fetchone()
         assert pq_rows[0] > 0
 
+        # Kiểm tra gap_combinations (Khối 2 Lớp B)
+        gap_rows = db.execute(
+            text("SELECT COUNT(*) FROM gap_combinations WHERE run_version = :ver AND is_active = TRUE"),
+            {"ver": run_version},
+        ).fetchone()
+        assert gap_rows[0] > 0
+
+        # Ghế và OD gợi ý phải cùng loại chỗ — nếu ánh xạ seat_index -> seats.id lệch thì
+        # bất biến này gãy trước tiên.
+        mismatched = db.execute(
+            text("""
+                SELECT COUNT(*) FROM gap_combinations g
+                JOIN seats s ON g.seat_id = s.id
+                JOIN od_products o ON g.suggested_od_product_id = o.id
+                WHERE g.run_version = :ver AND s.seat_type <> o.seat_type
+            """),
+            {"ver": run_version},
+        ).fetchone()
+        assert mismatched[0] == 0
+
     finally:
         # Dọn dẹp dữ liệu của run_version này để giữ database sạch
         if run_version:
@@ -80,6 +100,7 @@ async def test_optimize_resolve_success(client):
             db.execute(text("DELETE FROM bid_prices WHERE run_version = :ver"), {"ver": run_version})
             db.execute(text("DELETE FROM quotas WHERE run_version = :ver"), {"ver": run_version})
             db.execute(text("DELETE FROM price_quotes WHERE run_version = :ver"), {"ver": run_version})
+            db.execute(text("DELETE FROM gap_combinations WHERE run_version = :ver"), {"ver": run_version})
             db.commit()
         db.close()
 

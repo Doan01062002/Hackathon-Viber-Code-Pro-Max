@@ -4,7 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.services.ai_pricing_client import AIServiceError
+from backend.services.ai_client import AIServiceError
 from backend.services.pricing_service import PricingService
 from backend.views.pricing_view import (
     PricingQuoteODResponse,

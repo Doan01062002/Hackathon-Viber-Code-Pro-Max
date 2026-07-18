@@ -96,14 +96,18 @@ def replay(order, ods, decide):
     rem = {st: [C.CAPACITY[st]] * NSEG for st in C.SEAT_TYPES}
     rev = vol = paxkm = 0.0
     for k, wtp in order:
-        od = ods[k]; stype = od["seat_type"]; segs = od["segments"]
+        od = ods[k]
+        stype = od["seat_type"]
+        segs = od["segments"]
         if not all(rem[stype][s] > 0 for s in segs):     # hết chỗ -> mất khách
             continue
         book, price = decide(k, wtp)
         if book:
             for s in segs:
                 rem[stype][s] -= 1
-            rev += price; vol += 1; paxkm += od["distance_km"]
+            rev += price
+            vol += 1
+            paxkm += od["distance_km"]
     return dict(revenue=rev, vol=vol, paxkm=paxkm)
 
 
@@ -136,9 +140,11 @@ def main():
             bid = opt.solve_bid_prices(ods_day, demand_paid, NSEG)["bid_prices"]
         except Exception:
             bid = {}
-        order = list(custs); org.shuffle(order)                  # CÙNG thứ tự cho mọi chính sách
+        order = list(custs)
+        org.shuffle(order)                  # CÙNG thứ tự cho mọi chính sách
         days.append(dict(order=order, bid=bid, peak=is_peak))
-    npk = sum(x["peak"] for x in days); nnm = len(days) - npk
+    npk = sum(x["peak"] for x in days)
+    nnm = len(days) - npk
     print(f"[eval-price] {len(days)} chuyến ({npk} cao điểm / {nnm} thường)\n")
 
     # --- các hàm quyết định của 3 chính sách ---
@@ -200,7 +206,9 @@ def main():
         for name, key in [("Doanh thu (đ)", "revenue"), ("Vé bán", "vol"), ("Passenger-km", "paxkm")]:
             print(f"{name:20s}{b[key]:>14,.0f}{k[key]:>14,.0f}{p[key]:>14,.0f}"
                   f"{pct(p[key], b[key]):>11.1f}%{pct(p[key], k[key]):>10.1f}%")
-        avg = lambda m: (m["revenue"] / m["vol"]) if m["vol"] else 0.0
+        def avg(m):
+            return (m["revenue"] / m["vol"]) if m["vol"] else 0.0
+
         print(f"{'Giá TB/vé (đ)':20s}{avg(b):>14,.0f}{avg(k):>14,.0f}{avg(p):>14,.0f}"
               f"{pct(avg(p), avg(b)):>11.1f}%{pct(avg(p), avg(k)):>10.1f}%")
         print(f"{'Lấp đầy ghế-km':20s}{b['paxkm'] / capkm * 100:>13.1f}%"

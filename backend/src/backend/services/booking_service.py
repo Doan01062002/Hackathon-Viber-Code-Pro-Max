@@ -351,8 +351,16 @@ class BookingService:
         trip_id, seat_type, base_price, is_active = product_row
 
         # 2. Kiểm tra hạn ngạch (quota) hoạt động
+        # Schema chỉ ràng buộc UNIQUE (od_product_id, run_version), không chặn hai dòng cùng
+        # is_active — nên phải chọn dòng mới nhất một cách tường minh. Không có ORDER BY thì
+        # Postgres trả dòng tùy ý và hạn mức áp dụng sẽ khác nhau giữa các lần gọi.
         quota_row = db.execute(
-            text("SELECT quota FROM quotas WHERE od_product_id = :od_product_id AND is_active = TRUE"),
+            text("""
+                SELECT quota FROM quotas
+                WHERE od_product_id = :od_product_id AND is_active = TRUE
+                ORDER BY calculated_at DESC, id DESC
+                LIMIT 1
+            """),
             {"od_product_id": od_product_id},
         ).fetchone()
 

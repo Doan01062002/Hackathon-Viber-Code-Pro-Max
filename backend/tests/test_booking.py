@@ -4,8 +4,39 @@ from sqlalchemy import text
 from backend.database import get_session_factory
 
 
+@pytest.fixture()
+def no_active_quota_od1():
+    """Tạm gỡ hạn ngạch đang hoạt động của sản phẩm OD 1, trả lại nguyên trạng sau test.
+
+    Batch tối ưu ghi quota cho MỌI sản phẩm OD của chuyến, nên sản phẩm 1 có thể đã có
+    hạn ngạch thật nhỏ hơn số vé đã đặt — khi đó đặt vé bị từ chối và các test dưới đây
+    hỏng vì lý do không liên quan đến thứ chúng kiểm tra. Fixture này giúp test độc lập
+    với lần chạy tối ưu gần nhất.
+    """
+    db = get_session_factory()()
+    active_ids = [
+        row[0] for row in db.execute(text("SELECT id FROM quotas WHERE od_product_id = 1 AND is_active = TRUE"))
+    ]
+    if active_ids:
+        db.execute(
+            text("UPDATE quotas SET is_active = FALSE WHERE id = ANY(:ids)"),
+            {"ids": active_ids},
+        )
+        db.commit()
+    try:
+        yield
+    finally:
+        if active_ids:
+            db.execute(
+                text("UPDATE quotas SET is_active = TRUE WHERE id = ANY(:ids)"),
+                {"ids": active_ids},
+            )
+            db.commit()
+        db.close()
+
+
 @pytest.mark.asyncio
-async def test_create_booking_hold_success(client):
+async def test_create_booking_hold_success(client, no_active_quota_od1):
     # 1. Đo lường tồn kho trước khi đặt vé
     db = get_session_factory()()
     try:
@@ -63,7 +94,7 @@ async def test_create_booking_hold_success(client):
 
 
 @pytest.mark.asyncio
-async def test_confirm_booking_success(client):
+async def test_confirm_booking_success(client, no_active_quota_od1):
     db = get_session_factory()()
     booking_id = None
     try:
@@ -111,7 +142,7 @@ async def test_confirm_booking_success(client):
 
 
 @pytest.mark.asyncio
-async def test_booking_quota_exceeded(client):
+async def test_booking_quota_exceeded(client, no_active_quota_od1):
     db = get_session_factory()()
     quota_id = None
     try:

@@ -1,7 +1,7 @@
 import pytest
 
 from backend.controllers.pricing_controller import get_pricing_service
-from backend.services.ai_pricing_client import AIServiceError
+from backend.services.ai_client import AIServiceError
 from backend.views.pricing_view import PricingExplanation, PricingQuoteODResponse
 
 REQUEST_BODY = {

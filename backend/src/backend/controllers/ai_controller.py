@@ -1,11 +1,10 @@
-"""Controller mỏng expose trực tiếp forecast/optimize của ai-service qua HTTP AIClient.
+"""Controller mỏng expose forecast/optimize của ai_service qua AIClient.
 
-Khác với optimize_controller (chạy batch, ghi DB, tích hợp ai_service in-process),
-controller này chỉ proxy sang microservice ai-service để preview/debug nhanh kết quả
-Khối 1 (forecast) và Khối 2 (optimize) mà không đụng tới database.
+Khác với optimize_controller (chạy batch, ghi DB), controller này chỉ preview/debug nhanh
+kết quả Khối 1 (forecast) và Khối 2 (optimize) mà không đụng tới database.
 """
 
-import httpx
+from ai_service.engine import InvalidRequestError, ModelNotReadyError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -13,7 +12,7 @@ from backend.services.ai_client import AIClient
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
-# Singleton client — giữ cache bid price/optimization theo service_date giữa các request
+# Singleton client — dùng chung AIEngine (đã nạp model.pkl và cache nghiệm tối ưu).
 _ai_client = AIClient()
 
 
@@ -31,21 +30,21 @@ class OptimizeRequest(BaseModel):
 
 @router.post("/forecast")
 async def forecast(request: ForecastRequest) -> dict:
-    """Khối 1 — gọi ai-service dự báo nhu cầu (λ̂, p10/p50/p90) cho ngày chạy tàu."""
+    """Khối 1 — dự báo nhu cầu (λ̂, p10/p50/p90) cho ngày chạy tàu."""
     try:
         return await get_ai_client().get_forecast(request.service_date)
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=503, detail=f"ai-service không khả dụng: {exc}")
+    except InvalidRequestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ModelNotReadyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 @router.post("/optimize")
 async def optimize(request: OptimizeRequest) -> dict:
-    """Khối 2 — gọi ai-service giải DLP bid price (có cache theo service_date)."""
+    """Khối 2 — giải DLP bid price (engine cache theo fingerprint của λ̂)."""
     try:
         return await get_ai_client().get_optimization(request.service_date)
-    except httpx.HTTPStatusError as exc:
-        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=503, detail=f"ai-service không khả dụng: {exc}")
+    except InvalidRequestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ModelNotReadyError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))

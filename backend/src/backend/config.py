@@ -28,9 +28,8 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./data/app.db"
 
-    # ai-service — Khối 1-2-3 (forecast/optimize/price), xem ai/ai_service/app.py
-    ai_service_url: str = "http://localhost:8001"
-    ai_service_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    # Khối 1-2-3 (forecast/optimize/price) chạy in-process qua ai_service.engine.AIEngine
+    # (xem backend/services/ai_client.py) — không còn URL/timeout vì không còn gọi mạng.
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
