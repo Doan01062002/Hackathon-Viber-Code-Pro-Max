@@ -6,62 +6,38 @@ export interface RouteSegment {
   id: string;
   label: string;
   loadPct: number;
+  originCode?: string;
+  originName?: string;
+  destinationCode?: string;
+  destinationName?: string;
+  remaining?: number;
+  capacity?: number;
 }
-
-interface StationNode {
-  name: string;
-  code: string;
-  x: number;
-  y: number;
-}
-
-// ─── Station database (17 stations) ──────────────────────────────────────────
-
-const STATIONS: StationNode[] = [
-  { name: "Hà Nội", code: "HN", x: 50, y: 45 },
-  { name: "Nam Định", code: "ND", x: 50, y: 145 },
-  { name: "Ninh Bình", code: "NB", x: 150, y: 45 },
-  { name: "Thanh Hóa", code: "TH", x: 150, y: 145 },
-  { name: "Vinh", code: "VII", x: 250, y: 45 },
-  { name: "Đồng Hới", code: "DH", x: 250, y: 145 },
-  { name: "Huế", code: "HUE", x: 350, y: 45 },
-  { name: "Đà Nẵng", code: "DAD", x: 350, y: 145 },
-  { name: "Tam Kỳ", code: "TK", x: 450, y: 45 },
-  { name: "Quảng Ngãi", code: "QN", x: 450, y: 145 },
-  { name: "Quy Nhơn", code: "QNH", x: 550, y: 45 },
-  { name: "Tuy Hòa", code: "THO", x: 550, y: 145 },
-  { name: "Nha Trang", code: "NHA", x: 650, y: 45 },
-  { name: "Phan Rang", code: "PR", x: 650, y: 145 },
-  { name: "Bình Thuận", code: "BT", x: 750, y: 45 },
-  { name: "Biên Hòa", code: "BH", x: 750, y: 145 },
-  { name: "TP. HCM", code: "SGN", x: 850, y: 45 },
-];
 
 export const MOCK_ROUTE_SEGMENTS: RouteSegment[] = [
-  { id: "HN-NAM", label: "Hà Nội - Nam Định", loadPct: 55 },
-  { id: "NAM-NB", label: "Nam Định - Ninh Bình", loadPct: 68 },
-  { id: "NB-TH", label: "Ninh Bình - Thanh Hóa", loadPct: 45 },
-  { id: "TH-VINH", label: "Thanh Hóa - Vinh", loadPct: 92 },
-  { id: "VINH-DH", label: "Vinh - Đồng Hới", loadPct: 74 },
-  { id: "DH-HUE", label: "Đồng Hới - Huế", loadPct: 88 },
-  { id: "HUE-DN", label: "Huế - Đà Nẵng", loadPct: 96 },
-  { id: "DN-TK", label: "Đà Nẵng - Tam Kỳ", loadPct: 35 },
-  { id: "TK-QN", label: "Tam Kỳ - Quảng Ngãi", loadPct: 48 },
-  { id: "QN-QNH", label: "Quảng Ngãi - Quy Nhơn", loadPct: 62 },
-  { id: "QNH-THO", label: "Quy Nhơn - Tuy Hòa", loadPct: 71 },
-  { id: "THO-NT", label: "Tuy Hòa - Nha Trang", loadPct: 82 },
-  { id: "NT-PR", label: "Nha Trang - Phan Rang", loadPct: 50 },
-  { id: "PR-BT", label: "Phan Rang - Bình Thuận", loadPct: 67 },
-  { id: "BT-BH", label: "Bình Thuận - Biên Hòa", loadPct: 89 },
-  { id: "BH-SGN", label: "Biên Hòa - TP. HCM", loadPct: 98 },
+  { id: "HAN-NDI", label: "Ha Noi - Nam Dinh", loadPct: 55, originCode: "HAN", originName: "Ha Noi", destinationCode: "NDI", destinationName: "Nam Dinh" },
+  { id: "NDI-NBH", label: "Nam Dinh - Ninh Binh", loadPct: 68, originCode: "NDI", originName: "Nam Dinh", destinationCode: "NBH", destinationName: "Ninh Binh" },
+  { id: "NBH-THH", label: "Ninh Binh - Thanh Hoa", loadPct: 45, originCode: "NBH", originName: "Ninh Binh", destinationCode: "THH", destinationName: "Thanh Hoa" },
+  { id: "THH-VIH", label: "Thanh Hoa - Vinh", loadPct: 92, originCode: "THH", originName: "Thanh Hoa", destinationCode: "VIH", destinationName: "Vinh" },
+  { id: "VIH-HUE", label: "Vinh - Hue", loadPct: 74, originCode: "VIH", originName: "Vinh", destinationCode: "HUE", destinationName: "Hue" },
+  { id: "HUE-DAN", label: "Hue - Da Nang", loadPct: 88, originCode: "HUE", originName: "Hue", destinationCode: "DAN", destinationName: "Da Nang" },
 ];
 
 interface RouteMapProps {
   segments?: RouteSegment[];
   title?: string;
+  loading?: boolean;
+  selectedOrigin?: string;
+  selectedDestination?: string;
 }
 
-export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ tải chặng tuyến Bắc - Nam" }: RouteMapProps) {
+export function RouteMap({
+  segments = MOCK_ROUTE_SEGMENTS,
+  title = "Bản đồ tải chặng",
+  loading = false,
+  selectedOrigin,
+  selectedDestination,
+}: RouteMapProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
@@ -76,6 +52,72 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
     if (load >= 70) return "Tốt";
     return "Ổn định";
   };
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <div className="h-40 rounded-xl bg-slate-100 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (segments.length === 0) {
+    return (
+      <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
+        <div className="h-40 rounded-xl border border-dashed border-outline-variant flex items-center justify-center text-xs font-semibold text-on-surface-variant">
+          Chọn hành trình để tải bản đồ chặng.
+        </div>
+      </div>
+    );
+  }
+
+  const columnsCount = Math.ceil((segments.length + 1) / 2);
+  const stride = columnsCount > 1 ? 800 / (columnsCount - 1) : 0;
+
+  // Danh sách mã ga trên tuyến thực tế
+  const routeStationCodes = [
+    segments[0]?.originCode ?? "",
+    ...segments.map((s) => s.destinationCode ?? ""),
+  ];
+
+  const originIdx = selectedOrigin ? routeStationCodes.indexOf(selectedOrigin) : -1;
+  const destIdx = selectedDestination ? routeStationCodes.indexOf(selectedDestination) : -1;
+
+  const isSegmentSelected = (idx: number) => {
+    if (originIdx === -1 || destIdx === -1) return false;
+    const min = Math.min(originIdx, destIdx);
+    const max = Math.max(originIdx, destIdx);
+    return idx >= min && idx < max;
+  };
+
+  const isStationSelected = (idx: number) => {
+    if (originIdx === -1 || destIdx === -1) return true;
+    const min = Math.min(originIdx, destIdx);
+    const max = Math.max(originIdx, destIdx);
+    return idx >= min && idx <= max;
+  };
+
+  // Xây dựng danh sách ga động dựa trên dữ liệu chặng từ database
+  const stationsList = Array.from({ length: segments.length + 1 }, (_, i) => {
+    const isTop = i % 2 === 0;
+    const colIdx = Math.floor(i / 2);
+    const name = i === 0
+      ? (segments[0].originName ?? segments[0].originCode ?? "Ga đầu")
+      : (segments[i - 1].destinationName ?? segments[i - 1].destinationCode ?? `Ga ${i}`);
+    const code = i === 0
+      ? segments[0].originCode
+      : segments[i - 1].destinationCode;
+
+    const x = columnsCount > 1 ? 50 + colIdx * stride : 450;
+
+    return {
+      name,
+      code: code ?? "",
+      x,
+      y: isTop ? 45 : 145,
+      isTop,
+    };
+  });
 
   return (
     <div className="bg-white border border-outline-variant rounded-xl p-6 shadow-sm">
@@ -114,20 +156,23 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
 
       <div className="relative w-full">
         <svg className="w-full h-auto overflow-visible select-none" viewBox="0 0 900 220">
-          {/* Top and Bottom grey backbone lines */}
-          <line x1="50" y1="45" x2="850" y2="45" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
-          <line x1="50" y1="145" x2="750" y2="145" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
+          {/* Đường trục răng cưa nét đứt hàng trên và hàng dưới */}
+          <line x1="50" y1="45" x2={columnsCount > 1 ? 850 : 450} y2="45" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
+          <line x1="50" y1="145" x2={columnsCount > 1 ? (segments.length % 2 === 0 ? 850 - stride : 850) : 450} y2="145" stroke="#cbd5e1" strokeWidth="1.5" strokeDasharray="3 3" />
 
-          {/* Connecting segments (Lines) */}
+          {/* Các chặng liên kết (Đoạn thẳng và Hiệu ứng mạch xung) */}
           {segments.map((seg, idx) => {
-            const start = STATIONS[idx];
-            const end = STATIONS[idx + 1];
+            const start = stationsList[idx];
+            const end = stationsList[idx + 1];
             const isHovered = hoveredIdx === idx;
-            const strokeColor = getSegmentColor(seg.loadPct);
+            const selected = isSegmentSelected(idx);
+            // Nếu chặng nằm ngoài vùng được chọn, hiển thị màu xanh dương nhạt
+            const strokeColor = selected ? getSegmentColor(seg.loadPct) : "#bfdbfe";
+            const shouldPulse = selected && seg.loadPct >= 70;
 
             return (
               <g key={seg.id}>
-                {/* Glow layer when hovered */}
+                {/* Hiệu ứng hào quang phát sáng khi hover */}
                 {isHovered && (
                   <line
                     x1={start.x}
@@ -141,7 +186,8 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
                     className="transition-all duration-150"
                   />
                 )}
-                {/* Active rail segment line */}
+                
+                {/* Đường ray chính của chặng */}
                 <line
                   x1={start.x}
                   y1={start.y}
@@ -153,15 +199,15 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
                   className="cursor-pointer transition-all duration-150 hover:stroke-[5px]"
                   onMouseEnter={() => {
                     setHoveredIdx(idx);
-                    // Calculate coordinate in SVG space for tooltip
                     const midX = (start.x + end.x) / 2;
                     const midY = (start.y + end.y) / 2;
                     setTooltipPos({ x: midX, y: midY });
                   }}
                   onMouseLeave={() => setHoveredIdx(null)}
                 />
-                {/* Glowing train pulse travel animation along the active segment lines */}
-                {(idx === 3 || idx === 8 || idx === 14) && (
+                
+                {/* Hoạt ảnh tàu chạy dạng mạch xung phát sáng (dành cho chặng đông hoặc nghẽn) */}
+                {shouldPulse && (
                   <>
                     <line
                       x1={start.x}
@@ -186,67 +232,79 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
                     />
                   </>
                 )}
-                {/* Label show % on segment line */}
+
+                {/* Nhãn % lấp đầy nằm đè trên trung điểm đường ray */}
                 <g transform={`translate(${(start.x + end.x) / 2}, ${(start.y + end.y) / 2})`}>
                   <rect
-                    x="-15"
+                    x="-18"
                     y="-8"
-                    width="30"
+                    width="36"
                     height="16"
                     rx="4"
-                    fill="#1e293b"
+                    fill={selected ? "#1e293b" : "#cbd5e1"}
                     className="pointer-events-none"
                   />
                   <text
                     x="0"
                     y="3"
-                    fill="#fff"
+                    fill={selected ? "#fff" : "#64748b"}
                     fontSize="9"
                     fontWeight="bold"
                     textAnchor="middle"
                     className="pointer-events-none font-mono"
                   >
-                    {seg.loadPct}%
+                    {seg.loadPct.toFixed(0)}%
                   </text>
                 </g>
               </g>
             );
           })}
 
-          {/* Station Nodes */}
-          {STATIONS.map((station, idx) => {
-            const isTop = idx % 2 === 0;
+          {/* Các Node ga tàu (Vòng tròn kép và nhãn Tên/Mã ga) */}
+          {stationsList.map((station, idx) => {
+            const isTop = station.isTop;
+            const selected = isStationSelected(idx);
+            
+            // Màu sắc vòng ngoài (mờ đi nếu ngoài vùng chọn)
+            const outerCircleColor = selected
+              ? (idx === destIdx ? "#3525cd" : "#334155")
+              : "#cbd5e1";
+
             return (
-              <g key={station.code}>
-                {/* Outer circle */}
+              <g key={`${station.code}-${idx}`}>
+                {/* Vòng tròn bên ngoài */}
                 <circle
                   cx={station.x}
                   cy={station.y}
                   r="8"
-                  fill="#334155"
+                  fill={outerCircleColor}
                 />
-                {/* Inner core */}
+                {/* Nhân trắng bên trong */}
                 <circle
                   cx={station.x}
                   cy={station.y}
                   r="4"
                   fill="#fff"
                 />
-                {/* Station name text */}
+                {/* Tên ga tiếng Việt */}
                 <text
                   x={station.x}
                   y={isTop ? 22 : 172}
                   textAnchor="middle"
-                  className="text-[10px] font-black text-on-surface"
+                  className={`text-[10px] font-black transition-all ${
+                    selected ? "text-on-surface" : "text-on-surface-variant/40"
+                  }`}
                 >
                   {station.name}
                 </text>
-                {/* Station Code */}
+                {/* Mã ga viết tắt */}
                 <text
                   x={station.x}
                   y={isTop ? 10 : 184}
                   textAnchor="middle"
-                  className="text-[8px] font-extrabold text-on-surface-variant/50 font-mono"
+                  className={`text-[8px] font-extrabold font-mono transition-all ${
+                    selected ? "text-on-surface-variant/50" : "text-on-surface-variant/20"
+                  }`}
                 >
                   {station.code}
                 </text>
@@ -255,7 +313,7 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
           })}
         </svg>
 
-        {/* Floating Tooltip */}
+        {/* Tooltip nổi khi Hover qua các chặng */}
         {hoveredIdx !== null && (
           <div
             style={{
@@ -270,7 +328,7 @@ export function RouteMap({ segments = MOCK_ROUTE_SEGMENTS, title = "Bản đồ 
               {segments[hoveredIdx].label}
             </p>
             <p>
-              Tải chặng: <span className="font-black text-white">{segments[hoveredIdx].loadPct}%</span>
+              Tải chặng: <span className="font-black text-white">{segments[hoveredIdx].loadPct.toFixed(1)}%</span>
             </p>
             <p className="opacity-75">
               Trạng thái: <span className="font-bold">{getSegmentLabel(segments[hoveredIdx].loadPct)}</span>

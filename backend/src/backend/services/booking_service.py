@@ -1,12 +1,25 @@
 import random
 import string
-from datetime import datetime, timezone
-UTC = timezone.utc
+from datetime import UTC, date, datetime
+
+UTC = UTC
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.views.booking_view import BookingConfirmResponse, BookingCreateRequest, BookingResponse
+from backend.views.booking_view import (
+    BookingCoachItem,
+    BookingConfirmResponse,
+    BookingCreateRequest,
+    BookingDestinationOption,
+    BookingDetailResponse,
+    BookingOptionsResponse,
+    BookingResponse,
+    BookingSearchItem,
+    BookingSeatItem,
+    BookingSeatPlanResponse,
+    BookingSegmentItem,
+)
 
 
 def generate_booking_code() -> str:
@@ -14,6 +27,315 @@ def generate_booking_code() -> str:
 
 
 class BookingService:
+    def get_booking_options(
+        self, origin: str, destination: str | None, db: Session
+    ) -> BookingOptionsResponse:
+        origin_value = origin.strip()
+        destination_rows = db.execute(
+            text("""
+                SELECT DISTINCT destination.code, destination.name, destination.display_order
+                FROM od_products product
+                JOIN stations origin ON origin.id = product.origin_station_id
+                JOIN stations destination ON destination.id = product.destination_station_id
+                WHERE product.is_active = TRUE
+                  AND (LOWER(origin.code) = LOWER(:origin) OR LOWER(origin.name) = LOWER(:origin))
+                ORDER BY destination.display_order NULLS LAST, destination.name
+            """),
+            {"origin": origin_value},
+        ).all()
+
+        departure_dates: list[date] = []
+        return_dates: list[date] = []
+        if destination:
+            destination_value = destination.strip()
+            departure_dates = list(
+                db.execute(
+                    text("""
+                        SELECT DISTINCT trip.service_date
+                        FROM od_products product
+                        JOIN trips trip ON trip.id = product.trip_id
+                        JOIN stations origin ON origin.id = product.origin_station_id
+                        JOIN stations destination ON destination.id = product.destination_station_id
+                        WHERE product.is_active = TRUE
+                          AND trip.status <> 'cancelled'
+                          AND (LOWER(origin.code) = LOWER(:origin) OR LOWER(origin.name) = LOWER(:origin))
+                          AND (
+                            LOWER(destination.code) = LOWER(:destination)
+                            OR LOWER(destination.name) = LOWER(:destination)
+                          )
+                        ORDER BY trip.service_date
+                    """),
+                    {"origin": origin_value, "destination": destination_value},
+                ).scalars().all()
+            )
+            return_dates = list(
+                db.execute(
+                    text("""
+                        SELECT DISTINCT trip.service_date
+                        FROM od_products product
+                        JOIN trips trip ON trip.id = product.trip_id
+                        JOIN stations origin ON origin.id = product.origin_station_id
+                        JOIN stations destination ON destination.id = product.destination_station_id
+                        WHERE product.is_active = TRUE
+                          AND trip.status <> 'cancelled'
+                          AND (LOWER(origin.code) = LOWER(:destination) OR LOWER(origin.name) = LOWER(:destination))
+                          AND (
+                            LOWER(destination.code) = LOWER(:origin)
+                            OR LOWER(destination.name) = LOWER(:origin)
+                          )
+                        ORDER BY trip.service_date
+                    """),
+                    {"origin": origin_value, "destination": destination_value},
+                ).scalars().all()
+            )
+
+        return BookingOptionsResponse(
+            destinations=[
+                BookingDestinationOption(code=str(row[0]), name=str(row[1]))
+                for row in destination_rows
+            ],
+            departure_dates=departure_dates,
+            return_dates=return_dates,
+        )
+
+    def search_products(
+        self,
+        origin: str,
+        destination: str,
+        service_date: date,
+        seat_type: str | None,
+        db: Session,
+    ) -> list[BookingSearchItem]:
+        if origin.strip().lower() == destination.strip().lower():
+            raise ValueError("Ga di va ga den khong duoc trung nhau")
+
+        rows = db.execute(
+            text("""
+                SELECT
+                    od.id AS od_product_id,
+                    od.trip_id,
+                    train.code AS train_code,
+                    origin.code AS origin_code,
+                    origin.name AS origin_name,
+                    destination.code AS destination_code,
+                    destination.name AS destination_name,
+                    trip.service_date,
+                    MIN(segment.departure_at) AS departure_at,
+                    MAX(segment.arrival_at) AS arrival_at,
+                    od.seat_type,
+                    seat_type_ref.name AS seat_type_name,
+                    od.base_price,
+                    COALESCE(MIN(inventory.remaining), 0) AS availability
+                FROM od_products od
+                JOIN trips trip ON trip.id = od.trip_id
+                JOIN trains train ON train.id = trip.train_id
+                JOIN stations origin ON origin.id = od.origin_station_id
+                JOIN stations destination ON destination.id = od.destination_station_id
+                JOIN seat_types seat_type_ref ON seat_type_ref.code = od.seat_type
+                JOIN od_product_segments mapping ON mapping.od_product_id = od.id
+                JOIN segments segment ON segment.id = mapping.segment_id
+                LEFT JOIN segment_inventory inventory
+                  ON inventory.segment_id = segment.id
+                 AND inventory.seat_type = od.seat_type
+                WHERE trip.service_date = :service_date
+                  AND trip.status <> 'cancelled'
+                  AND od.is_active = TRUE
+                  AND (LOWER(origin.code) = LOWER(:origin) OR LOWER(origin.name) = LOWER(:origin))
+                  AND (
+                    LOWER(destination.code) = LOWER(:destination)
+                    OR LOWER(destination.name) = LOWER(:destination)
+                  )
+                  AND (CAST(:seat_type AS VARCHAR) IS NULL OR od.seat_type = :seat_type)
+                GROUP BY
+                    od.id, od.trip_id, train.code, origin.code, origin.name,
+                    destination.code, destination.name, trip.service_date,
+                    od.seat_type, seat_type_ref.name, od.base_price
+                ORDER BY departure_at, od.seat_type
+            """),
+            {
+                "origin": origin.strip(),
+                "destination": destination.strip(),
+                "service_date": service_date,
+                "seat_type": seat_type.strip() if seat_type else None,
+            },
+        ).mappings().all()
+        return [BookingSearchItem(**row) for row in rows]
+
+    def get_seat_plan(self, od_product_id: int, db: Session) -> BookingSeatPlanResponse:
+        product = db.execute(
+            text("""
+                SELECT
+                    od.id AS od_product_id, od.trip_id, train.code AS train_code,
+                    origin.code AS origin_code, origin.name AS origin_name,
+                    destination.code AS destination_code, destination.name AS destination_name,
+                    trip.service_date, od.seat_type
+                FROM od_products od
+                JOIN trips trip ON trip.id = od.trip_id
+                JOIN trains train ON train.id = trip.train_id
+                JOIN stations origin ON origin.id = od.origin_station_id
+                JOIN stations destination ON destination.id = od.destination_station_id
+                WHERE od.id = :od_product_id AND od.is_active = TRUE
+            """),
+            {"od_product_id": od_product_id},
+        ).mappings().first()
+        if not product:
+            raise ValueError(f"Khong tim thay san pham OD {od_product_id}")
+
+        seat_rows = db.execute(
+            text("""
+                SELECT id AS seat_id, coach_no, seat_no, seat_type, status
+                FROM seats
+                WHERE trip_id = :trip_id AND seat_type = :seat_type
+                ORDER BY coach_no, seat_no
+            """),
+            {"trip_id": product["trip_id"], "seat_type": product["seat_type"]},
+        ).mappings().all()
+
+        occupied_rows = db.execute(
+            text("""
+                SELECT DISTINCT booking.seat_id, booking.status
+                FROM bookings booking
+                JOIN od_product_segments booked_mapping
+                  ON booked_mapping.od_product_id = booking.od_product_id
+                JOIN od_product_segments requested_mapping
+                  ON requested_mapping.segment_id = booked_mapping.segment_id
+                 AND requested_mapping.od_product_id = :od_product_id
+                WHERE booking.seat_id IS NOT NULL
+                  AND booking.status IN ('held', 'confirmed')
+                  AND (booking.status = 'confirmed' OR booking.expires_at > CURRENT_TIMESTAMP)
+            """),
+            {"od_product_id": od_product_id},
+        ).mappings().all()
+        occupied: dict[int, str] = {}
+        for row in occupied_rows:
+            seat_id = int(row["seat_id"])
+            if row["status"] == "confirmed" or seat_id not in occupied:
+                occupied[seat_id] = str(row["status"])
+
+        grouped: dict[str, list[BookingSeatItem]] = {}
+        for row in seat_rows:
+            status = "blocked" if row["status"] != "available" else occupied.get(int(row["seat_id"]), "available")
+            grouped.setdefault(str(row["coach_no"]), []).append(
+                BookingSeatItem(seat_id=int(row["seat_id"]), seat_no=str(row["seat_no"]), status=status)
+            )
+
+        coaches = [
+            BookingCoachItem(
+                coach_no=coach_no,
+                seat_type=str(product["seat_type"]),
+                total_seats=len(seats),
+                available_seats=sum(seat.status == "available" for seat in seats),
+                seats=seats,
+            )
+            for coach_no, seats in grouped.items()
+        ]
+        segment_rows = db.execute(
+            text("""
+                SELECT
+                    segment.id AS segment_id,
+                    segment.sequence_no,
+                    origin.code AS origin_code,
+                    origin.name AS origin_name,
+                    destination.code AS destination_code,
+                    destination.name AS destination_name,
+                    segment.departure_at,
+                    segment.arrival_at,
+                    segment.distance_km,
+                    capacity.capacity,
+                    inventory.remaining,
+                    ROUND(
+                        (capacity.capacity - inventory.remaining) * 100.0
+                        / NULLIF(capacity.capacity, 0),
+                        1
+                    ) AS load_pct
+                FROM segments segment
+                JOIN stations origin ON origin.id = segment.origin_station_id
+                JOIN stations destination ON destination.id = segment.destination_station_id
+                JOIN segment_capacities capacity
+                  ON capacity.segment_id = segment.id
+                 AND capacity.seat_type = :seat_type
+                JOIN segment_inventory inventory
+                  ON inventory.segment_id = segment.id
+                 AND inventory.seat_type = :seat_type
+                WHERE segment.trip_id = :trip_id
+                ORDER BY segment.sequence_no
+            """),
+            {"trip_id": product["trip_id"], "seat_type": product["seat_type"]},
+        ).mappings().all()
+        segments = [BookingSegmentItem(**row) for row in segment_rows]
+        return BookingSeatPlanResponse(**product, coaches=coaches, segments=segments)
+
+    def get_booking_detail(self, booking_code: str, db: Session) -> BookingDetailResponse:
+        row = db.execute(
+            text("""
+                SELECT
+                    booking.id AS booking_id, booking.booking_code, booking.status,
+                    booking.booked_price, booking.booked_at, booking.expires_at,
+                    od.trip_id, train.code AS train_code, trip.service_date,
+                    (SELECT MIN(segment.departure_at)
+                     FROM od_product_segments mapping
+                     JOIN segments segment ON segment.id = mapping.segment_id
+                     WHERE mapping.od_product_id = od.id) AS departure_at,
+                    (SELECT MAX(segment.arrival_at)
+                     FROM od_product_segments mapping
+                     JOIN segments segment ON segment.id = mapping.segment_id
+                     WHERE mapping.od_product_id = od.id) AS arrival_at,
+                    origin.code AS origin_code, origin.name AS origin_name,
+                    destination.code AS destination_code, destination.name AS destination_name,
+                    od.seat_type, seat.coach_no, seat.seat_no
+                FROM bookings booking
+                JOIN od_products od ON od.id = booking.od_product_id
+                JOIN trips trip ON trip.id = od.trip_id
+                JOIN trains train ON train.id = trip.train_id
+                JOIN stations origin ON origin.id = od.origin_station_id
+                JOIN stations destination ON destination.id = od.destination_station_id
+                LEFT JOIN seats seat ON seat.id = booking.seat_id
+                WHERE UPPER(booking.booking_code) = UPPER(:booking_code)
+            """),
+            {"booking_code": booking_code.strip()},
+        ).mappings().first()
+        if not row:
+            raise ValueError(f"Khong tim thay booking {booking_code}")
+        return BookingDetailResponse(**row)
+
+    @staticmethod
+    def _lock_requested_seat(
+        seat_id: int, trip_id: int, seat_type: str, od_product_id: int, db: Session
+    ) -> int:
+        seat = db.execute(
+            text("""
+                SELECT id, trip_id, seat_type, status
+                FROM seats
+                WHERE id = :seat_id
+                FOR UPDATE
+            """),
+            {"seat_id": seat_id},
+        ).mappings().first()
+        if not seat or int(seat["trip_id"]) != int(trip_id) or seat["seat_type"] != seat_type:
+            raise ValueError("Ghe khong thuoc chuyen tau hoac khong dung loai cho")
+        if seat["status"] != "available":
+            raise ValueError("Ghe dang bi khoa hoac bao tri")
+
+        conflict = db.execute(
+            text("""
+                SELECT booking.id
+                FROM bookings booking
+                JOIN od_product_segments booked_mapping
+                  ON booked_mapping.od_product_id = booking.od_product_id
+                JOIN od_product_segments requested_mapping
+                  ON requested_mapping.segment_id = booked_mapping.segment_id
+                 AND requested_mapping.od_product_id = :od_product_id
+                WHERE booking.seat_id = :seat_id
+                  AND booking.status IN ('held', 'confirmed')
+                  AND (booking.status = 'confirmed' OR booking.expires_at > CURRENT_TIMESTAMP)
+                LIMIT 1
+            """),
+            {"seat_id": seat_id, "od_product_id": od_product_id},
+        ).first()
+        if conflict:
+            raise ValueError("Ghe da duoc giu hoac ban tren chang nay")
+        return seat_id
+
     def create_booking_hold(self, request: BookingCreateRequest, db: Session) -> BookingResponse:
         od_product_id = request.od_product_id
 
@@ -88,6 +410,16 @@ class BookingService:
                 raise ValueError(f"Chặng {row['segment_id']} đã hết chỗ trống cho loại chỗ '{seat_type}'")
 
         # 5. Thực hiện trừ tồn kho chặng chặng
+        selected_seat_id = None
+        if request.seat_id is not None:
+            selected_seat_id = self._lock_requested_seat(
+                seat_id=request.seat_id,
+                trip_id=trip_id,
+                seat_type=seat_type,
+                od_product_id=od_product_id,
+                db=db,
+            )
+
         update_inventory_query = text("""
             UPDATE segment_inventory
             SET remaining = remaining - 1
@@ -135,7 +467,7 @@ class BookingService:
             INSERT INTO bookings (
                 booking_code, od_product_id, seat_id, status, channel, booked_price, booked_at, expires_at
             ) VALUES (
-                :booking_code, :od_product_id, NULL, 'held', :channel, :booked_price, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 minutes'
+                :booking_code, :od_product_id, :seat_id, 'held', :channel, :booked_price, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '15 minutes'
             ) RETURNING id, booked_at, expires_at
         """)
 
@@ -144,6 +476,7 @@ class BookingService:
             {
                 "booking_code": booking_code,
                 "od_product_id": od_product_id,
+                "seat_id": selected_seat_id,
                 "channel": request.channel or "web",
                 "booked_price": booked_price,
             },
@@ -158,7 +491,7 @@ class BookingService:
             booking_id=booking_id,
             booking_code=booking_code,
             od_product_id=od_product_id,
-            seat_id=None,
+            seat_id=selected_seat_id,
             status="held",
             booked_price=booked_price,
             booked_at=booked_at_str,
@@ -195,6 +528,33 @@ class BookingService:
             {"od_product_id": od_product_id},
         ).fetchone()
         trip_id, seat_type = prod_row
+
+        selected_seat = db.execute(
+            text("""
+                SELECT seat.id, seat.coach_no, seat.seat_no
+                FROM bookings booking
+                JOIN seats seat ON seat.id = booking.seat_id
+                WHERE booking.id = :booking_id
+            """),
+            {"booking_id": booking_id},
+        ).mappings().first()
+        if selected_seat:
+            db.execute(
+                text("""
+                    UPDATE bookings
+                    SET status = 'confirmed', expires_at = NULL
+                    WHERE id = :booking_id
+                """),
+                {"booking_id": booking_id},
+            )
+            return BookingConfirmResponse(
+                booking_id=booking_id,
+                booking_code=booking_code,
+                status="confirmed",
+                seat_id=int(selected_seat["id"]),
+                coach_no=str(selected_seat["coach_no"]),
+                seat_no=str(selected_seat["seat_no"]),
+            )
 
         # 3. Thuật toán tìm ghế vật lý trống không bị trùng chặng
         seat_query = text("""

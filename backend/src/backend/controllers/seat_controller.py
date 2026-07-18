@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
 from backend.database import get_db
 
 router = APIRouter()
@@ -29,6 +30,38 @@ class GapSuggestionResponse(BaseModel):
     benefit: str = Field(..., description="Lợi ích khả dụng (e.g. +17 chỗ khả dụng)")
     priority: str = Field(..., description="Độ ưu tiên (Cao, Trung bình, Theo dõi)")
     reason: str = Field(..., description="Lý do chi tiết gợi ý từ thuật toán")
+
+class TripOptionResponse(BaseModel):
+    trip_id: int = Field(..., description="ID của chuyến tàu")
+    train_code: str = Field(..., description="Mã tàu (e.g. SE1)")
+    service_date: str = Field(..., description="Ngày chạy tàu (e.g. 2025-12-30)")
+
+@router.get("/seats/trips", response_model=list[TripOptionResponse])
+async def get_all_trips(db: Session = Depends(get_db)) -> list[TripOptionResponse]:
+    """Lấy danh sách tất cả các chuyến tàu và ngày chạy tàu để cấu hình chọn trên frontend."""
+    try:
+        query = text("""
+            SELECT 
+                t.id AS trip_id, 
+                tr.code AS train_code, 
+                t.service_date
+            FROM trips t
+            JOIN trains tr ON t.train_id = tr.id
+            ORDER BY t.service_date DESC, tr.code;
+        """)
+        rows = db.execute(query).fetchall()
+        res = []
+        for r in rows:
+            res.append(
+                TripOptionResponse(
+                    trip_id=r[0],
+                    train_code=r[1],
+                    service_date=r[2].strftime("%Y-%m-%d") if r[2] else ""
+                )
+            )
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
 
 @router.get("/seats/coaches", response_model=list[CoachResponse])
 async def get_coaches(
@@ -73,11 +106,11 @@ async def get_coaches(
         coach_no = r[0]
         seat_type = r[1]
         total_seats = int(r[2])
-        
+
         occupied_seats = occupied_map.get(coach_no, 0)
         # Hệ số tải giới hạn từ 0% đến 100%
         pct = min(100, int(round((occupied_seats / total_seats) * 100))) if total_seats > 0 else 0
-        
+
         type_str = "Ngồi mềm" if seat_type == "ngoi_mem" else "Giường nằm K6"
         coaches.append(
             CoachResponse(
@@ -146,7 +179,7 @@ async def get_seat_layout(
     for s_row in seats_rows:
         s_id = s_row[0]
         db_status = s_row[3]
-        
+
         if db_status in ("locked", "maintenance"):
             status_str = "blocked"
         elif s_id in bookings_map:
@@ -165,7 +198,7 @@ async def get_seat_layout(
     ]
 
     route_str = f"{train_code} · {service_date.strftime('%d/%m/%Y')}" if service_date else f"{train_code}"
-    
+
     legend = [
         SeatLegendItem(tone="available", label="Còn trống"),
         SeatLegendItem(tone="selected", label="Đang chọn"),
@@ -222,7 +255,7 @@ async def get_gap_suggestions(
         from_st = r[1]
         to_st = r[2]
         seat_type = r[3]
-        
+
         key = (from_st, to_st, seat_type)
         if key not in groups:
             groups[key] = {"count": 0, "coaches": set()}
@@ -234,10 +267,10 @@ async def get_gap_suggestions(
         from_st, to_st, seat_type = key
         count = data["count"]
         coaches_str = ", ".join(sorted(list(data["coaches"])))
-        
+
         seat_type_vn = "Ngồi mềm" if seat_type == "ngoi_mem" else "Giường nằm K6"
         priority = "Cao" if count >= 10 else "Trung bình" if count >= 5 else "Theo dõi"
-        
+
         suggestions.append(
             GapSuggestionResponse(
                 route=f"{from_st} → {to_st}",
@@ -247,9 +280,9 @@ async def get_gap_suggestions(
                 reason=f"Có {count} khoảng trống liên tiếp trong toa {coaches_str} sau khi mở lại quota ngắn."
             )
         )
-        
+
     # Sắp xếp theo ưu tiên: Cao -> Trung bình -> Theo dõi
     priority_order = {"Cao": 0, "Trung bình": 1, "Theo dõi": 2}
     suggestions.sort(key=lambda x: priority_order.get(x.priority, 3))
-    
+
     return suggestions

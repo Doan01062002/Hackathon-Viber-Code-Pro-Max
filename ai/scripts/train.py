@@ -12,12 +12,20 @@ Chạy:  python scripts/train.py --from-seeds out/seeds --tune
        python scripts/train.py                       # tự sinh bằng datagen
 """
 from __future__ import annotations
-import sys, os, pickle, warnings, argparse
+
+import argparse
+import os
+import pickle
+import sys
+import warnings
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 warnings.filterwarnings("ignore")
 from datetime import date
+
 import pandas as pd
-from ai_service import datagen, forecasting, pricing, booking_curve as BC
+from ai_service import booking_curve as BC
+from ai_service import datagen, forecasting, pricing
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(REPO, "models")

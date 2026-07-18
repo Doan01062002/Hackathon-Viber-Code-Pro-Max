@@ -48,7 +48,7 @@ class SimulationService:
             """),
             {"trip_id": trip_id}
         ).fetchone()
-        
+
         active_version = active_ver_row[0] if active_ver_row else None
 
         if active_version:

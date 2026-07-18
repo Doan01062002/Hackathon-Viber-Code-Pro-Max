@@ -7,11 +7,18 @@ Chạy:  python scripts/eda.py --from-seeds out/seeds
        python scripts/eda.py                       # dùng datagen
 """
 from __future__ import annotations
-import sys, os, warnings, argparse
+
+import argparse
+import os
+import sys
+import warnings
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 warnings.filterwarnings("ignore")
 from datetime import date
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
 from ai_service import datagen, forecasting
 
 

@@ -5,13 +5,23 @@ Chạy:  python scripts/eval.py --from-seeds out/seeds
        python scripts/eval.py                      # dùng datagen (có cả corr với λ thật)
 """
 from __future__ import annotations
-import sys, os, pickle, warnings, argparse
+
+import argparse
+import os
+import pickle
+import sys
+import warnings
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 warnings.filterwarnings("ignore")
 from datetime import date
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
+from ai_service import booking_curve as BC
+
 # pyrefly: ignore [missing-import]
-from ai_service import datagen, forecasting, booking_curve as BC
+from ai_service import datagen, forecasting
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(REPO, "models", "model.pkl")

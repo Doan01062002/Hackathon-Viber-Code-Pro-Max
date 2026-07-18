@@ -1,13 +1,11 @@
-from datetime import date, datetime, timezone
-UTC = timezone.utc
+from datetime import UTC, date, datetime
 from typing import Any
-
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 
 from ai_service import datagen
 from ai_service import optimization as opt
 from ai_service.engine import MODEL_PATH, feature_rows, get_engine
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 class OptimizeService:
