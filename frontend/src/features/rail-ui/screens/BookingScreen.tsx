@@ -3,8 +3,25 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { RouteMap } from "@/features/rail-ui/components/RouteMap";
+import { createPricingQuote } from "@/features/quote/api/quoteApi";
+import { createBookingHold, confirmBooking } from "@/features/booking/api/bookingApi";
+import type { BookingConfirmResponse } from "@/features/booking/types";
+import { ApiError } from "@/lib/api/client";
 
 type Station = "Hà Nội" | "Vinh" | "Huế" | "Đà Nẵng" | "Sài Gòn";
+
+// Ánh xạ tên ga (hiển thị) -> mã ga thật trong DB
+const STATION_CODE: Record<Station, string> = {
+  "Hà Nội": "HAN",
+  Vinh: "VIH",
+  Huế: "HUE",
+  "Đà Nẵng": "DAN",
+  "Sài Gòn": "SGO",
+};
+
+// Dải ngày có chuyến trong dữ liệu (seed 2024-01-01 -> 2025-12-30)
+const TRIP_DATE_MIN = "2024-01-01";
+const TRIP_DATE_MAX = "2025-12-30";
 
 const coaches = [
   { id: "Toa 1", label: "Đầu tàu", type: "engine", display: "Đầu tàu", class: "" },
@@ -20,10 +37,18 @@ const coaches = [
 export function BookingScreen() {
   const [origin, setOrigin] = useState<Station>("Hà Nội");
   const [destination, setDestination] = useState<Station>("Huế");
-  const [date, setDate] = useState("2026-07-19");
+  const [date, setDate] = useState(TRIP_DATE_MAX);
   const [selectedCoach, setSelectedCoach] = useState("Toa 2");
   const [seatClass, setSeatClass] = useState<"standard" | "business">("standard");
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+
+  // Trạng thái đặt vé thật (gọi backend)
+  const [booking, setBooking] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<BookingConfirmResponse[] | null>(null);
+  const [paidPrice, setPaidPrice] = useState(0);
+  // Ghế đã đặt trong phiên này -> tô xám. Key: `${toa}:${ghế}` vì mã ghế lặp giữa các toa.
+  const [bookedLocal, setBookedLocal] = useState<string[]>([]);
 
   // Sync seat class when coach changes
   useEffect(() => {
@@ -33,6 +58,12 @@ export function BookingScreen() {
     }
     setSelectedSeats([]); // Reset selected seats when changing coach
   }, [selectedCoach]);
+
+  // Xoá kết quả cũ khi đổi hành trình/ngày
+  useEffect(() => {
+    setConfirmed(null);
+    setBookingError(null);
+  }, [origin, destination, date, selectedCoach]);
 
   // Dynamic pricing based on selections
   const basePrices: Record<string, number> = {
@@ -65,7 +96,8 @@ export function BookingScreen() {
       for (let i = 1; i <= 11; i++) {
         const id = `${r}${i}`;
         const code = id.charCodeAt(0) + id.charCodeAt(1) + selectedCoach.charCodeAt(selectedCoach.length - 1) + i;
-        const status = code % 3 === 0 ? "booked" : "available";
+        const isJustBooked = bookedLocal.includes(`${selectedCoach}:${id}`);
+        const status = code % 3 === 0 || isJustBooked ? "booked" : "available";
         seatsList.push({ id, status });
       }
     }
@@ -88,6 +120,52 @@ export function BookingScreen() {
       style: "currency",
       currency: "VND",
     }).format(value);
+
+  // Đặt vé thật: quote -> hold -> confirm (một lượt cho mỗi chỗ đã chọn)
+  const handleConfirm = async () => {
+    if (selectedSeats.length === 0 || booking) return;
+    if (origin === destination) {
+      setBookingError("Ga đi và ga đến không được trùng nhau.");
+      return;
+    }
+    setBooking(true);
+    setBookingError(null);
+    setConfirmed(null);
+    try {
+      const seatType = isSleeper ? "giuong_nam_k6" : "ngoi_mem";
+      const quote = await createPricingQuote({
+        origin: STATION_CODE[origin],
+        destination: STATION_CODE[destination],
+        service_date: date,
+        seat_type: seatType,
+      });
+
+      const results: BookingConfirmResponse[] = [];
+      for (let i = 0; i < selectedSeats.length; i++) {
+        const hold = await createBookingHold({
+          od_product_id: quote.od_product_id,
+          quote_id: quote.quote_id,
+          channel: "web",
+        });
+        results.push(await confirmBooking(hold.booking_id));
+      }
+
+      setConfirmed(results);
+      setPaidPrice(quote.final_price * results.length);
+      // Tô xám các ô vừa đặt (giữ theo toa hiện tại)
+      setBookedLocal((prev) => [
+        ...prev,
+        ...selectedSeats.map((s) => `${selectedCoach}:${s}`),
+      ]);
+      setSelectedSeats([]);
+    } catch (e) {
+      setBookingError(
+        e instanceof ApiError ? e.message : "Đặt vé thất bại, vui lòng thử lại.",
+      );
+    } finally {
+      setBooking(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -267,9 +345,14 @@ export function BookingScreen() {
                 <input
                   type="date"
                   value={date}
+                  min={TRIP_DATE_MIN}
+                  max={TRIP_DATE_MAX}
                   onChange={(e) => setDate(e.target.value)}
                   className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-1.5 px-2 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary"
                 />
+                <p className="text-[9px] text-on-surface-variant/70">
+                  Có chuyến trong khoảng {TRIP_DATE_MIN} → {TRIP_DATE_MAX}
+                </p>
               </div>
             </div>
           </div>
@@ -335,9 +418,40 @@ export function BookingScreen() {
                 </div>
               </div>
 
-              <Button className="w-full py-2.5 mt-2 text-xs" disabled={selectedSeats.length === 0}>
-                Xác nhận & Thanh toán
+              <Button
+                className="w-full py-2.5 mt-2 text-xs"
+                disabled={selectedSeats.length === 0 || booking}
+                onClick={handleConfirm}
+              >
+                {booking ? "Đang xử lý..." : "Xác nhận & Thanh toán"}
               </Button>
+
+              {bookingError && (
+                <div className="mt-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[11px] font-semibold px-3 py-2">
+                  {bookingError}
+                </div>
+              )}
+
+              {confirmed && confirmed.length > 0 && (
+                <div className="mt-3 rounded-lg bg-green-50 border border-green-200 px-3 py-2.5 text-[11px] space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-green-700">
+                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                    Đặt vé thành công ({confirmed.length} vé)
+                  </div>
+                  {confirmed.map((b) => (
+                    <div key={b.booking_id} className="flex justify-between text-green-800">
+                      <span className="font-mono font-bold">{b.booking_code}</span>
+                      <span>
+                        Toa {b.coach_no} · Ghế {b.seat_no}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t border-green-200 pt-1 font-bold text-green-800">
+                    <span>Đã thanh toán</span>
+                    <span className="font-mono">{paidPrice.toLocaleString("vi-VN")} VNĐ</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </aside>
