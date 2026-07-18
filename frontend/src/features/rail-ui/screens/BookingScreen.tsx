@@ -552,7 +552,7 @@ function DateField({ label, value, onChange, dates, loading, optional }: { label
     <div className="space-y-1">
       <label className="text-[9px] uppercase font-bold text-on-surface-variant">{label}</label>
       <input type="date" value={value} disabled={loading || dates.length === 0} min={dates[0]} max={dates.at(-1)} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs font-semibold disabled:opacity-50" />
-      {optional && dates.length === 0 ? <span className="text-[8px] text-amber-700">Chua co du lieu</span> : null}
+      {optional && dates.length === 0 ? <span className="text-[8px] text-amber-700">Chưa có dữ liệu</span> : null}
     </div>
   );
 }
