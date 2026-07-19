@@ -14,6 +14,7 @@ import {
 } from "@/features/booking/components/TicketPrimitives";
 import type { BookingDetail, CombinedBooking } from "@/features/booking/types";
 import { ApiError } from "@/lib/api/client";
+import { getSeatTypeName } from "@/lib/utils";
 
 const moneyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
@@ -281,7 +282,7 @@ function TicketCard({ ticket }: { ticket: BookingDetail }) {
           <div>
             <SectionTitle icon="event_seat">Chỗ ngồi</SectionTitle>
             <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <InfoLine label="Loại chỗ" value={ticket.seat_type_name} />
+              <InfoLine label="Loại chỗ" value={getSeatTypeName(ticket.seat_type_name)} />
               <InfoLine label="Hạng vé" value={ticket.fare_class} />
               <InfoLine label="Toa" value={ticket.coach_no ? `Toa ${ticket.coach_no}` : "Chưa phân toa"} />
               <InfoLine label="Số chỗ" value={ticket.seat_no ?? "Chưa phân chỗ"} highlight />
