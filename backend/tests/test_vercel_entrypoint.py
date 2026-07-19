@@ -20,12 +20,14 @@ def test_vercel_entrypoint_exports_complete_fastapi_app() -> None:
 
 
 def test_fastapi_startup_does_not_import_heavy_ai_engine() -> None:
+    repo_root = Path(__file__).resolve().parent.parent.parent
     result = subprocess.run(
         [
             sys.executable,
             "-c",
             "import sys; import index; print('ai_service.engine' in sys.modules)",
         ],
+        cwd=str(repo_root),
         check=True,
         capture_output=True,
         text=True,
