@@ -18,6 +18,7 @@ from backend.views.booking_view import (
 from backend.views.combined_booking_view import (
     CombinedBookingCreateRequest,
     CombinedBookingResponse,
+    CombinedCancelResponse,
     CombinedJourneyOptionsResponse,
 )
 
@@ -159,6 +160,38 @@ async def confirm_combined_booking(
         raise HTTPException(status_code=500, detail=f"Loi he thong: {exc}") from exc
 
 
+@router.post("/booking/combined/{group_code}/cancel", response_model=CombinedCancelResponse)
+async def cancel_combined_booking(
+    group_code: str,
+    service: CombinedBookingService = Depends(get_combined_booking_service),
+    db: Session = Depends(get_db),
+) -> CombinedCancelResponse:
+    """Hủy toàn bộ nhóm vé và tính tiền hoàn theo chính sách."""
+    try:
+        return service.cancel_group(group_code=group_code, db=db)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Loi he thong: {exc}") from exc
+
+
+@router.post(
+    "/booking/combined/{group_code}/legs/{sequence_no}/refund",
+    response_model=CombinedCancelResponse,
+)
+async def refund_combined_booking_leg(
+    group_code: str,
+    sequence_no: int,
+    service: CombinedBookingService = Depends(get_combined_booking_service),
+    db: Session = Depends(get_db),
+) -> CombinedCancelResponse:
+    """Hoàn một chặng; các chặng còn lại của nhóm vẫn giữ nguyên hiệu lực."""
+    try:
+        return service.cancel_group(group_code=group_code, db=db, sequence_no=sequence_no)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Loi he thong: {exc}") from exc
 @router.post("/booking", response_model=BookingResponse, status_code=201)
 async def create_booking_hold_standard(
     request: BookingCreateRequest,

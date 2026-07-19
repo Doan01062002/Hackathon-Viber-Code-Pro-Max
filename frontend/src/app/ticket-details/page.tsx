@@ -5,7 +5,7 @@ import { TicketDetailsScreen } from "@/features/rail-ui/screens/TicketDetailsScr
 export default function TicketDetailsPage() {
   return (
     <AppShell eyebrow="Cổng hành khách" title="Chi tiết vé tàu & Hành trình">
-      <Suspense fallback={<div className="rounded-2xl border border-outline-variant bg-white p-12 text-center text-xs font-semibold text-on-surface-variant shadow-sm">Đang tải trang chi tiết vé...</div>}>
+      <Suspense fallback={<div className="text-xs text-on-surface-variant font-medium">Đang tải chi tiết hành trình...</div>}>
         <TicketDetailsScreen />
       </Suspense>
     </AppShell>

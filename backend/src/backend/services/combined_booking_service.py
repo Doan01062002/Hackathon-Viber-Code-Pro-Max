@@ -1,18 +1,22 @@
 import secrets
 from collections import defaultdict
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.services.booking_service import BookingService
+from backend.services.refund_policy import compute_refund
 from backend.views.booking_view import BookingCreateRequest
 from backend.views.combined_booking_view import (
     CombinedBookingCreateRequest,
     CombinedBookingResponse,
+    CombinedCancelResponse,
     CombinedJourneyOption,
     CombinedJourneyOptionsResponse,
+    CombinedRefundLeg,
 )
 
 
@@ -274,6 +278,150 @@ class CombinedBookingService:
         )
         return self.get_detail(group_code, db)
 
+    def _load_group_for_update(self, group_code: str, db: Session) -> dict[str, Any]:
+        group = db.execute(
+            text("""
+                SELECT id, group_code, status
+                FROM booking_groups
+                WHERE UPPER(group_code) = UPPER(:group_code)
+                FOR UPDATE
+            """),
+            {"group_code": group_code.strip()},
+        ).mappings().first()
+        if not group:
+            raise ValueError(f"Không tìm thấy nhóm vé {group_code}")
+        return dict(group)
+
+    def _load_cancellable_legs(
+        self, group_id: int, db: Session, sequence_no: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Các chặng còn hiệu lực của nhóm, kèm giờ khởi hành để tính bậc hoàn tiền."""
+        return [
+            dict(row)
+            for row in db.execute(
+                text("""
+                    SELECT
+                        item.sequence_no, item.gap_combination_id,
+                        booking.id AS booking_id, booking.booking_code,
+                        booking.od_product_id, booking.booked_price, booking.status,
+                        (SELECT MIN(segment.departure_at)
+                         FROM od_product_segments mapping
+                         JOIN segments segment ON segment.id = mapping.segment_id
+                         WHERE mapping.od_product_id = booking.od_product_id) AS departure_at
+                    FROM booking_group_items item
+                    JOIN bookings booking ON booking.id = item.booking_id
+                    WHERE item.booking_group_id = :group_id
+                      AND booking.status IN ('held', 'confirmed')
+                      AND (
+                          CAST(:sequence_no AS INTEGER) IS NULL
+                          OR item.sequence_no = CAST(:sequence_no AS INTEGER)
+                      )
+                    ORDER BY item.sequence_no
+                """),
+                {"group_id": group_id, "sequence_no": sequence_no},
+            ).mappings()
+        ]
+
+    @staticmethod
+    def _release_leg(leg: dict[str, Any], db: Session) -> None:
+        """Hủy một chặng: đổi trạng thái vé, cộng lại tồn kho, bật lại gap."""
+        db.execute(
+            text("UPDATE bookings SET status = 'cancelled' WHERE id = :booking_id"),
+            {"booking_id": leg["booking_id"]},
+        )
+        # Cộng lại tồn kho cho mọi chặng mà sản phẩm OD này đi qua.
+        db.execute(
+            text("""
+                UPDATE segment_inventory inventory
+                SET remaining = inventory.remaining + 1
+                FROM od_product_segments mapping
+                JOIN od_products product ON product.id = mapping.od_product_id
+                WHERE mapping.od_product_id = :od_product_id
+                  AND inventory.segment_id = mapping.segment_id
+                  AND inventory.seat_type = product.seat_type
+            """),
+            {"od_product_id": leg["od_product_id"]},
+        )
+        # Trả đoạn trống về kho để thuật toán ghép chặng dùng lại được.
+        db.execute(
+            text("UPDATE gap_combinations SET is_active = TRUE WHERE id = :gap_id"),
+            {"gap_id": leg["gap_combination_id"]},
+        )
+
+    def cancel_group(
+        self,
+        group_code: str,
+        db: Session,
+        sequence_no: int | None = None,
+        now: datetime | None = None,
+    ) -> CombinedCancelResponse:
+        """Hủy cả nhóm vé, hoặc một chặng khi truyền `sequence_no`.
+
+        Tiền hoàn tính theo `refund_policy` dựa trên giờ khởi hành của TỪNG chặng —
+        chặng cuối của hành trình dài có thể còn xa giờ chạy trong khi chặng đầu đã
+        gần, nên áp một bậc chung cho cả nhóm sẽ tính sai.
+        """
+        moment = now or datetime.now(UTC)
+        group = self._load_group_for_update(group_code, db)
+
+        if group["status"] in {"cancelled", "refunded"}:
+            raise ValueError(f"Nhóm vé đã ở trạng thái '{group['status']}'")
+
+        legs = self._load_cancellable_legs(int(group["id"]), db, sequence_no)
+        if not legs:
+            if sequence_no is not None:
+                raise ValueError(f"Chặng {sequence_no} không tồn tại hoặc đã bị hủy")
+            raise ValueError("Nhóm vé không còn chặng nào để hủy")
+
+        # Vé mới giữ chỗ thì chưa thu tiền, nên không phát sinh hoàn.
+        is_paid = group["status"] == "confirmed"
+
+        refunds: list[CombinedRefundLeg] = []
+        total_refund = Decimal("0")
+        total_fee = Decimal("0")
+        for leg in legs:
+            outcome = compute_refund(
+                Decimal(str(leg["booked_price"])),
+                leg["departure_at"],
+                moment,
+                is_paid=is_paid,
+            )
+            self._release_leg(leg, db)
+            total_refund += outcome.refund_amount
+            total_fee += outcome.fee_amount
+            refunds.append(
+                CombinedRefundLeg(
+                    sequence_no=int(leg["sequence_no"]),
+                    booking_code=leg["booking_code"],
+                    booked_price=float(leg["booked_price"]),
+                    refund_amount=float(outcome.refund_amount),
+                    fee_amount=float(outcome.fee_amount),
+                    tier_code=outcome.tier_code,
+                    tier_label=outcome.label,
+                )
+            )
+
+        # Nhóm chỉ đóng lại khi không còn chặng nào hiệu lực — hủy lẻ một chặng
+        # thì phần còn lại của hành trình vẫn dùng được.
+        remaining = self._load_cancellable_legs(int(group["id"]), db)
+        if remaining:
+            group_status = group["status"]
+        else:
+            group_status = "refunded" if total_refund > 0 else "cancelled"
+            db.execute(
+                text("UPDATE booking_groups SET status = :status, expires_at = NULL WHERE id = :group_id"),
+                {"status": group_status, "group_id": group["id"]},
+            )
+
+        return CombinedCancelResponse(
+            group_code=group["group_code"],
+            status=group_status,
+            cancelled_legs=len(refunds),
+            total_refund=float(total_refund),
+            total_fee=float(total_fee),
+            legs=refunds,
+        )
+
     def get_detail(self, group_code: str, db: Session) -> CombinedBookingResponse:
         group = db.execute(
             text("""
@@ -449,6 +597,26 @@ class CombinedBookingService:
                        AND inventory.seat_type = product.seat_type
                       WHERE mapping.od_product_id = product.id
                         AND inventory.remaining <= 0
+                  )
+                  -- Loại sản phẩm đã hết hạn ngạch. Phải soi cùng một luật với
+                  -- BookingService.create_hold, nếu không tìm kiếm sẽ chào những
+                  -- phương án mà giữ chỗ chắc chắn từ chối bằng lỗi 400.
+                  -- Không có dòng quota nào = không giới hạn, giống create_hold.
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM (
+                          SELECT quota
+                          FROM quotas
+                          WHERE od_product_id = product.id AND is_active = TRUE
+                          ORDER BY calculated_at DESC, id DESC
+                          LIMIT 1
+                      ) active_quota
+                      WHERE (
+                          SELECT COUNT(*)
+                          FROM bookings
+                          WHERE od_product_id = product.id
+                            AND status IN ('held', 'confirmed')
+                      ) >= active_quota.quota
                   )
                 ORDER BY product.base_price, gap.id
             """),

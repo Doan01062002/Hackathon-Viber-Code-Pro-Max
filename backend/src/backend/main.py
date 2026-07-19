@@ -24,7 +24,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Warning: Could not start EventWorker: {str(e)}")
 
+    expiry_task = None
+    try:
+        from backend.services.expiry_task import start_expiry_task
+
+        expiry_task = start_expiry_task()
+    except Exception as e:
+        print(f"Warning: Could not start expiry task: {str(e)}")
+
     yield
+
+    if expiry_task is not None:
+        from backend.services.expiry_task import stop_expiry_task
+
+        await stop_expiry_task(expiry_task)
 
     if worker:
         try:

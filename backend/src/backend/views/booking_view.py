@@ -101,31 +101,15 @@ class BookingSeatPlanResponse(BaseModel):
     segments: list[BookingSegmentItem]
 
 
-class BookingDetailSegment(BaseModel):
-    segment_id: int
-    sequence_no: int
-    origin_code: str
-    origin_name: str
-    destination_code: str
-    destination_name: str
-    departure_at: datetime
-    arrival_at: datetime
-    distance_km: float
-
-
 class BookingDetailResponse(BaseModel):
     booking_id: int
     booking_code: str
-    od_product_id: int
     status: str
-    channel: str | None
     booked_price: float
     booked_at: datetime
     expires_at: datetime | None
     trip_id: int
     train_code: str
-    train_name: str | None
-    trip_status: str
     service_date: date
     departure_at: datetime
     arrival_at: datetime
@@ -134,9 +118,5 @@ class BookingDetailResponse(BaseModel):
     destination_code: str
     destination_name: str
     seat_type: str
-    seat_type_name: str
-    fare_class: str
-    distance_km: float
     coach_no: str | None
     seat_no: str | None
-    segments: list[BookingDetailSegment]

@@ -80,7 +80,3 @@ async def test_booking_detail_by_code(client):
     assert data["booking_code"] == booking_code
     assert data["origin_code"] != data["destination_code"]
     assert data["departure_at"] < data["arrival_at"]
-    assert data["seat_type_name"]
-    assert data["distance_km"] > 0
-    assert data["segments"]
-    assert data["segments"][0]["sequence_no"] > 0

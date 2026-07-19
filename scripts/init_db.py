@@ -12,6 +12,8 @@ SCHEMA_PATH = ROOT_DIR / "schema.sql"
 EXPECTED_TABLES = {
     "audit_logs",
     "bid_prices",
+    "booking_group_items",
+    "booking_groups",
     "bookings",
     "calendar_features",
     "demand_forecasts",

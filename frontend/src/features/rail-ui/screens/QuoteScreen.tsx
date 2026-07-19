@@ -9,6 +9,7 @@ import type { PricingQuoteRequest, PricingQuoteResponse } from "@/features/quote
 import { RouteMap, MOCK_ROUTE_SEGMENTS } from "@/features/rail-ui/components/RouteMap";
 import { STATION_OPTIONS, toStationOptions } from "@/features/rail-ui/stations";
 import { ApiError } from "@/lib/api/client";
+import { getSeatTypeName } from "@/lib/utils";
 
 const initialRequest: PricingQuoteRequest = {
   origin: "HAN",
@@ -164,7 +165,9 @@ export function QuoteScreen() {
                       { code: "ngoi_mem", name: "Ngồi mềm điều hòa" },
                       { code: "giuong_nam_k6", name: "Giường nằm K6" },
                     ]).map((seatType) => (
-                      <option key={seatType.code} value={seatType.code}>{seatType.name}</option>
+                      <option key={seatType.code} value={seatType.code}>
+                        {getSeatTypeName(seatType.code) || seatType.name}
+                      </option>
                     ))}
                   </select>
                 </div>
