@@ -71,6 +71,25 @@ class CombinedBookingLegResponse(BaseModel):
     keep_previous_seat: bool
 
 
+class CombinedRefundLeg(BaseModel):
+    sequence_no: int
+    booking_code: str
+    booked_price: float
+    refund_amount: float
+    fee_amount: float
+    tier_code: str
+    tier_label: str
+
+
+class CombinedCancelResponse(BaseModel):
+    group_code: str
+    status: str
+    cancelled_legs: int
+    total_refund: float
+    total_fee: float
+    legs: list[CombinedRefundLeg]
+
+
 class CombinedBookingResponse(BaseModel):
     booking_group_id: int
     group_code: str
