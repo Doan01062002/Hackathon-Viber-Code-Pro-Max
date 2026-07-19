@@ -1,9 +1,13 @@
 import subprocess
 import sys
+from pathlib import Path
 
-from fastapi import FastAPI
+# Thêm thư mục cha (gốc repo) vào sys.path để có thể import index.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from index import app as vercel_app
+from fastapi import FastAPI  # noqa: E402
+
+from index import app as vercel_app  # noqa: E402
 
 
 def test_vercel_entrypoint_exports_complete_fastapi_app() -> None:
