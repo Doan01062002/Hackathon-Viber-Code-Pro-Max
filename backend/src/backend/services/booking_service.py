@@ -498,7 +498,17 @@ class BookingService:
             expires_at=expires_at_str,
         )
 
-    def confirm_booking(self, booking_id: int, db: Session) -> BookingConfirmResponse:
+    def confirm_booking(
+        self, booking_id: int, db: Session, allow_group: bool = False
+    ) -> BookingConfirmResponse:
+        """Xác nhận một booking đang giữ chỗ.
+
+        `allow_group` chỉ được bật khi lời gọi đến từ `CombinedBookingService.confirm`,
+        nơi cả nhóm vé ghép chặng được xác nhận trong cùng một giao dịch. Xác nhận lẻ
+        một chặng của hành trình ghép sẽ để lại nhóm ở trạng thái nửa vời — khách trả
+        tiền chặng A->B rồi mới phát hiện chặng B->D đã hết hạn giữ chỗ — nên mặc định
+        bị chặn.
+        """
         # 1. Truy vấn booking
         booking_row = db.execute(
             text("SELECT od_product_id, status, expires_at, booking_code FROM bookings WHERE id = :booking_id"),
@@ -509,6 +519,22 @@ class BookingService:
             raise ValueError(f"Không tìm thấy booking với ID {booking_id}")
 
         od_product_id, status, expires_at_val, booking_code = booking_row
+
+        if not allow_group:
+            group_code = db.execute(
+                text("""
+                    SELECT booking_group.group_code
+                    FROM booking_group_items item
+                    JOIN booking_groups booking_group ON booking_group.id = item.booking_group_id
+                    WHERE item.booking_id = :booking_id
+                """),
+                {"booking_id": booking_id},
+            ).scalar()
+            if group_code:
+                raise ValueError(
+                    f"Vé {booking_code} là một chặng của hành trình ghép {group_code}; "
+                    f"hãy xác nhận cả nhóm qua POST /booking/combined/{group_code}/confirm"
+                )
 
         if status != "held":
             raise ValueError(f"Booking không ở trạng thái giữ chỗ (đang là '{status}')")
