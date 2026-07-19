@@ -3,6 +3,7 @@
 import { formatClock, formatLegWindow, formatMoney } from "@/features/booking/format";
 import { isSeatChange } from "@/features/booking/hooks/combinedState";
 import type { CombinedJourneyLegOption } from "@/features/booking/types";
+import { getSeatTypeName } from "@/lib/utils";
 
 /**
  * Sơ đồ hành trình ghép chặng — mỗi chặng một thẻ toa, chỗ được giữ được đánh dấu.
@@ -36,7 +37,7 @@ function LegCard({ leg }: { leg: CombinedJourneyMapLeg }) {
       </div>
 
       <p className="mt-2 text-center text-[9px] font-bold text-on-surface-variant">
-        {leg.seat_type_name} • {formatLegWindow(leg.departure_at, leg.arrival_at)}
+        {getSeatTypeName(leg.seat_type_name)} • {formatLegWindow(leg.departure_at, leg.arrival_at)}
       </p>
     </div>
   );

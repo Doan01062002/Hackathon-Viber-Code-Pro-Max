@@ -8,6 +8,7 @@ import {
   ticketStatusStyles,
 } from "@/features/booking/components/TicketPrimitives";
 import type { CombinedBooking, CombinedBookingLeg } from "@/features/booking/types";
+import { getSeatTypeName } from "@/lib/utils";
 
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
@@ -67,7 +68,7 @@ function LegBlock({ leg, isLast }: { leg: CombinedBookingLeg; isLast: boolean })
             Toa {leg.coach_no} · Chỗ {leg.seat_no}
           </span>
           <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-on-surface-variant">
-            {leg.seat_type_name}
+            {getSeatTypeName(leg.seat_type_name)}
           </span>
           <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-on-surface-variant">
             {leg.booking_code}

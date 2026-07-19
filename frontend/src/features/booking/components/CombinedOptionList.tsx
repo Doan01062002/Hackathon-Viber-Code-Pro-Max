@@ -3,6 +3,7 @@
 import { formatLegWindow, formatMoney } from "@/features/booking/format";
 import { isSeatChange } from "@/features/booking/hooks/combinedState";
 import type { CombinedJourneyLegOption, CombinedJourneyOption } from "@/features/booking/types";
+import { getSeatTypeName } from "@/lib/utils";
 
 /**
  * Ghi chú đổi chỗ tại ga chuyển — thay cho chuỗi hardcode trước đây.
@@ -27,7 +28,7 @@ function LegRow({ leg }: { leg: CombinedJourneyLegOption }) {
       </p>
       <p className="font-semibold text-on-surface-variant">
         Toa {leg.coach_no} • Chỗ <span className="font-extrabold text-purple-700">{leg.seat_no}</span> •{" "}
-        {leg.seat_type_name}
+        {getSeatTypeName(leg.seat_type_name)}
       </p>
       {note ? <p className="mt-0.5 text-[9.5px] font-bold italic text-amber-700">{note}</p> : null}
     </div>

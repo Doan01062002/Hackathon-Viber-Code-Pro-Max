@@ -25,6 +25,7 @@ import { createPricingQuote } from "@/features/quote/api/quoteApi";
 import { RouteMap, type RouteSegment } from "@/features/rail-ui/components/RouteMap";
 import { STATION_OPTIONS, toStationOptions } from "@/features/rail-ui/stations";
 import { ApiError } from "@/lib/api/client";
+import { getSeatTypeName } from "@/lib/utils";
 
 const FALLBACK_DATE = "2025-12-30";
 
@@ -583,7 +584,7 @@ export function BookingScreen() {
               ) : (
                 <>
                   <SummaryRow label="Toa" value={selectedCoachNo || "Chưa chọn"} />
-                  <SummaryRow label="Loại chỗ" value={selectedProduct?.seat_type_name ?? "Chưa chọn"} />
+                  <SummaryRow label="Loại chỗ" value={selectedProduct ? getSeatTypeName(selectedProduct.seat_type_name) : "Chưa chọn"} />
                   <SummaryRow label="Số ghế" value={pickedSeats.length ? pickedSeats.map((item) => `Toa ${item.coachNo}-${item.seatNo}`).join(", ") : "Chưa chọn"} />
                   <div className="flex justify-between items-end pt-2">
                     <span className="text-on-surface-variant font-bold">Tạm tính</span>
