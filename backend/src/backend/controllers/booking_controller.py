@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.services.booking_service import BookingService
+from backend.services.combined_booking_service import CombinedBookingService
 from backend.views.booking_view import (
     BookingConfirmResponse,
     BookingCreateRequest,
@@ -14,7 +15,6 @@ from backend.views.booking_view import (
     BookingSearchItem,
     BookingSeatPlanResponse,
 )
-from backend.services.combined_booking_service import CombinedBookingService
 from backend.views.combined_booking_view import (
     CombinedBookingCreateRequest,
     CombinedBookingResponse,

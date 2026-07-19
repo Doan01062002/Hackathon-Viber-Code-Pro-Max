@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api/client";
 import type {
   BookingConfirmResponse,
   BookingCreateRequest,
+  BookingDetail,
   BookingOptions,
   BookingResponse,
   BookingSearchItem,
@@ -54,4 +55,11 @@ export function confirmBooking(
   signal?: AbortSignal,
 ): Promise<BookingConfirmResponse> {
   return apiClient.post<BookingConfirmResponse>(`/api/v1/booking/${bookingId}/confirm`, {}, { signal });
+}
+
+export function getBookingDetail(
+  bookingCode: string,
+  signal?: AbortSignal,
+): Promise<BookingDetail> {
+  return apiClient.get<BookingDetail>(`/api/v1/booking/code/${encodeURIComponent(bookingCode)}`, { signal });
 }
