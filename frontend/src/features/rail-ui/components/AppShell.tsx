@@ -52,7 +52,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
               Cổng Hành Khách
             </p>
             {navItems
-              .filter((item) => item.group === "passenger")
+              .filter((item) => item.group === "passenger" && item.icon !== "simulation")
               .map((item) => {
                 const active = pathname === item.href;
                 return (
@@ -78,7 +78,7 @@ export function AppShell({ title, eyebrow, children }: AppShellProps) {
               Điều Hành Doanh Thu
             </p>
             {navItems
-              .filter((item) => item.group === "admin")
+              .filter((item) => item.group === "admin" && item.icon !== "simulation")
               .map((item) => {
                 const active = pathname === item.href;
                 return (

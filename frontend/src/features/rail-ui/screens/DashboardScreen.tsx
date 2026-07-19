@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { seatApi } from "@/features/rail-ui/api/seatApi";
 import type { GapSuggestionDto } from "@/features/rail-ui/api/seatApi";
@@ -14,18 +14,26 @@ import {
 
 const DEFAULT_TRIP_ID = 1;
 
-/** Ngày hôm nay theo giờ máy người dùng, dạng YYYY-MM-DD cho <input type="date">. */
-function todayIso() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
+const DATE_MIN = "2024-01-01";
+const DATE_MAX = "2025-12-30";
+
+/** "2024-01-01" → "01/01/2024" */
+function toDisplayDate(iso: string) {
+  if (!iso) return "Chọn ngày";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
 }
 
-/** "2026-07-18" → "18 Tháng 7 2026". */
-function formatVnDate(iso: string) {
-  const [year, month, day] = iso.split("-");
-  return `${Number(day)} Tháng ${Number(month)} ${year}`;
+/** "01/01/2024" → "2024-01-01" (trả về null nếu không hợp lệ) */
+function fromDisplayDate(display: string): string | null {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, d, m, y] = match;
+  const iso = `${y}-${m}-${d}`;
+  if (iso < DATE_MIN || iso > DATE_MAX) return null;
+  return iso;
 }
+
 
 function heatClass(value: number) {
   if (value >= 90) return "text-red-600 font-bold";
@@ -182,27 +190,10 @@ export function DashboardScreen() {
   const segments = useSegmentsLoad(DEFAULT_TRIP_ID);
   const [suggestions, setSuggestions] = useState<GapSuggestionDto[]>(mockGapSuggestions);
 
-  // Ngày đang xem. Khởi tạo rỗng rồi set sau khi mount để tránh lệch hydration
-  // giữa timezone của server và của trình duyệt.
-  const [today, setToday] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  const [selectedDate, setSelectedDate] = useState(DATE_MIN);
+  const [displayDate, setDisplayDate] = useState(toDisplayDate(DATE_MIN));
+  const hiddenDateInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const iso = todayIso();
-    setToday(iso);
-    setSelectedDate((current) => current || iso);
-  }, []);
-
-  function openDatePicker() {
-    const input = dateInputRef.current;
-    if (!input) return;
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-    } else {
-      input.focus();
-    }
-  }
 
   useEffect(() => {
     async function loadGaps() {
@@ -237,7 +228,7 @@ export function DashboardScreen() {
 
   // Sparkline data
   // Nhãn cuối bám theo ngày đang chọn để không mâu thuẫn với bộ chọn ngày ở header.
-  const lastSparkLabel = !selectedDate || selectedDate === today ? "Hôm nay" : formatVnDate(selectedDate);
+  const lastSparkLabel = selectedDate ? toDisplayDate(selectedDate) : "01/01/2024";
   const sparkLabels = ["D-9", "D-8", "D-7", "D-6", "D-5", "D-4", "D-3", "D-2", "D-1", lastSparkLabel];
   const revenueTrend = [1.10, 1.12, 1.08, 1.15, 1.13, 1.18, 1.16, 1.22, 1.20, 1.24];
   const loadTrend = [86.5, 87.2, 86.0, 85.3, 85.5, 84.8, 85.0, 84.2, 84.5, avgLoad];
@@ -272,39 +263,57 @@ export function DashboardScreen() {
           </p>
         </div>
         <div className="flex items-center space-x-3 mr-16">
-          <div
-            onClick={openDatePicker}
-            className="relative bg-white border border-outline-variant rounded-lg px-3 py-1.5 flex items-center space-x-2 shadow-sm cursor-pointer hover:bg-slate-50 focus-within:ring-1 focus-within:ring-primary transition-colors"
-          >
-            <span className="material-symbols-outlined text-outline text-sm">calendar_today</span>
-            <span className="text-xs font-semibold whitespace-nowrap">
-              {selectedDate
-                ? `${selectedDate === today ? "Hôm nay, " : ""}${formatVnDate(selectedDate)}`
-                : "Chọn ngày"}
-            </span>
+          <div className="relative flex items-center w-36">
             <input
-              ref={dateInputRef}
+              type="text"
+              aria-label="Chọn ngày xem dữ liệu (dd/mm/yyyy)"
+              placeholder="dd/mm/yyyy"
+              maxLength={10}
+              value={displayDate}
+              onChange={(event) => {
+                const raw = event.target.value;
+                setDisplayDate(raw);
+                const iso = fromDisplayDate(raw);
+                if (iso) setSelectedDate(iso);
+              }}
+              onBlur={() => {
+                // Nếu gõ sai thì reset về giá trị hợp lệ cuối cùng
+                const iso = fromDisplayDate(displayDate);
+                if (!iso) {
+                  setDisplayDate(toDisplayDate(selectedDate || DATE_MIN));
+                }
+              }}
+              className="w-full rounded-lg border border-outline-variant bg-surface-container-low pl-2 pr-8 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary text-on-surface shadow-sm"
+            />
+            <span 
+              onClick={() => {
+                if (hiddenDateInputRef.current && typeof hiddenDateInputRef.current.showPicker === "function") {
+                  hiddenDateInputRef.current.showPicker();
+                }
+              }}
+              className="absolute right-2 material-symbols-outlined text-outline text-sm cursor-pointer hover:text-primary transition-colors select-none"
+            >
+              calendar_today
+            </span>
+            {/* hidden native date input for calendar picker */}
+            <input
+              ref={hiddenDateInputRef}
               type="date"
-              aria-label="Chọn ngày xem dữ liệu"
-              // Chặn ngày quá khứ: dashboard chỉ phục vụ dự báo từ hôm nay trở đi.
-              min={today}
+              min={DATE_MIN}
+              max={DATE_MAX}
               value={selectedDate}
+              tabIndex={-1}
               onChange={(event) => {
                 const value = event.target.value;
                 if (!value) return;
-                // Gõ tay có thể vượt qua `min`, nên kẹp lại về hôm nay.
-                setSelectedDate(today && value < today ? today : value);
+                setSelectedDate(value);
+                setDisplayDate(toDisplayDate(value));
               }}
-              className="absolute inset-0 h-full w-full opacity-0 pointer-events-none"
+              className="absolute pointer-events-none opacity-0"
+              style={{ width: 0, height: 0 }}
             />
           </div>
-          <select
-            className="bg-white border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-bold focus:ring-primary focus:border-primary outline-none shadow-sm cursor-pointer"
-            defaultValue="Mã tàu: SE1, SE2, SE3"
-          >
-            <option>Mã tàu: SE1, SE2, SE3</option>
-            <option>Mã tàu: SE4, SE5, SE6</option>
-          </select>
+
         </div>
       </div>
 

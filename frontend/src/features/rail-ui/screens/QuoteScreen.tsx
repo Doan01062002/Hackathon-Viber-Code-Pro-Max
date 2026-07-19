@@ -2,7 +2,6 @@
 
 import React, { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { SearchableStationSelect } from "@/components/ui/SearchableStationSelect";
 import { useRailCatalog } from "@/features/catalog/hooks/useRailCatalog";
 import { createPricingQuote } from "@/features/quote/api/quoteApi";
@@ -18,6 +17,24 @@ const initialRequest: PricingQuoteRequest = {
   service_date: "2025-12-30",
 };
 
+const DATE_MIN = "2024-01-01";
+const DATE_MAX = "2025-12-30";
+
+function toDisplayDate(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function fromDisplayDate(display: string): string | null {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, d, m, y] = match;
+  const iso = `${y}-${m}-${d}`;
+  if (iso < DATE_MIN || iso > DATE_MAX) return null;
+  return iso;
+}
+
 const moneyFormatter = new Intl.NumberFormat("vi-VN", {
   style: "currency",
   currency: "VND",
@@ -30,7 +47,9 @@ function formatMoney(value: number): string {
 
 export function QuoteScreen() {
   const { catalog, error: catalogError } = useRailCatalog();
+  const hiddenDateInputRef = React.useRef<HTMLInputElement>(null);
   const [request, setRequest] = useState<PricingQuoteRequest>(initialRequest);
+  const [displayDate, setDisplayDate] = useState(toDisplayDate(initialRequest.service_date));
   const [quote, setQuote] = useState<PricingQuoteResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,16 +170,53 @@ export function QuoteScreen() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold tracking-wider text-on-surface-variant">
-                    Ngày đi
+                    Ngày đi (dd/mm/yyyy)
                   </label>
-                  <Input
-                    type="date"
-                    min={catalog?.service_date_min ?? undefined}
-                    max={catalog?.service_date_max ?? undefined}
-                    value={request.service_date}
-                    onChange={(event) => setRequest({ ...request, service_date: event.target.value })}
-                    required
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      placeholder="dd/mm/yyyy"
+                      maxLength={10}
+                      value={displayDate}
+                      onChange={(e) => {
+                        setDisplayDate(e.target.value);
+                        const iso = fromDisplayDate(e.target.value);
+                        if (iso) setRequest({ ...request, service_date: iso });
+                      }}
+                      onBlur={() => {
+                        const iso = fromDisplayDate(displayDate);
+                        if (!iso) setDisplayDate(toDisplayDate(request.service_date));
+                      }}
+                      className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-2 pl-3 pr-8 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary text-on-surface"
+                    />
+                    <span
+                      onClick={() => {
+                        if (hiddenDateInputRef.current && typeof hiddenDateInputRef.current.showPicker === "function") {
+                          hiddenDateInputRef.current.showPicker();
+                        }
+                      }}
+                      className="absolute right-2 material-symbols-outlined text-outline text-sm cursor-pointer hover:text-primary transition-colors select-none"
+                    >
+                      calendar_today
+                    </span>
+                    <input
+                      ref={hiddenDateInputRef}
+                      type="date"
+                      min={DATE_MIN}
+                      max={DATE_MAX}
+                      value={request.service_date}
+                      tabIndex={-1}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          setRequest({ ...request, service_date: value });
+                          setDisplayDate(toDisplayDate(value));
+                        }
+                      }}
+                      className="absolute pointer-events-none opacity-0"
+                      style={{ width: 0, height: 0 }}
+                    />
+                  </div>
                 </div>
               </div>
 

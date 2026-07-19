@@ -5,11 +5,31 @@ import { useRouter } from "next/navigation";
 import { seatApi } from "@/features/rail-ui/api/seatApi";
 import type { CoachDto, SeatPlanDto, GapSuggestionDto, TripOptionDto } from "@/features/rail-ui/api/seatApi";
 
+const TL_DATE_MIN = "2024-01-01";
+const TL_DATE_MAX = "2025-12-30";
+
+function tlToDD(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function tlFromDD(display: string): string | null {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, d, m, y] = match;
+  const iso = `${y}-${m}-${d}`;
+  if (iso < TL_DATE_MIN || iso > TL_DATE_MAX) return null;
+  return iso;
+}
+
 export function TrainLayoutScreen() {
   const router = useRouter();
+  const hiddenDateInputRef = React.useRef<HTMLInputElement>(null);
   const [trips, setTrips] = useState<TripOptionDto[]>([]);
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [displayDate, setDisplayDate] = useState<string>("");
   const [coaches, setCoaches] = useState<CoachDto[]>([]);
   const [selectedCoachNo, setSelectedCoachNo] = useState<string>("01");
   const [seatPlan, setSeatPlan] = useState<SeatPlanDto | null>(null);
@@ -76,6 +96,7 @@ export function TrainLayoutScreen() {
         }
         
         setSelectedDate(initialTrip.service_date);
+        setDisplayDate(tlToDD(initialTrip.service_date));
         setSelectedTripId(initialTrip.trip_id);
       }
     } catch (err) {
@@ -278,31 +299,57 @@ export function TrainLayoutScreen() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">
-              Chọn Ngày đi
+              Chọn Ngày đi (dd/mm/yyyy)
             </label>
-            <select
-              className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-2 px-3 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary cursor-pointer text-on-surface"
-              value={selectedDate}
-              onChange={(e) => {
-                const newDate = e.target.value;
-                setSelectedDate(newDate);
-                const tripsForDate = trips.filter(t => t.service_date === newDate);
-                if (tripsForDate.length > 0) {
-                  setSelectedTripId(tripsForDate[0].trip_id);
-                }
-              }}
-            >
-              {Array.from(new Set(trips.map(t => t.service_date)))
-                .sort((a, b) => b.localeCompare(a))
-                .map((dateStr) => {
-                  const [y, m, d] = dateStr.split("-");
-                  return (
-                    <option key={dateStr} value={dateStr}>
-                      {`${d}/${m}/${y}`}
-                    </option>
-                  );
-                })}
-            </select>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                placeholder="dd/mm/yyyy"
+                maxLength={10}
+                value={displayDate}
+                onChange={(e) => {
+                  setDisplayDate(e.target.value);
+                  const iso = tlFromDD(e.target.value);
+                  if (iso) {
+                    setSelectedDate(iso);
+                    const tripsForDate = trips.filter(t => t.service_date === iso);
+                    if (tripsForDate.length > 0) setSelectedTripId(tripsForDate[0].trip_id);
+                  }
+                }}
+                onBlur={() => {
+                  if (!tlFromDD(displayDate)) setDisplayDate(tlToDD(selectedDate));
+                }}
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg py-2 pl-3 pr-8 text-xs font-semibold outline-none focus:ring-1 focus:ring-primary text-on-surface"
+              />
+              <span
+                onClick={() => {
+                  if (hiddenDateInputRef.current && typeof hiddenDateInputRef.current.showPicker === "function") {
+                    hiddenDateInputRef.current.showPicker();
+                  }
+                }}
+                className="absolute right-2 material-symbols-outlined text-outline text-sm cursor-pointer hover:text-primary transition-colors select-none"
+              >
+                calendar_today
+              </span>
+              <input
+                ref={hiddenDateInputRef}
+                type="date"
+                tabIndex={-1}
+                min={TL_DATE_MIN}
+                max={TL_DATE_MAX}
+                value={selectedDate}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  if (!newDate) return;
+                  setSelectedDate(newDate);
+                  setDisplayDate(tlToDD(newDate));
+                  const tripsForDate = trips.filter(t => t.service_date === newDate);
+                  if (tripsForDate.length > 0) setSelectedTripId(tripsForDate[0].trip_id);
+                }}
+                className="absolute pointer-events-none opacity-0"
+                style={{ width: 0, height: 0 }}
+              />
+            </div>
           </div>
 
           <div className="space-y-1">

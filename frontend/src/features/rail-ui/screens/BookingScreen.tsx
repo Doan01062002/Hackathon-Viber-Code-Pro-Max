@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { SearchableStationSelect } from "@/components/ui/SearchableStationSelect";
 import {
@@ -814,11 +814,78 @@ function SeatButton({ seat, selected, onClick, suffix }: { seat: BookingSeat; se
   );
 }
 
+const BOOKING_DATE_MIN = "2024-01-01";
+const BOOKING_DATE_MAX = "2025-12-30";
+
+function toDD(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function fromDD(display: string, allowedDates: string[]): string | null {
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, d, m, y] = match;
+  const iso = `${y}-${m}-${d}`;
+  if (iso < BOOKING_DATE_MIN || iso > BOOKING_DATE_MAX) return null;
+  // Nếu có danh sách ngày hợp lệ thì phải nằm trong đó
+  if (allowedDates.length > 0 && !allowedDates.includes(iso)) return null;
+  return iso;
+}
+
 function DateField({ label, value, onChange, dates, loading, optional }: { label: string; value: string; onChange: (value: string) => void; dates: string[]; loading?: boolean; optional?: boolean }) {
+  const [display, setDisplay] = useState(toDD(value));
+  const hiddenDateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDisplay(toDD(value));
+  }, [value]);
+
   return (
     <div className="space-y-1">
-      <label className="text-[9px] uppercase font-bold text-on-surface-variant">{label}</label>
-      <input type="date" value={value} disabled={loading || dates.length === 0} min={dates[0]} max={dates.at(-1)} onChange={(event) => onChange(event.target.value)} className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs font-semibold disabled:opacity-50" />
+      <label className="text-[9px] uppercase font-bold text-on-surface-variant">{label} <span className="normal-case font-normal opacity-60">(dd/mm/yyyy)</span></label>
+      <div className="relative flex items-center">
+        <input
+          type="text"
+          placeholder="dd/mm/yyyy"
+          maxLength={10}
+          value={display}
+          disabled={loading}
+          onChange={(e) => {
+            setDisplay(e.target.value);
+            const iso = fromDD(e.target.value, dates);
+            if (iso) onChange(iso);
+          }}
+          onBlur={() => {
+            const iso = fromDD(display, dates);
+            if (!iso) setDisplay(toDD(value));
+          }}
+          className="w-full rounded-lg border border-outline-variant bg-surface-container-low pl-2 pr-8 py-2 text-xs font-semibold disabled:opacity-50 outline-none focus:ring-1 focus:ring-primary text-on-surface"
+        />
+        <span
+          onClick={() => {
+            if (hiddenDateInputRef.current && typeof hiddenDateInputRef.current.showPicker === "function") {
+              hiddenDateInputRef.current.showPicker();
+            }
+          }}
+          className="absolute right-2 material-symbols-outlined text-outline text-sm cursor-pointer hover:text-primary transition-colors select-none"
+        >
+          calendar_today
+        </span>
+        <input
+          ref={hiddenDateInputRef}
+          type="date"
+          tabIndex={-1}
+          min={dates.length > 0 ? dates[0] : BOOKING_DATE_MIN}
+          max={dates.length > 0 ? dates.at(-1) : BOOKING_DATE_MAX}
+          value={value}
+          disabled={loading}
+          onChange={(e) => { if (e.target.value) onChange(e.target.value); }}
+          className="absolute pointer-events-none opacity-0"
+          style={{ width: 0, height: 0 }}
+        />
+      </div>
       {optional && dates.length === 0 ? <span className="text-[8px] text-amber-700">Chưa có dữ liệu</span> : null}
     </div>
   );
