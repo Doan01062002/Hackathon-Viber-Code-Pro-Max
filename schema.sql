@@ -185,6 +185,43 @@ CREATE TABLE gap_combinations (
     CHECK (from_station_id <> to_station_id)
 );
 
+-- Vé ghép chặng: khách đi A->D nhưng không ghế nào trống suốt tuyến, nên hành trình
+-- được ghép từ nhiều ghế khác nhau. `booking_groups` là hành trình; mỗi chặng của nó
+-- vẫn là một `bookings` bình thường, nối vào nhóm qua `booking_group_items`.
+CREATE TABLE booking_groups (
+    id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    group_code              VARCHAR(50) NOT NULL UNIQUE,
+    trip_id               BIGINT NOT NULL REFERENCES trips(id),
+    origin_station_id       BIGINT NOT NULL REFERENCES stations(id),
+    destination_station_id  BIGINT NOT NULL REFERENCES stations(id),
+    status                  VARCHAR(20) NOT NULL DEFAULT 'held',
+    channel                 VARCHAR(30),
+    total_price             NUMERIC(14,2) NOT NULL DEFAULT 0,
+    transfer_count          SMALLINT NOT NULL,
+    booked_at               TIMESTAMPTZ NOT NULL,
+    expires_at              TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (status IN ('held', 'confirmed', 'cancelled', 'refunded')),
+    CHECK (total_price >= 0),
+    -- Ghép chặng thì phải có ít nhất 1 lần chuyển ghế, nếu không đã bán vé thẳng.
+    CHECK (transfer_count >= 1),
+    CHECK (origin_station_id <> destination_station_id)
+);
+
+CREATE TABLE booking_group_items (
+    id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    booking_group_id    BIGINT NOT NULL REFERENCES booking_groups(id) ON DELETE CASCADE,
+    booking_id          BIGINT NOT NULL REFERENCES bookings(id),
+    gap_combination_id  BIGINT REFERENCES gap_combinations(id) ON DELETE SET NULL,
+    sequence_no         SMALLINT NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Một booking chỉ thuộc đúng một nhóm, và thứ tự chặng trong nhóm là duy nhất.
+    UNIQUE (booking_id),
+    UNIQUE (booking_group_id, sequence_no),
+    CHECK (sequence_no >= 1)
+);
+
 CREATE TABLE demand_forecasts (
     id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     od_product_id       BIGINT NOT NULL REFERENCES od_products(id) ON DELETE CASCADE,
@@ -330,6 +367,11 @@ CREATE TRIGGER trg_price_policies_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
 
+CREATE TRIGGER trg_booking_groups_updated_at
+    BEFORE UPDATE ON booking_groups
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at();
+
 CREATE UNIQUE INDEX ux_bid_prices_active
     ON bid_prices (segment_id, seat_type)
     WHERE is_active = TRUE;
@@ -346,3 +388,10 @@ CREATE INDEX ix_od_product_segments_segment
 
 CREATE INDEX ix_gap_combinations_lookup
     ON gap_combinations (from_station_id, to_station_id, is_active);
+
+-- confirm_booking phải tra ngược từ booking -> nhóm để chặn xác nhận lẻ một chặng.
+CREATE INDEX ix_booking_group_items_booking
+    ON booking_group_items (booking_id);
+
+CREATE INDEX ix_booking_group_items_group
+    ON booking_group_items (booking_group_id, sequence_no);
