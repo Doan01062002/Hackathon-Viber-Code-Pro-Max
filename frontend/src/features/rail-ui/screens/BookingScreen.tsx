@@ -10,6 +10,9 @@ import {
   getBookingSeatPlan,
   searchBookingProducts,
 } from "@/features/booking/api/bookingApi";
+import { CombinedBookingPanel } from "@/features/booking/components/CombinedBookingPanel";
+import { CombinedJourneyMap } from "@/features/booking/components/CombinedJourneyMap";
+import { useCombinedBooking } from "@/features/booking/hooks/useCombinedBooking";
 import type {
   BookingConfirmResponse,
   BookingOptions,
@@ -89,7 +92,8 @@ export function BookingScreen() {
 
   // States for interactive combined seat selection (FR2.7 / PM requirement)
   const [isCombinedMode, setIsCombinedMode] = useState(false);
-  const [combinedLegs, setCombinedLegs] = useState<{ leg: string; seatNo: string; coachNo: string; seatId: number; time: string; note?: string }[]>([]);
+  // Luồng vé ghép sống ở hook riêng; sơ đồ hành trình và cột phải cùng đọc state này.
+  const combined = useCombinedBooking();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -231,41 +235,17 @@ export function BookingScreen() {
   const triggerCombinedMode = () => {
     setIsCombinedMode(true);
     setPickedSeats([]);
-    // Setup mock combined legs (4 segments for high-granularity visual demo)
-    setCombinedLegs([
-      {
-        leg: "Hà Nội → Thanh Hóa",
-        seatNo: "Ghế 12",
-        coachNo: "01",
-        seatId: 101,
-        time: "19:30 - 21:45",
-      },
-      {
-        leg: "Thanh Hóa → Vinh",
-        seatNo: "Ghế 08",
-        coachNo: "02",
-        seatId: 102,
-        time: "21:55 - 00:15",
-        note: "Đổi từ Toa 01 Ghế 12 sang Toa 02 Ghế 08 tại Thanh Hóa (dừng 10 phút).",
-      },
-      {
-        leg: "Vinh → Đà Nẵng",
-        seatNo: "Ghế 15",
-        coachNo: "02",
-        seatId: 103,
-        time: "00:25 - 06:10",
-        note: "Di chuyển sang Ghế 15 cùng Toa 02 tại ga Vinh (dừng 10 phút).",
-      },
-      {
-        leg: "Đà Nẵng → Sài Gòn",
-        seatNo: "Ghế 24",
-        coachNo: "03",
-        seatId: 104,
-        time: "06:20 - 18:45",
-        note: "Đổi sang Toa 03 Ghế 24 tại ga Đà Nẵng (dừng 10 phút).",
-      }
-    ]);
   };
+
+  const exitCombinedMode = () => {
+    setIsCombinedMode(false);
+    setPickedSeats([]);
+  };
+
+  /** Chặng của phương án đang xem: ưu tiên nhóm vé đã giữ, nếu chưa thì phương án đang chọn. */
+  const combinedLegs = combined.state.booking?.legs ?? combined.selectedOption?.legs ?? [];
+  const combinedTotal =
+    combined.state.booking?.total_price ?? combined.selectedOption?.estimated_total_price ?? null;
 
   const coachEntries = selectedTripProducts
     .flatMap((product) =>
@@ -452,154 +432,11 @@ export function BookingScreen() {
             </div>
 
             {isCombinedMode ? (
-              /* 4-COACH Z-SHAPE COMBINED LAYOUT (PM/TEAMMATE Z-SHAPE PATHWAY SPECIFICATION) */
-              <div className="space-y-6">
-                <div className="grid grid-cols-[1fr_auto_1fr] gap-y-6 gap-x-4 items-center p-6 bg-slate-50 rounded-2xl border border-slate-200 max-w-4xl mx-auto">
-                  
-                  {/* ROW 1: Left to Right */}
-                  {/* Toa 01 */}
-                  <div className="bg-white border border-outline-variant/65 rounded-xl p-3 shadow-sm relative">
-                    <div className="text-[10px] font-black text-purple-700 border-b border-purple-100 pb-1.5 text-center uppercase tracking-wider mb-2">
-                      Toa 01 (Chặng 1: HAN → TH)
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 bg-slate-50 p-2 rounded border text-center">
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">10</div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">11</div>
-                      <div className="h-6 rounded bg-purple-600 text-white text-[8px] font-black flex items-center justify-center scale-105 shadow-sm ring-2 ring-purple-600 ring-offset-1 relative">
-                        12
-                      </div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">13</div>
-                    </div>
-                    <p className="text-[9px] text-on-surface-variant font-bold text-center mt-2">Ghế 12 • Ga đi: Hà Nội</p>
-                  </div>
-
-                  {/* Arrow 1: Right */}
-                  <div className="flex flex-col items-center px-2 text-purple-600 text-center select-none">
-                    <span className="material-symbols-outlined text-lg font-black animate-pulse">arrow_forward</span>
-                    <span className="text-[7.5px] font-black uppercase tracking-wider mt-0.5 text-slate-500">Thanh Hóa</span>
-                  </div>
-
-                  {/* Toa 02 (Chặng 2) */}
-                  <div className="bg-white border border-outline-variant/65 rounded-xl p-3 shadow-sm relative">
-                    <div className="text-[10px] font-black text-blue-700 border-b border-blue-100 pb-1.5 text-center uppercase tracking-wider mb-2">
-                      Toa 02 (Chặng 2: TH → VII)
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 bg-slate-50 p-2 rounded border text-center">
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">6</div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">7</div>
-                      <div className="h-6 rounded bg-blue-600 text-white text-[8px] font-black flex items-center justify-center scale-105 shadow-sm ring-2 ring-blue-600 ring-offset-1 relative">
-                        08
-                      </div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">9</div>
-                    </div>
-                    <p className="text-[9px] text-on-surface-variant font-bold text-center mt-2">Ghế 08 • Đổi toa/ghế</p>
-                  </div>
-
-                  {/* ROW 2: Diagonal Down-Left in the middle column */}
-                  <div />
-                  {/* Arrow 2: South West (Diagonal Down-Left ↙) */}
-                  <div className="flex flex-col items-center py-1.5 text-blue-600 text-center select-none justify-self-center">
-                    <span className="material-symbols-outlined text-lg font-black animate-pulse">south_west</span>
-                    <span className="text-[7.5px] font-black uppercase tracking-wider mt-0.5 text-slate-500">Ga Vinh</span>
-                  </div>
-                  <div />
-
-                  {/* ROW 3: Left to Right again (forming the Z shape) */}
-                  {/* Toa 02 (Chặng 3) */}
-                  <div className="bg-white border border-outline-variant/65 rounded-xl p-3 shadow-sm relative">
-                    <div className="text-[10px] font-black text-amber-700 border-b border-amber-100 pb-1.5 text-center uppercase tracking-wider mb-2">
-                      Toa 02 (Chặng 3: VII → DAD)
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 bg-slate-50 p-2 rounded border text-center">
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">13</div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">14</div>
-                      <div className="h-6 rounded bg-amber-500 text-white text-[8px] font-black flex items-center justify-center scale-105 shadow-sm ring-2 ring-amber-500 ring-offset-1 relative">
-                        15
-                      </div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">16</div>
-                    </div>
-                    <p className="text-[9px] text-on-surface-variant font-bold text-center mt-2">Ghế 15 • Đổi chỗ cùng toa</p>
-                  </div>
-
-                  {/* Arrow 3: Right */}
-                  <div className="flex flex-col items-center px-2 text-amber-700 text-center select-none">
-                    <span className="material-symbols-outlined text-lg font-black animate-pulse">arrow_forward</span>
-                    <span className="text-[7.5px] font-black uppercase tracking-wider mt-0.5 text-slate-500">Đà Nẵng</span>
-                  </div>
-
-                  {/* Toa 03 */}
-                  <div className="bg-white border border-outline-variant/65 rounded-xl p-3 shadow-sm relative">
-                    <div className="text-[10px] font-black text-emerald-700 border-b border-emerald-100 pb-1.5 text-center uppercase tracking-wider mb-2">
-                      Toa 03 (Chặng 4: DAD → SGN)
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 bg-slate-50 p-2 rounded border text-center">
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">22</div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">23</div>
-                      <div className="h-6 rounded bg-emerald-600 text-white text-[8px] font-black flex items-center justify-center scale-105 shadow-sm ring-2 ring-emerald-600 ring-offset-1 relative">
-                        24
-                      </div>
-                      <div className="h-6 rounded bg-slate-300 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-not-allowed">25</div>
-                    </div>
-                    <p className="text-[9px] text-on-surface-variant font-bold text-center mt-2">Ghế 24 • Ga cuối: Sài Gòn</p>
-                  </div>
-
-                </div>
-
-                {/* Hybrid Segment Detail Table (Leg-by-Leg details) */}
-                <div className="border border-outline-variant/65 rounded-xl overflow-hidden shadow-sm bg-white">
-                  <div className="bg-slate-50 px-4 py-2 border-b border-outline-variant/45 flex justify-between items-center text-xs">
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Danh Sách Bảng Chi Tiết Chặng Ghép</span>
-                    <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Tối ưu bởi AI</span>
-                  </div>
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/20 text-[10px] uppercase font-bold text-slate-400 border-b border-outline-variant/20">
-                        <th className="py-2.5 px-4 font-black">Chặng</th>
-                        <th className="py-2.5 px-4 font-black">Phân đoạn hành trình</th>
-                        <th className="py-2.5 px-4 font-black">Thời gian chạy</th>
-                        <th className="py-2.5 px-4 font-black">Vị trí chỗ</th>
-                        <th className="py-2.5 px-4 font-black">Chỉ dẫn AI</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant/20 text-slate-700 font-semibold">
-                      <tr className="hover:bg-slate-50/40">
-                        <td className="py-2.5 px-4 text-purple-700 font-black">Chặng 1</td>
-                        <td className="py-2.5 px-4">Hà Nội (HAN) → Thanh Hóa (THH)</td>
-                        <td className="py-2.5 px-4 font-mono">19:30 - 21:45</td>
-                        <td className="py-2.5 px-4">Toa 01 • <span className="text-purple-700 font-black">Ghế 12</span></td>
-                        <td className="py-2.5 px-4 text-slate-400 font-medium">Bắt đầu hành trình tại Ga Hà Nội</td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/40">
-                        <td className="py-2.5 px-4 text-blue-700 font-black">Chặng 2</td>
-                        <td className="py-2.5 px-4">Thanh Hóa (THH) → Vinh (VII)</td>
-                        <td className="py-2.5 px-4 font-mono">21:55 - 00:15</td>
-                        <td className="py-2.5 px-4 text-blue-700">Toa 02 • <span className="text-blue-700 font-black">Ghế 08</span></td>
-                        <td className="py-2.5 px-4 text-blue-700 font-bold italic">
-                          Đổi từ Toa 01 Ghế 12 sang Toa 02 Ghế 08 tại Thanh Hóa (dừng 10 phút).
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/40">
-                        <td className="py-2.5 px-4 text-amber-700 font-black">Chặng 3</td>
-                        <td className="py-2.5 px-4">Vinh (VII) → Đà Nẵng (DAD)</td>
-                        <td className="py-2.5 px-4 font-mono">00:25 - 06:10</td>
-                        <td className="py-2.5 px-4 text-amber-700">Toa 02 • <span className="text-amber-700 font-black">Ghế 15</span></td>
-                        <td className="py-2.5 px-4 text-amber-700 font-bold italic">
-                          Đổi sang Ghế 15 cùng Toa 02 tại ga Vinh (dừng 10 phút).
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-slate-50/40">
-                        <td className="py-2.5 px-4 text-emerald-700 font-black">Chặng 4</td>
-                        <td className="py-2.5 px-4">Đà Nẵng (DAD) → Sài Gòn (SGN)</td>
-                        <td className="py-2.5 px-4 font-mono">06:20 - 18:45</td>
-                        <td className="py-2.5 px-4 text-emerald-700">Toa 03 • <span className="text-emerald-700 font-black">Ghế 24</span></td>
-                        <td className="py-2.5 px-4 text-emerald-700 font-bold italic">
-                          Đổi sang Toa 03 Ghế 24 tại ga Đà Nẵng (dừng 10 phút).
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <CombinedJourneyMap
+                legs={combinedLegs}
+                totalPrice={combinedTotal}
+                emptyHint="Chọn một phương án ghép chặng ở cột bên phải để xem sơ đồ hành trình."
+              />
             ) : selectedSeats.length > 0 ? (
               <div className="max-h-[430px] overflow-auto custom-scrollbar rounded-2xl border-2 border-slate-300 bg-slate-50 p-4">
                 {isSleeper ? (
@@ -708,32 +545,20 @@ export function BookingScreen() {
               Tìm kiếm hành trình
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
-              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); setCombinedLegs([]); }} />
+              <SearchableStationSelect label="Ga đi" options={allStations} value={origin} onChange={(value) => { setOrigin(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); }} />
+              <SearchableStationSelect label="Ga đến" align="right" options={destinationStations} value={destination} onChange={(value) => { setDestination(value); setSelectedTripId(null); setPickedSeats([]); setIsCombinedMode(false); }} />
             </div>
             <div className="space-y-1">
               <DateField label="Ngày đi" value={departureDate} onChange={setDepartureDate} dates={bookingOptions?.departure_dates ?? []} loading={loadingOptions} />
             </div>
             <div className="pt-2">
-              {isCombinedMode ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCombinedMode(false);
-                    setPickedSeats([]);
-                    setCombinedLegs([]);
-                  }}
-                  className="w-full py-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-extrabold text-[10.5px] rounded-lg transition-all cursor-pointer border border-outline-variant/35"
-                >
-                  ✕ Hủy chế độ vé ghép AI
-                </button>
-              ) : (
+              {isCombinedMode ? null : (
                 <button
                   type="button"
                   onClick={triggerCombinedMode}
                   className="w-full py-1.5 bg-primary hover:bg-primary/95 text-white font-extrabold text-[10.5px] rounded-lg transition-all shadow-sm cursor-pointer"
                 >
-                  💡 Đề xuất vé ghép chặng AI
+                  💡 Tìm vé ghép chặng
                 </button>
               )}
             </div>
@@ -748,39 +573,13 @@ export function BookingScreen() {
               <SummaryRow label="Hành trình" value={`${origin} - ${destination}`} />
               <SummaryRow label="Chuyến tàu" value={selectedPlan?.train_code ?? "Chưa chọn"} />
               {isCombinedMode ? (
-                <>
-                  <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2.5 text-[11px] font-semibold text-slate-700">
-                    <span className="text-[10px] text-purple-700 font-black uppercase block tracking-wider">Hành trình chặng ghép AI</span>
-                    {combinedLegs.map((legItem, idx) => (
-                      <div key={idx} className="border-b border-purple-100/50 pb-1.5 last:border-0 last:pb-0 space-y-0.5">
-                        <p className="font-black text-xs text-on-surface">{legItem.leg} ({legItem.time})</p>
-                        <p className="text-on-surface-variant font-semibold">Toa: Toa 02 • Vị trí: <span className="text-purple-700 font-extrabold">{legItem.seatNo}</span></p>
-                        {legItem.note && <p className="text-[9.5px] text-amber-700 font-bold italic mt-0.5">{legItem.note}</p>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between items-end pt-2">
-                    <span className="text-on-surface-variant font-bold">Tổng tiền ghép</span>
-                    <span className="text-lg font-black text-primary font-mono">{moneyFormatter.format(850000)}</span>
-                  </div>
-                  <Button
-                    className="w-full py-2.5 bg-primary"
-                    disabled={booking}
-                    onClick={async () => {
-                      setBooking(true);
-                      setTimeout(() => {
-                        setConfirmed([
-                          { booking_id: 101, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 101, seat_no: isSleeper ? "Giường 03 (T2 A)" : "Ghế 12", coach_no: "02" },
-                          { booking_id: 102, booking_code: "SE3-COMBINED", status: "confirmed", seat_id: 102, seat_no: isSleeper ? "Giường 05 (T3 A)" : "Ghế 18", coach_no: "02" }
-                        ]);
-                        setPaidPrice(850000);
-                        setBooking(false);
-                      }, 1000);
-                    }}
-                  >
-                    {booking ? "Đang đặt vé ghép..." : "Xác nhận & Đặt vé ghép chặng"}
-                  </Button>
-                </>
+                <CombinedBookingPanel
+                  combined={combined}
+                  origin={origin}
+                  destination={destination}
+                  serviceDate={departureDate}
+                  onExit={exitCombinedMode}
+                />
               ) : (
                 <>
                   <SummaryRow label="Toa" value={selectedCoachNo || "Chưa chọn"} />
