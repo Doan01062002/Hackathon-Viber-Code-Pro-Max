@@ -111,6 +111,57 @@ Tra cứu nhóm vé. Trả 404 nếu không tồn tại.
 
 Xác nhận nhóm vé đang giữ. Trả 400 nếu đã quá `expires_at`.
 
+Nguyên tử: `get_db` commit một lần ở cuối request và rollback khi có exception
+(`backend/src/backend/database.py:27`), nên nếu một chặng hỏng thì cả nhóm rollback —
+không có chuyện đặt thành công một phần.
+
+### POST /booking/combined/{group_code}/cancel
+
+Hủy toàn bộ nhóm. Mỗi chặng được chuyển sang `cancelled`, tồn kho chặng cộng lại,
+và `gap_combinations` bật lại để thuật toán ghép chặng tái sử dụng.
+
+Trả về tiền hoàn từng chặng kèm bậc áp dụng. Trả 400 nếu nhóm đã `cancelled`/`refunded`.
+
+### POST /booking/combined/{group_code}/legs/{sequence_no}/refund
+
+Hoàn một chặng. Các chặng còn lại giữ nguyên hiệu lực và nhóm vẫn `confirmed`;
+nhóm chỉ đóng khi không còn chặng nào hiệu lực.
+
+### Chính sách hoàn tiền
+
+Định nghĩa ở `backend/src/backend/services/refund_policy.py`, tính theo giờ khởi hành
+của **từng chặng** (chặng cuối hành trình dài có thể còn xa giờ chạy trong khi chặng
+đầu đã sát giờ).
+
+| Thời điểm hủy | Hoàn |
+|---|---|
+| Trước giờ chạy > 24h | 90% |
+| Trước giờ chạy 4–24h | 70% |
+| Trước giờ chạy < 4h | 50% |
+| Sau giờ chạy | 0% |
+
+Vé mới giữ chỗ chưa thanh toán thì hủy không phát sinh hoàn.
+
+PRD không quy định các con số này — chúng là giá trị tạm theo thông lệ đường sắt VN,
+sửa ở `REFUND_TIERS` khi có quyết định chính thức.
+
+### Tự động giải phóng chỗ quá hạn
+
+`backend/src/backend/services/expiry_task.py` chạy vòng lặp asyncio gọi
+`release_expired_bookings` mỗi 60 giây, khởi động cùng app qua lifespan.
+
+| Config | Mặc định | Ý nghĩa |
+|---|---|---|
+| `RELEASE_EXPIRED_ENABLED` | `true` | Tắt trong test và môi trường serverless |
+| `RELEASE_EXPIRED_INTERVAL_SECONDS` | `60` | 10–3600 |
+
+Service đồng bộ nên vòng lặp gọi qua `asyncio.to_thread` để không chặn event loop.
+Lỗi DB một chu kỳ được log và bỏ qua, vòng lặp không chết.
+
+Trên Vercel (serverless, mỗi request một tiến trình) vòng lặp nền không sống đủ lâu —
+đặt `RELEASE_EXPIRED_ENABLED=false` và dùng cron gọi
+`POST /api/v1/booking/release-expired`.
+
 ## 3. Luồng frontend
 
 ```
@@ -129,23 +180,29 @@ cộng `expired` và lỗi. Logic thuần nằm ở `combinedState.ts`, có test
 Sau khi xác nhận, chuyển tới `/ticket-details?groupCode=...`.
 Trang chi tiết phân biệt `?code=` (vé thường) và `?groupCode=` (vé ghép).
 
-## 4. Vấn đề đã biết
+## 4. Ghi chú kiểm thử
 
-**`combined-options` trả về phương án mà `POST /booking/combined` từ chối.**
+### Đã chạy thật trên RDS (2026-07-19)
 
-Trên dữ liệu RDS hiện tại, `DAN → SGO` ngày `2024-01-02` trả 10 phương án, nhưng cả 10
-đều bị từ chối khi giữ chỗ:
+Luồng đầy đủ `tìm → giữ chỗ → xác nhận → chi tiết → hủy` chạy thông với nhóm 3 chặng
+`Da Nang → Quang Ngai → Nha Trang → Sai Gon`. Sau khi hủy: cả 3 vé `cancelled`,
+`gap_combinations` đã bật lại, `demand_forecasts` giữ nguyên 48.312 dòng.
 
-```
-400 Sản phẩm OD (ID 344) đã vượt quá hạn ngạch (quota) tối đa là 0 vé
-```
+### Lỗi quota đã sửa
 
-`search_options` không lọc theo `quotas.quota`, nên nó chào những phương án không thể
-đặt được. Có 104 quota đang active bằng 0.
+Trước đó `combined-options` trả về phương án mà `POST /booking/combined` từ chối bằng
+`400 ... đã vượt quá hạn ngạch (quota) tối đa là 0 vé`, vì truy vấn tìm kiếm không lọc
+theo `quotas`. Đã thêm điều kiện soi đúng luật của `BookingService.create_hold`
+(lấy dòng quota active mới nhất, so với số vé `held`/`confirmed`; không có dòng quota
+nghĩa là không giới hạn). Đây là thứ chặn toàn bộ luồng đặt vé gộp.
 
-Cách sửa: thêm điều kiện `quota > 0` vào truy vấn trong
-`backend/src/backend/services/combined_booking_service.py`. Thuộc phạm vi backend
-(sub-project B), chưa làm trong đợt này.
+### Chưa kiểm chứng được
 
-Frontend đã xử lý đúng lỗi này: `HOLD_FAILURE` đưa user về danh sách phương án kèm
-thông báo, danh sách không bị mất.
+**Bậc hoàn tiền chưa chạy với số tiền khác 0.** Toàn bộ `service_date` trong seed data
+là năm 2024, tức đã quá giờ chạy, nên mọi lần hủy đều rơi vào bậc "không hoàn". Các mốc
+90/70/50% chỉ được phủ bởi unit test (`tests/test_refund_policy.py`), chưa quan sát
+end-to-end. Muốn kiểm thật thì cần seed một chuyến có `service_date` ở tương lai.
+
+**Test backend có DB chưa chạy được ở máy dev.** Docker không chạy nên không có
+Postgres local. `test_refund_policy.py` và `test_expiry_task.py` là logic thuần nên
+chạy được (16 test pass); các test còn lại cần CI hoặc `docker compose up db`.

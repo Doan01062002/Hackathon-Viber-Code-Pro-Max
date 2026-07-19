@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
+    # Tự động giải phóng chỗ giữ quá hạn.
+    # Tắt trong test và trong môi trường serverless (mỗi request một tiến trình,
+    # vòng lặp nền không sống đủ lâu để có tác dụng) — ở đó dùng cron gọi
+    # POST /api/v1/booking/release-expired thay thế.
+    release_expired_enabled: bool = True
+    release_expired_interval_seconds: int = Field(default=60, ge=10, le=3600)
+
 
 @lru_cache
 def get_settings() -> Settings:
