@@ -14,7 +14,13 @@ async def test_vong_lap_goi_runner_lap_lai():
         return 2
 
     task = asyncio.create_task(expiry_task._loop(0.01, runner))
-    await asyncio.sleep(0.05)
+    
+    # Chờ tối đa 1 giây cho đến khi len(calls) >= 2
+    for _ in range(100):
+        if len(calls) >= 2:
+            break
+        await asyncio.sleep(0.01)
+
     await expiry_task.stop_expiry_task(task)
 
     assert len(calls) >= 2
@@ -32,7 +38,13 @@ async def test_loi_db_khong_giet_vong_lap():
         return 0
 
     task = asyncio.create_task(expiry_task._loop(0.01, runner))
-    await asyncio.sleep(0.06)
+    
+    # Chờ tối đa 1 giây cho đến khi len(calls) >= 2
+    for _ in range(100):
+        if len(calls) >= 2:
+            break
+        await asyncio.sleep(0.01)
+
     still_running = not task.done()
     await expiry_task.stop_expiry_task(task)
 
