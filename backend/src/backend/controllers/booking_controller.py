@@ -192,8 +192,6 @@ async def refund_combined_booking_leg(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Loi he thong: {exc}") from exc
-
-
 @router.post("/booking", response_model=BookingResponse, status_code=201)
 async def create_booking_hold_standard(
     request: BookingCreateRequest,

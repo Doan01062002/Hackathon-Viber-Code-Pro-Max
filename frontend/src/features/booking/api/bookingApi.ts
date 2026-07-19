@@ -10,13 +10,6 @@ import type {
   BookingSeatPlan,
 } from "@/features/booking/types";
 
-export function getBookingDetail(
-  bookingCode: string,
-  signal?: AbortSignal,
-): Promise<BookingDetail> {
-  return apiClient.get<BookingDetail>(`/api/v1/booking/code/${encodeURIComponent(bookingCode)}`, { signal });
-}
-
 export function getBookingOptions(
   origin: string,
   destination?: string,
@@ -62,4 +55,11 @@ export function confirmBooking(
   signal?: AbortSignal,
 ): Promise<BookingConfirmResponse> {
   return apiClient.post<BookingConfirmResponse>(`/api/v1/booking/${bookingId}/confirm`, {}, { signal });
+}
+
+export function getBookingDetail(
+  bookingCode: string,
+  signal?: AbortSignal,
+): Promise<BookingDetail> {
+  return apiClient.get<BookingDetail>(`/api/v1/booking/code/${encodeURIComponent(bookingCode)}`, { signal });
 }

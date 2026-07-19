@@ -269,11 +269,9 @@ class BookingService:
         row = db.execute(
             text("""
                 SELECT
-                    booking.id AS booking_id, booking.booking_code, booking.od_product_id,
-                    booking.status, booking.channel,
+                    booking.id AS booking_id, booking.booking_code, booking.status,
                     booking.booked_price, booking.booked_at, booking.expires_at,
-                    od.trip_id, train.code AS train_code, train.name AS train_name,
-                    trip.status AS trip_status, trip.service_date,
+                    od.trip_id, train.code AS train_code, trip.service_date,
                     (SELECT MIN(segment.departure_at)
                      FROM od_product_segments mapping
                      JOIN segments segment ON segment.id = mapping.segment_id
@@ -284,41 +282,21 @@ class BookingService:
                      WHERE mapping.od_product_id = od.id) AS arrival_at,
                     origin.code AS origin_code, origin.name AS origin_name,
                     destination.code AS destination_code, destination.name AS destination_name,
-                    od.seat_type, seat_type.name AS seat_type_name,
-                    od.fare_class, od.distance_km,
-                    seat.coach_no, seat.seat_no
+                    od.seat_type, seat.coach_no, seat.seat_no
                 FROM bookings booking
                 JOIN od_products od ON od.id = booking.od_product_id
                 JOIN trips trip ON trip.id = od.trip_id
                 JOIN trains train ON train.id = trip.train_id
                 JOIN stations origin ON origin.id = od.origin_station_id
                 JOIN stations destination ON destination.id = od.destination_station_id
-                JOIN seat_types seat_type ON seat_type.code = od.seat_type
                 LEFT JOIN seats seat ON seat.id = booking.seat_id
                 WHERE UPPER(booking.booking_code) = UPPER(:booking_code)
             """),
             {"booking_code": booking_code.strip()},
         ).mappings().first()
         if not row:
-            raise ValueError(f"Không tìm thấy booking {booking_code}")
-
-        segment_rows = db.execute(
-            text("""
-                SELECT
-                    segment.id AS segment_id, segment.sequence_no,
-                    origin.code AS origin_code, origin.name AS origin_name,
-                    destination.code AS destination_code, destination.name AS destination_name,
-                    segment.departure_at, segment.arrival_at, segment.distance_km
-                FROM od_product_segments mapping
-                JOIN segments segment ON segment.id = mapping.segment_id
-                JOIN stations origin ON origin.id = segment.origin_station_id
-                JOIN stations destination ON destination.id = segment.destination_station_id
-                WHERE mapping.od_product_id = :od_product_id
-                ORDER BY segment.sequence_no
-            """),
-            {"od_product_id": row["od_product_id"]},
-        ).mappings().all()
-        return BookingDetailResponse(**row, segments=segment_rows)
+            raise ValueError(f"Khong tim thay booking {booking_code}")
+        return BookingDetailResponse(**row)
 
     @staticmethod
     def _lock_requested_seat(
@@ -520,27 +498,7 @@ class BookingService:
             expires_at=expires_at_str,
         )
 
-    def confirm_booking(
-        self,
-        booking_id: int,
-        db: Session,
-        allow_group: bool = False,
-    ) -> BookingConfirmResponse:
-        if not allow_group:
-            group_code = db.execute(
-                text("""
-                    SELECT booking_group.group_code
-                    FROM booking_group_items item
-                    JOIN booking_groups booking_group ON booking_group.id = item.booking_group_id
-                    WHERE item.booking_id = :booking_id
-                """),
-                {"booking_id": booking_id},
-            ).scalar_one_or_none()
-            if group_code:
-                raise ValueError(
-                    f"Booking belongs to group {group_code}; confirm the whole group instead"
-                )
-
+    def confirm_booking(self, booking_id: int, db: Session) -> BookingConfirmResponse:
         # 1. Truy vấn booking
         booking_row = db.execute(
             text("SELECT od_product_id, status, expires_at, booking_code FROM bookings WHERE id = :booking_id"),
@@ -693,39 +651,5 @@ class BookingService:
                 db.execute(update_inventory_query, {"seg_id": seg_id, "seat_type": seat_type})
 
             released_count += 1
-
-        db.execute(
-            text("""
-                UPDATE gap_combinations gap
-                SET is_active = TRUE
-                FROM booking_group_items item
-                JOIN booking_groups booking_group ON booking_group.id = item.booking_group_id
-                WHERE item.gap_combination_id = gap.id
-                  AND booking_group.status = 'held'
-                  AND booking_group.expires_at < CURRENT_TIMESTAMP
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM booking_group_items active_item
-                      JOIN bookings active_booking ON active_booking.id = active_item.booking_id
-                      WHERE active_item.booking_group_id = booking_group.id
-                        AND active_booking.status IN ('held', 'confirmed')
-                  )
-            """)
-        )
-        db.execute(
-            text("""
-                UPDATE booking_groups
-                SET status = 'cancelled'
-                WHERE status = 'held'
-                  AND expires_at < CURRENT_TIMESTAMP
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM booking_group_items item
-                      JOIN bookings booking ON booking.id = item.booking_id
-                      WHERE item.booking_group_id = booking_groups.id
-                        AND booking.status IN ('held', 'confirmed')
-                  )
-            """)
-        )
 
         return released_count

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { SearchableStationSelect } from "@/components/ui/SearchableStationSelect";
@@ -598,14 +597,7 @@ export function BookingScreen() {
               {confirmed.length > 0 ? (
                 <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-green-800 space-y-1">
                   <p className="font-black">Đã đặt {confirmed.length} vé trong phiên này</p>
-                  {confirmed.map((item) => (
-                    <div key={item.booking_id} className="flex items-center justify-between gap-2">
-                      <p className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghế {item.seat_no}</p>
-                      <Link href={`/ticket-details?code=${encodeURIComponent(item.booking_code)}`} className="shrink-0 font-bold text-primary hover:underline">
-                        Xem vé
-                      </Link>
-                    </div>
-                  ))}
+                  {confirmed.map((item) => <p key={item.booking_id} className="font-mono">{item.booking_code} · Toa {item.coach_no} · Ghế {item.seat_no}</p>)}
                   <p className="border-t border-green-200 pt-1 font-bold">Tổng đã thanh toán: {moneyFormatter.format(paidPrice)}</p>
                 </div>
               ) : null}

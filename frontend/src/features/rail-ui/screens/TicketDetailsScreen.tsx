@@ -144,13 +144,14 @@ export function TicketDetailsScreen() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-outline-variant bg-white p-6 shadow-sm">
-        <h2 className="flex items-center gap-2 text-xl font-black text-on-surface">
-          <span className="material-symbols-outlined text-2xl text-primary">confirmation_number</span>
-          Tra cứu vé và hành trình
+      {/* Header */}
+      <div className="bg-white border border-outline-variant rounded-2xl p-6 shadow-sm">
+        <h2 className="text-xl font-black text-on-surface flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary text-2xl">confirmation_number</span>
+          Tra Cứu Vé & Chi Tiết Hành Trình
         </h2>
-        <p className="mt-1 text-xs font-medium text-on-surface-variant">
-          Dữ liệu vé, lịch chạy và chỗ ngồi được lấy trực tiếp từ hệ thống đặt vé.
+        <p className="text-xs text-on-surface-variant font-medium mt-1">
+          Nhập mã đặt vé của bạn để kiểm tra chi tiết chỗ ngồi, vé chặng ghép (nếu có) và hướng dẫn di chuyển giữa các chặng.
         </p>
       </div>
 
@@ -297,42 +298,6 @@ function TicketCard({ ticket }: { ticket: BookingDetail }) {
             </div>
           </div>
         </div>
-
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <SectionTitle icon="route">Lịch trình chi tiết</SectionTitle>
-            <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase ${status.className}`}>{status.label}</span>
-          </div>
-          <div className="mt-4 space-y-0">
-            {ticket.segments.map((segment, index) => (
-              <div key={segment.segment_id} className="grid grid-cols-[1.5rem_1fr] gap-3">
-                <div className="flex flex-col items-center">
-                  <span className="mt-1 h-3 w-3 rounded-full border-2 border-primary bg-white" />
-                  {index < ticket.segments.length - 1 ? <span className="min-h-12 w-px flex-1 bg-primary/25" /> : null}
-                </div>
-                <div className="pb-5">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-xs font-black text-on-surface">
-                      {segment.origin_name} → {segment.destination_name}
-                    </p>
-                    <span className="text-[10px] font-bold text-on-surface-variant">{segment.distance_km.toLocaleString("vi-VN")} km</span>
-                  </div>
-                  <p className="mt-1 text-[10px] font-semibold text-on-surface-variant">
-                    {formatDateTime(segment.departure_at)} → {formatDateTime(segment.arrival_at)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-dashed border-outline-variant pt-5">
-          <div className="text-[10px] font-semibold text-on-surface-variant">
-            <p>ID đặt vé: #{ticket.booking_id} · ID chuyến: #{ticket.trip_id}</p>
-            {ticket.status === "held" && ticket.expires_at ? <p>Giữ chỗ đến: {formatDateTime(ticket.expires_at)}</p> : null}
-          </div>
-          <span className="font-mono text-xs font-black tracking-widest text-primary">{ticket.booking_code}</span>
-        </footer>
       </div>
     </article>
   );
